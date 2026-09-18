@@ -1,0 +1,10 @@
+Runtime-test preflight; this is not an emulator execution log.
+2026-09-17T19:15:04Z
+Linux x86_64
+java: /usr/bin/java
+kotlinc: /root/.sdkman/candidates/kotlin/current/bin/kotlinc
+adb: emulator: sdkmanager: avdmanager: gradle: /dev/kvm absent (software emulation was not ruled out solely for this reason)
+Attempting official emulator download headers:
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0curl: (6) Could not resolve host: dl.google.com

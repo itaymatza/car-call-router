@@ -1,0 +1,63 @@
+PASS idle never requests
+PASS fresh active call requests immediately
+PASS disabled auto stays passive
+PASS ringing cannot trigger a route
+PASS unknown projection waits for callback
+PASS disconnected projection blocks
+PASS no BMW device means no request
+PASS device arriving inside window triggers
+PASS device arriving after deadline does not trigger
+PASS unsafe emergency call blocked
+PASS two calls blocked
+PASS target already selected needs no request
+PASS request is not verification
+PASS BMW callback verifies
+PASS only one request in flight
+PASS known competitor retry after timeout
+PASS unknown competitor never gets blind retry
+PASS known head unit reassertion bounded
+PASS early known competitor bounce throttled
+PASS speaker override respected
+PASS handset override respected
+PASS Buds override respected
+PASS wired override respected
+PASS new alternative during pending request respected
+PASS unknown change after BMW is not fought
+PASS projection loss cancels guard
+PASS BMW disconnect cancels guard
+PASS hold cancels guard permanently
+PASS call waiting cancels guard
+PASS startup window releases control
+PASS user pause permanently stops this session
+PASS manual test bypasses auto and projection only
+PASS manual test still blocks emergency
+PASS manual test still requires BMW
+PASS manual success releases immediately
+PASS request exception prevents retries
+PASS new session resets pause and counters
+PASS manual one-shot cannot bypass Telecom authorization
+PASS authorization revocation prevents startup retry
+PASS authorization restoration does not undo session suspension
+PASS speaker event cannot be erased by later queued car event
+PASS Buds event cannot be erased while waiting for projection
+PASS unknown initial route may acquire ordinary handset baseline
+PASS streaming override is respected
+PASS override while projection is pending: SPEAKER
+PASS override while projection is pending: HANDSET
+PASS override while projection is pending: OTHER_BLUETOOTH
+PASS override while projection is pending: WIRED
+PASS override while BMW availability is pending: SPEAKER
+PASS override while BMW availability is pending: HANDSET
+PASS override while BMW availability is pending: OTHER_BLUETOOTH
+PASS override while BMW availability is pending: WIRED
+PASS ordinary SIM call accepted
+PASS network emergency rejected
+PASS emergency callback mode rejected
+PASS emergency number rejected
+PASS unavailable emergency API rejected
+PASS hidden caller number rejected
+PASS unknown SIM capability rejected
+PASS VoIP account rejected
+PASS external or self-managed call rejected
+PASS conference rejected
+62/62 passed

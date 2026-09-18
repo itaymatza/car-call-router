@@ -1,0 +1,46 @@
+name: Build and verify one APK
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install SDK packages
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"'
+      - name: Compile, unit-test and lint
+        run: bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
+      - name: Verify APK signature and alignment
+        run: |
+          set -euo pipefail
+          mkdir -p verified-apk
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" | tee verified-apk/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$apk" > verified-apk/alignment.txt
+          cp "$apk" verified-apk/CarCallRouter.apk
+          (cd verified-apk && sha256sum CarCallRouter.apk > SHA256SUMS.txt)
+      - name: Upload successfully verified APK only
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarCallRouter-APK
+          path: verified-apk/CarCallRouter.apk
+          if-no-files-found: error
+      - name: Upload diagnostics separately
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarCallRouter-build-reports
+          path: |
+            app/build/reports/
+            verified-apk/*.txt
+          if-no-files-found: warn

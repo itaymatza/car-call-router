@@ -1,0 +1,15 @@
+Car Call Router 0.2.0 — third-party notices
+
+Kotlin standard library 1.9.0
+Copyright 2010-2023 JetBrains s.r.o. and Kotlin Programming Language contributors.
+Licensed under the Apache License, Version 2.0 (included in this directory).
+https://github.com/JetBrains/kotlin
+
+Car-connection provider protocol adaptation (ProjectionMonitor.kt)
+Copyright 2021 The Android Open Source Project.
+Licensed under the Apache License, Version 2.0.
+Adapted from AndroidX CarConnection / CarConnectionTypeLiveData. Modifications:
+Kotlin lifecycle wrapper; cursor closing; generation-aware callbacks; fail-closed handling.
+https://github.com/androidx/androidx/tree/androidx-main/car/app/app/src/main/java/androidx/car/app/connection
+
+Build tools and the Android SDK stub library are not included in this application.

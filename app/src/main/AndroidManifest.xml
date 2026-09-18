@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+    <uses-feature android:name="android.hardware.telephony" android:required="true" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- getPhoneAccount requires this to classify a call as SIM-backed. -->
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+    <!-- Provisioned explicitly via AppOps, NOT pm grant or a runtime dialog. -->
+    <uses-permission android:name="android.permission.MANAGE_ONGOING_CALLS"
+        tools:ignore="ProtectedPermissions" />
+    <queries>
+        <package android:name="com.google.android.projection.gearhead" />
+        <provider android:authorities="androidx.car.app.connection" />
+    </queries>
+    <application
+        android:name=".RouterApplication"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:label="Car Call Router"
+        android:icon="@drawable/ic_router"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity android:name=".ui.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".telecom.RouterInCallService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="false" />
+            <meta-data android:name="android.telecom.IN_CALL_SERVICE_CAR_MODE_UI" android:value="false" />
+            <meta-data android:name="android.telecom.IN_CALL_SERVICE_RINGING" android:value="false" />
+            <meta-data android:name="android.telecom.INCLUDE_SELF_MANAGED_CALLS" android:value="false" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

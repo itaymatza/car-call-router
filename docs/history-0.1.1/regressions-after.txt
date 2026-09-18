@@ -1,0 +1,4 @@
+PASS override while waiting: SPEAKER; requested=false
+PASS override while waiting: HANDSET; requested=false
+PASS override while waiting: OTHER_BLUETOOTH; requested=false
+PASS override while waiting: WIRED; requested=false
