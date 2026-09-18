@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible defect without personal or device-identifying data.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a defect. Do not include phone numbers, real Bluetooth addresses, pairing records, credentials, exported logs, screenshots with personal data, or recordings. Use the private security-reporting path for security, privacy, or safety vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Source commit or application version
+      description: Provide a public commit SHA, tag, or version string.
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+      description: State the Android API level or release name.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use synthetic names such as “target device” and “competing device.”
+      placeholder: |
+        1. Configure a target device.
+        2. Start an ordinary non-emergency test call while parked.
+        3. Observe the routing state.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: This report contains no credentials, personal call data, real hardware identifiers, or exported diagnostics.
+          required: true

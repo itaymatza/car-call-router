@@ -34,6 +34,10 @@ The app is deliberately configuration-driven at runtime. Before enabling automat
 
 See [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
 
+## Project documentation
+
+Read the [architecture reference](docs/ARCHITECTURE.md) for the component boundaries and routing state machine. The [public-release guide](docs/PUBLIC_RELEASE.md) explains what remains visible in a public repository and how to review a change before pushing it. Contributors should follow [CONTRIBUTING.md](CONTRIBUTING.md); suspected security, privacy, or safety vulnerabilities belong in the private reporting path described by [SECURITY.md](SECURITY.md), not a public issue.
+
 ## Safety model and limitations
 
 The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. It makes at most three automatic requests in a four-second startup window, observes route changes, and stops on safety-relevant events, possible user overrides, authorization loss, projection loss, target loss, call hold, a second call, or a routing exception. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.

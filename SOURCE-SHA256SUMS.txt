@@ -1,7 +1,11 @@
-af237f77dc6b3cea30726829c17d6ee770cb93e5cf1c5ff7b356822210574df2  ./.github/workflows/build.yml
+942488f863a3b2a02dc07d74b9070e78c28cd4f63faa1afe0206abebae622849  ./.github/ISSUE_TEMPLATE/bug_report.yml
+e9c9b284355d257bce3e616d131e4eb705edc814c32de700b821dcf45254cbb7  ./.github/pull_request_template.md
+0f1fb97dccd78afd724b41ef2e4e836b8f3fcb26a9f4a45c607bf5c88eee96a0  ./.github/workflows/build.yml
 7a648629c5296732d4d0a48054ef0600383e49d165b18382f80c52c0a758d1e7  ./.gitignore
+354cadb3261f654502b730eaf7c1f2478e2279dbfe842c376db737230c9059ba  ./CONTRIBUTING.md
 8ae5647c2653ddce6c3ab583077c0c3d275fb934ec0818a20c994a91a301c081  ./LICENSE
-6eb403b6168eb415ec14dc7c07a968632f37ef404616029384180e21ac7189e2  ./README.md
+1cc5433dacef1c7fd63ea06961bc1d810f106f4a05b0da6e1365913aeabe0e30  ./README.md
+8d18cadb5a2d25ffd2c1df6c144e7a8eb69da4e3862b86c5f096b7e44b4e91a7  ./SECURITY.md
 deaa502f07e5d26cabad9c0eba7761f31e6619020b29f87205bac9a6529b5be7  ./app/build.gradle.kts
 9864829c95a1f8a3669780ca981c3ebeb2d1e19d737db5712161dfe8b7cf74db  ./app/src/main/AndroidManifest.xml
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  ./app/src/main/assets/LICENSE-Apache-2.0.txt
@@ -27,7 +31,9 @@ da136fdf72da27c539959215e1fc79bb26fe72fec2e4383d9d5a18a4f1b5064a  ./app/src/main
 48eba1e7dc6f784722cba2785299cad3b2c588414ec905613d71e97bcbf54fac  ./app/src/test/java/org/carcallrouter/companion/core/PolicyCases.kt
 3aaff6f1e2d499cefc14cdcd6b7e4a7f11e9b9a1f4bcde45596ca4f2544b20d2  ./app/src/test/java/org/carcallrouter/companion/core/PolicyTest.kt
 5b59a737f79aff3069b158e3716c6c89df8d01d1f43a9b369058d20e564f4dce  ./build.gradle.kts
-3065b24d4bddbb28f169b1db84803f8851189cd138c9627507eeff2961210f9c  ./docs/CONFIGURATION.md
+048bd40b91bddc48d60c37c9e366c0e6a2340332098abd0eb22fb26e6878fa11  ./docs/ARCHITECTURE.md
+be4cd2ddb279ff96fef8e8254f7e83c1b29b1ea1788c316e4833ddbce8ff8bb9  ./docs/CONFIGURATION.md
+6e792255c3f5543ed9b00b2216aec3c23d46823ae7a9ae57014317870b2f02ad  ./docs/PUBLIC_RELEASE.md
 8861d445ff6815001a5a4fd5a7aa3a18d3f244981890c6a5c1680017e28d78ff  ./docs/SAFETY.md
 3cf03e4e0a4319a7601c5b88e49eeedd7d502428bc8210ce6095542ebb04d81b  ./docs/TESTING.md
 fa078c27c9e4bde28a029d673875b028884505efa436b68cf60e1ac0be5b679b  ./gradle.properties

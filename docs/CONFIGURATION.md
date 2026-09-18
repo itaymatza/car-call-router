@@ -28,6 +28,12 @@ At runtime, a person configuring a test device chooses the target Bluetooth call
 
 The master automation toggle is disabled by default. It cannot be enabled until the target is selected, the required runtime permissions are granted, and the operating system reports that the protected ongoing-call authorization is present. A manual one-shot is available only while Telecom has bound the service, and it retains all authorization, call-safety, and target-identity requirements.
 
+The permissions button is an explicit user action. Before distributing a customized build, make sure its user-facing explanation clearly states why it requests Bluetooth connection and phone-number access, and that a denial leaves routing disabled rather than blocking the rest of the application. Android recommends requesting runtime permissions in the context of the action that needs them and degrading gracefully when they are denied. [1]
+
 ## Projection integration
 
 Automatic mode uses the AndroidX car-app host-provider protocol as an optional projection-state gate. The monitor deliberately avoids inferring projection state from Bluetooth names, Wi-Fi networks, package process state, or broadcast extras. A missing, unknown, or lost projection state prevents new automatic route requests. The manual one-shot has an explicit projection-gate bypass for parked testing only.
+
+## References
+
+[1]: https://developer.android.com/training/permissions/requesting "Android Developers: Request runtime permissions"
