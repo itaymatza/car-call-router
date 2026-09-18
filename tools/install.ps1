@@ -1,7 +1,8 @@
-param([string]$Serial, [string]$Adb, [switch]$SkipBuild)
+param([string]$Serial, [string]$Adb, [string]$ApplicationId = $env:APP_APPLICATION_ID, [switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path $PSScriptRoot -Parent
-$Package = 'com.itaymatza.carcallrouter'
+if (-not $ApplicationId) { $ApplicationId = 'org.carcallrouter.companion' }
+$SourceActivity = 'org.carcallrouter.companion.ui.MainActivity'
 if (-not $env:ANDROID_HOME -and $env:LOCALAPPDATA) {
     $Candidate = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
     if (Test-Path $Candidate) { $env:ANDROID_HOME = $Candidate }
@@ -17,7 +18,7 @@ if (-not $SkipBuild) {
     if (-not $env:ANDROID_HOME -and -not (Test-Path (Join-Path $Root 'local.properties'))) {
         throw 'Android SDK not configured. Open this project in Android Studio and install SDK Platform 36 and Build-Tools 35.0.0.'
     }
-    & (Join-Path $Root 'gradlew.bat') ':app:assembleDebug' ':app:testDebugUnitTest' ':app:lintDebug' '--console=plain'
+    & (Join-Path $Root 'gradlew.bat') "-PAPP_APPLICATION_ID=$ApplicationId" ':app:assembleDebug' ':app:testDebugUnitTest' ':app:lintDebug' '--console=plain'
     if ($LASTEXITCODE -ne 0) { throw 'Build or verification failed. Nothing was installed.' }
 }
 $Apk = Join-Path $Root 'app\build\outputs\apk\debug\app-debug.apk'
@@ -38,8 +39,8 @@ function Invoke-Adb {
 $UserId = (Invoke-Adb -Command @('shell', 'am', 'get-current-user') | Out-String).Trim()
 if ($UserId -notmatch '^\d+$') { throw 'Cannot determine current Android user' }
 Invoke-Adb -Command @('install', '--user', $UserId, '-r', $Apk)
-Invoke-Adb -Command @('shell', 'cmd', 'appops', 'set', '--user', $UserId, '--uid', $Package, 'MANAGE_ONGOING_CALLS', 'allow')
-Invoke-Adb -Command @('shell', 'cmd', 'appops', 'get', '--user', $UserId, $Package, 'MANAGE_ONGOING_CALLS')
-Invoke-Adb -Command @('shell', 'am', 'start', '--user', $UserId, '-n', "$Package/.ui.MainActivity")
-Write-Host 'Installed and requested Telecom authorization. In the app: grant permissions, select BMW, test Route now while parked, then enable automation.'
-Write-Host 'Keep Samsung Phone as the default dialer. The app status must show Telecom authorization: true.'
+Invoke-Adb -Command @('shell', 'cmd', 'appops', 'set', '--user', $UserId, '--uid', $ApplicationId, 'MANAGE_ONGOING_CALLS', 'allow')
+Invoke-Adb -Command @('shell', 'cmd', 'appops', 'get', '--user', $UserId, $ApplicationId, 'MANAGE_ONGOING_CALLS')
+Invoke-Adb -Command @('shell', 'am', 'start', '--user', $UserId, '-n', "$ApplicationId/$SourceActivity")
+Write-Host 'Installed and requested Telecom authorization. In the app: grant permissions, select a target device, test Route now while parked, then enable automation.'
+Write-Host 'The selected system dialer remains in control. The app status must show Telecom authorization: true.'

@@ -1,7 +1,7 @@
-import com.itaymatza.carcallrouter.core.RoutingPolicy
-import com.itaymatza.carcallrouter.core.RoutingPolicy.Route
-import com.itaymatza.carcallrouter.core.RoutingPolicy.Phase
-import com.itaymatza.carcallrouter.core.RoutingPolicy.Snapshot
+import org.carcallrouter.companion.core.RoutingPolicy
+import org.carcallrouter.companion.core.RoutingPolicy.Route
+import org.carcallrouter.companion.core.RoutingPolicy.Phase
+import org.carcallrouter.companion.core.RoutingPolicy.Snapshot
 import kotlin.random.Random
 fun main() {
     val random = Random(20260917)
@@ -10,7 +10,7 @@ fun main() {
     var requests = 0
     repeat(5000) {
         val manual = random.nextInt(5) == 0
-        val initial = if (random.nextBoolean()) Route.COMPETING_CAR else Route.values().random(random)
+        val initial = if (random.nextBoolean()) Route.COMPETING_DEVICE else Route.values().random(random)
         val p = RoutingPolicy()
         p.begin(0, initial, manual)
         var now = 0L
@@ -18,7 +18,7 @@ fun main() {
         repeat(50) {
             now += random.nextInt(0, 181)
             val route = when (random.nextInt(10)) {
-                in 0..4 -> Route.COMPETING_CAR
+                in 0..4 -> Route.COMPETING_DEVICE
                 in 5..7 -> Route.TARGET
                 else -> Route.values().random(random)
             }

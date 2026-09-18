@@ -4,10 +4,16 @@ local.properties
 **/build/
 *.iml
 *.apk
+*.aab
 *.jks
 *.keystore
 *.p12
+*.pfx
+*.pem
+.env
+.env.*
 captures/
 .tools/
+verification/current/
 verification/service-tests/*.jar
 verification/service-tests/*.log

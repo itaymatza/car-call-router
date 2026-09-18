@@ -1,2 +1,0 @@
-PASS 5000 seeded policy traces, 250000 evaluated transitions, 3786 permitted requests
-Seed: 20260917; these are pure Kotlin policy checks, not Android or Bluetooth tests.

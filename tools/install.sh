@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PACKAGE=com.itaymatza.carcallrouter
+PACKAGE="${APP_APPLICATION_ID:-org.carcallrouter.companion}"
+SOURCE_ACTIVITY='org.carcallrouter.companion.ui.MainActivity'
 if [[ -z "${ANDROID_HOME:-}" ]]; then
     for dir in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
         if [[ -d "$dir" ]]; then export ANDROID_HOME="$dir"; break; fi
@@ -10,7 +11,7 @@ fi
 ADB="${ADB:-${ANDROID_HOME:+$ANDROID_HOME/platform-tools/adb}}"
 ADB="${ADB:-adb}"
 SERIAL="${1:-}"
-[[ "${SKIP_BUILD:-0}" == 1 ]] || bash "$ROOT/gradlew" :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
+[[ "${SKIP_BUILD:-0}" == 1 ]] || bash "$ROOT/gradlew" "-PAPP_APPLICATION_ID=$PACKAGE" :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
 [[ -f "$APK" ]] || { echo "Missing APK: $APK" >&2; exit 1; }
 if [[ -z "$SERIAL" ]]; then
@@ -25,5 +26,5 @@ USER_ID="$(run_adb shell am get-current-user | tr -d '\r\n')"
 run_adb install --user "$USER_ID" -r "$APK"
 run_adb shell cmd appops set --user "$USER_ID" --uid "$PACKAGE" MANAGE_ONGOING_CALLS allow
 run_adb shell cmd appops get --user "$USER_ID" "$PACKAGE" MANAGE_ONGOING_CALLS
-run_adb shell am start --user "$USER_ID" -n "$PACKAGE/.ui.MainActivity"
-echo 'Grant runtime permissions, select BMW, test Route now while parked, then enable automation.'
+run_adb shell am start --user "$USER_ID" -n "$PACKAGE/$SOURCE_ACTIVITY"
+echo 'Grant runtime permissions, select a target device, test Route now while parked, then enable automation.'

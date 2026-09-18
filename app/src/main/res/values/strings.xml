@@ -1,17 +1,17 @@
 <resources>
-    <string name="app_name">Car Call Router</string>
-    <string name="tagline">BMW handles calls. Android Auto stays connected.</string>
-    <string name="validation">Device-validation build • Test while parked</string>
-    <string name="master">Auto-route calls to BMW</string>
-    <string name="setup_title">1. Set up</string>
+    <string name="app_name">Call Route Companion</string>
+    <string name="tagline">User-configured call routing with a bounded safety policy.</string>
+    <string name="validation">Reference build • Test only while parked</string>
+    <string name="master">Automatically request the target call route</string>
+    <string name="setup_title">1. Configure</string>
     <string name="permissions">Allow Bluetooth and phone-account access</string>
-    <string name="target">Choose BMW call device</string>
-    <string name="competitor">Choose competing head-unit device (optional)</string>
-    <string name="competitor_help">Only this explicitly selected device may be overridden again during the 4-second startup window. Leave unset for a single initial attempt.</string>
+    <string name="target">Choose target Bluetooth call device</string>
+    <string name="competitor">Choose explicitly competing device (optional)</string>
+    <string name="competitor_help">Only this explicitly selected device may receive a bounded reassertion during the 4-second startup window. Leave unset for a single initial attempt.</string>
     <string name="copy_adb">Copy one-time ADB authorization command</string>
     <string name="adb_help">Requires MANAGE_ONGOING_CALLS authorization through ADB. No root, accessibility, default-dialer replacement, or always-on foreground service is used.</string>
     <string name="test_title">2. Test an active cellular call</string>
-    <string name="test_help">First leave automation off. While parked, make a normal call, leave it on the bad route, and press Route now. This performs one request and bypasses only the Android Auto detection gate. Emergency and device-identity checks still apply.</string>
+    <string name="test_help">First leave automation off. While parked, make an ordinary non-emergency call, leave it on the initial route, and press Route now. This performs one request and bypasses only the projection-state gate. Emergency and device-identity checks still apply.</string>
     <string name="route_now">Route now — one-shot test</string>
     <string name="pause">Pause for this call</string>
     <string name="status_title">Live status</string>

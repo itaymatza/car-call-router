@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source_root="$(cd "${1:-../..}" && pwd)"
-base="$source_root/app/src/main/java/com/itaymatza/carcallrouter"
+base="$source_root/app/src/main/java/org/carcallrouter/companion"
 build="$(mktemp -d)"
 trap 'rm -rf "$build"' EXIT
 kotlinc -nowarn -jvm-target 17 stubs/*.kt ServiceTests.kt \

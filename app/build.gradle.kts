@@ -2,16 +2,27 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
+    .orElse("org.carcallrouter.companion")
+val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
+    .map { it.toInt() }
+    .getOrElse(1)
+val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
+    .orElse("0.1.0")
+
 android {
-    namespace = "com.itaymatza.carcallrouter"
+    namespace = "org.carcallrouter.companion"
     compileSdk = 36
+
     defaultConfig {
-        applicationId = "com.itaymatza.carcallrouter"
+        applicationId = configuredApplicationId.get()
         minSdk = 34
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.2.1-device-test"
+        versionCode = configuredVersionCode
+        versionName = configuredVersionName.get()
     }
+
     buildFeatures { buildConfig = true }
     buildTypes {
         release {
@@ -25,6 +36,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
     lint { abortOnError = true }
 }
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
 }

@@ -1,90 +1,57 @@
-# Car Call Router
+# Call Route Companion
 
-**0.2.1-device-test source candidate. No 0.2.1 APK has been built or installed.**
+**A generic Android 14+ reference implementation for a safety-bounded, user-configured call-audio route request.**
 
-Android 14+ companion app intended to route a newly active cellular call to an
-explicitly selected native BMW Bluetooth device while Android Auto remains
-connected. Samsung Phone remains the default dialer. The recovered application
-uses Kotlin with a framework/XML UI, not Jetpack Compose.
+Call Route Companion is a Kotlin and framework-XML Android companion application. When an eligible cellular call makes a fresh transition to `ACTIVE`, it can request Telecom to route call audio to a **locally selected paired Bluetooth device**. The optional projection-state gate is based on the AndroidX host-provider protocol, rather than a particular hardware ecosystem, handset, dialer, or projection product.
 
-## Current status (2026-09-18)
+> This repository contains source code, deterministic tests, and a build workflow. It does **not** include device configurations, Bluetooth addresses, signing materials, APKs, exported logs, or a claim of real-device behavior.
 
-The corrected production source was recovered from the previous project archive.
-It contains the callback-latching fix documented in `docs/REVERIFICATION.md`.
-The application source itself is unchanged from that corrected candidate; this
-revision changes version metadata, fixes the standalone service-test launcher,
-adds `tools/test-all.sh`, and includes freshly executed test evidence.
+## Public-repository posture
 
-- 62/62 pure Kotlin policy cases passed.
-- 37/37 production-service scenarios with Android framework doubles passed.
-- 5,000 seeded policy traces / 250,000 evaluated transitions passed.
-- Android build, lint, installation, actual Telecom admission and physical
-  Samsung/BMW/Android Auto behavior are **not verified** for this candidate.
+The tracked tree contains no real target-device settings. Device names and Bluetooth addresses are selected at runtime and stored only in the application’s private local preferences. Generated APKs, IDE configuration, local SDK configuration, test logs, captures, and conventional key/certificate files are excluded by `.gitignore`. GitHub Actions compiles, unit-tests, and lints the source but does not upload an APK or diagnostic artifact.
 
-The old 0.2.0 APK is deliberately not included: it does not contain the later
-callback-latching correction. Historical documents under `docs/` describe earlier
-operations, not a build or hardware validation of 0.2.1.
+A public repository still exposes its files, commit history, issue/discussion content, and workflow logs. Do not commit exported logs, screenshots, pairing records, keystores, certificates, API keys, or private test notes. If the repository should not be forked, copied, or associated with its GitHub owner, use a private repository and consider a separately planned history rewrite.
 
-## GitHub publication
+## Configuration
 
-Two actual upload attempts to `itaymatza/car-call-router` failed with HTTP 403,
-`Resource not accessible by integration`, on 2026-09-18: the contents API and Git
-Trees API. The repository was not changed and no GitHub Actions job was started.
-The presence of account-level push/admin metadata did not establish working
-write access through that connection. See `verification/current/upload-attempts.json`.
+### Build-time identity
 
-## Reproduce the checks
+The source namespace is the generic value `org.carcallrouter.companion`. Override the installed application ID and version metadata through Gradle properties without changing source:
 
-With JDK 17+ and `kotlinc` installed, from the repository root:
+```sh
+bash gradlew \
+  -PAPP_APPLICATION_ID=example.callroute \
+  -PAPP_VERSION_CODE=1 \
+  -PAPP_VERSION_NAME=0.1.0 \
+  :app:assembleDebug
+```
+
+`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `1`; and `APP_VERSION_NAME` defaults to `0.1.0`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
+
+### Runtime configuration
+
+The app is deliberately configuration-driven at runtime. Before enabling automation, grant the requested runtime permissions, obtain the protected Telecom authorization on the test device, select a paired target Bluetooth call device, and optionally select the only competing device that may receive a bounded reassertion. The UI does not contain a built-in device name, address, car brand, phone brand, or dialer requirement.
+
+See [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
+
+## Safety model and limitations
+
+The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. It makes at most three automatic requests in a four-second startup window, observes route changes, and stops on safety-relevant events, possible user overrides, authorization loss, projection loss, target loss, call hold, a second call, or a routing exception. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.
+
+The Android compatibility boundary uses the deprecated `Telecom.requestBluetoothAudio(BluetoothDevice)` API because current public `CallEndpoint` APIs do not expose a stable Bluetooth hardware address for deterministic target matching. This is a reference implementation, not a guarantee of acceptance by every Android build, dialer, Bluetooth stack, vehicle, or headset.
+
+> Configure and test only while parked. Do not rely on this project for emergency, safety-critical, or hands-free compliance use cases.
+
+## Verification
+
+With a JDK 17+ and Kotlin compiler installed:
 
 ```sh
 bash tools/test-all.sh
 ```
 
-The service harness uses deterministic Android doubles. It is not an emulator,
-APK installation or Bluetooth test. The script fails if any suite fails and
-writes fresh raw logs to `verification/current/`.
+The deterministic host-JVM suites exercise the pure policy and production-service code against framework doubles. They are not Android emulator, APK installation, Telecom admission, Bluetooth, microphone, or vehicle tests. The GitHub Actions workflow additionally builds, tests, and lints Android source with an Android SDK.
 
-## Android build
+## License
 
-Open this root directory in Android Studio, or use the retained checksum-pinned
-Gradle launcher with an Android SDK installed:
-
-```sh
-bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
-```
-
-The included `.github/workflows/build.yml` has not been executed for this source.
-A successful build is not proof of phone installation or hardware routing.
-
-## Activation is not install-only
-
-This architecture needs runtime permission approval, explicit selection of the
-BMW Bluetooth device, and protected Telecom authorization in addition to APK
-installation. It cannot grant itself the latter on an unmodified phone.
-
-From an already authorized ADB shell, the existing provision command is:
-
-```sh
-cmd appops set --uid com.itaymatza.carcallrouter MANAGE_ONGOING_CALLS allow
-```
-
-That command is not a claim that Samsung will admit the service on every build.
-Only actual device evidence can establish admission. Configure and test while
-parked, not while driving. No root, accessibility service, replacement dialer,
-Bluetooth disconnection, A2DP modification, call recording or internet upload is
-performed by this app.
-
-## Routing implementation and limits
-
-The recovered implementation selects an address-identified supported device via
-Telecom's deprecated `requestBluetoothAudio(BluetoothDevice)` API and observes
-both audio-state and endpoint callbacks. It is **not** a completed implementation
-of the previously discussed endpoint-request-only design. It makes a bounded
-startup attempt, with at most three requests in a four-second window, and stops
-on safety-relevant callbacks and possible manual overrides. It fails closed for
-emergency, unknown, non-SIM and multi-call cases.
-
-Preserve these distinctions when describing or extending this code. Consult
-`docs/REVERIFICATION.md` and `docs/ORIGINAL-README-0.2.0.md` for prior analysis.
-Never commit signing keys, credentials or personal call logs to the public repo.
+Licensed under the [MIT License](LICENSE).

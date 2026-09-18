@@ -21,7 +21,7 @@ public final class SignVerify {
    new ApkSigner.Builder(List.of(cfg)).setInputApk(new File(args[3])).setOutputApk(apk)
     .setMinSdkVersion(34).setV1SigningEnabled(false).setV2SigningEnabled(true)
     .setV3SigningEnabled(true).setV4SigningEnabled(false).setAlignmentPreserved(true)
-    .setDebuggableApkPermitted(false).setCreatedBy("CarCallRouter-AOSP-apksig").build().sign();
+    .setDebuggableApkPermitted(false).setCreatedBy("CallRouteCompanion-AOSP-apksig").build().sign();
    Arrays.fill(pass,'\0');
   } else { apk = new File(args[1]); }
   var result = new ApkVerifier.Builder(apk).setMinCheckedPlatformVersion(34).build().verify();

@@ -1,4 +1,4 @@
-import com.itaymatza.carcallrouter.core.PolicyCases
+import org.carcallrouter.companion.core.PolicyCases
 fun main() {
     var failed = 0
     PolicyCases.cases().forEach { (name, body) ->

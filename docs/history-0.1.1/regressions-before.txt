@@ -1,7 +1,0 @@
-FAIL override while waiting: SPEAKER; requested=true
-FAIL override while waiting: HANDSET; requested=true
-FAIL override while waiting: OTHER_BLUETOOTH; requested=true
-FAIL override while waiting: WIRED; requested=true
-Exception in thread "main" java.lang.IllegalStateException: 4 pending-override regressions
-	at RegressionBeforeKt.main(RegressionBefore.kt:15)
-	at RegressionBeforeKt.main(RegressionBefore.kt)
