@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Extract Android-independent routing, safety, endpoint identity, and trace behavior into a
+  dedicated pure-JVM `:core` module shared by the app and service harness.
+- Replace the ad-hoc core `kotlinc` launchers with Gradle/JUnit tests and an enforced 90% branch-
+  coverage gate.
+- Add explicit slow-SCO, head-unit-reclaim, intermediate-handset, projection-unknown, connection-
+  order scenarios, plus JSONL regression-trace replay.
+
 ## 0.3.0-beta.3
 
 - Add a privacy-safe parked-device capture harness that records only new structured routing traces,

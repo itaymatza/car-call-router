@@ -28,7 +28,7 @@ jobs:
           bash -n tools/*.sh verification/service-tests/run.sh
           pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "tools/install.ps1"), [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
       - name: Compile, unit-test, service-test and lint
-        run: bash gradlew :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
+        run: bash gradlew :core:check :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
       - name: Verify APK signature and manifest identity
         env:
           REPORT_FILE: verification/current/apk-verification.txt

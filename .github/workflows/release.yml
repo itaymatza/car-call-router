@@ -51,6 +51,7 @@ jobs:
         run: >-
           bash gradlew
           -PENABLE_BETA_SIGNING=true
+          :core:check
           :app:testDebugUnitTest
           :verification:service-tests:run
           :app:lintRelease

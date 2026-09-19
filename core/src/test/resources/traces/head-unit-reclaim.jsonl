@@ -1,0 +1,4 @@
+{"now":0,"projection":true,"targetHfpConnected":true,"targetAvailable":true,"endpointRevision":1,"route":"COMPETING_DEVICE"}
+{"now":100,"projection":true,"targetHfpConnected":true,"targetAvailable":true,"endpointRevision":1,"route":"TARGET"}
+{"now":3000,"projection":true,"targetHfpConnected":true,"targetAvailable":true,"endpointRevision":2,"route":"COMPETING_DEVICE"}
+{"now":3100,"projection":true,"targetHfpConnected":true,"targetAvailable":true,"endpointRevision":2,"route":"TARGET"}
