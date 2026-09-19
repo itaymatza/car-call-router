@@ -43,7 +43,7 @@ bash gradlew \
 ### Runtime configuration
 
 
-The app is deliberately configuration-driven at runtime. Before enabling automation, grant the requested runtime permissions, obtain the protected Telecom authorization on the test device, select a paired target Bluetooth call device, and optionally select the only competing device that may receive a bounded reassertion. The UI does not contain a built-in device name, address, car brand, phone brand, or dialer requirement.
+The app is deliberately configuration-driven at runtime. Before enabling automation, grant the requested runtime permissions, select a paired target Bluetooth call device, and use **Authorize call routing**. The app then opens Android's one-time companion-device approval for that exact Bluetooth address and verifies whether Telecom access was granted. If the device does not grant access through that supported flow, the app displays the existing local-ADB command as a fallback. You may also select the only competing device that may receive a bounded reassertion. The UI does not contain a built-in device name, address, car brand, phone brand, or dialer requirement.
 
 
 See [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
@@ -61,7 +61,17 @@ Each successful GitHub Actions run publishes the generated debug APK as a build 
 
 If Android reports that the package cannot be updated or is incompatible with the installed version, uninstall the existing build first and retry. Uninstalling clears the app's local configuration.
 
-> This is a debug/test build for Android 14+. Installation does not grant the protected Telecom authorization or complete the required [runtime configuration](docs/CONFIGURATION.md).
+> This is a debug/test build for Android 14+. Installation alone does not grant protected Telecom access. Open the app and complete the one-time authorization flow below.
+
+### Authorize call routing in the app
+
+1. Pair the intended car or headset in Android's Bluetooth settings and keep it nearby and powered on.
+2. Open Call Route Companion and select **Allow permissions**.
+3. Select **Choose Bluetooth device**, then choose the intended call device.
+4. Select **Authorize call routing** and approve the exact device in Android's system dialog.
+5. Wait for the app to report **Authorization complete**. If the phone does not grant Telecom access through the association, use the ADB fallback shown by the app.
+
+Android deliberately owns the confirmation dialog; the app cannot approve it on your behalf. Companion-device association records an app-to-device relationship but does not pair or connect Bluetooth by itself. See the full [configuration guidance](docs/CONFIGURATION.md) for limitations and fallback instructions.
 
 ## Project documentation
 
