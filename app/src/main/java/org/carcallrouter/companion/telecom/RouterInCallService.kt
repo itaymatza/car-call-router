@@ -16,10 +16,12 @@ import org.carcallrouter.companion.RouterLog
 import org.carcallrouter.companion.RouterSettings
 import org.carcallrouter.companion.SessionBridge
 import org.carcallrouter.companion.core.RoutingPolicy
+import org.carcallrouter.companion.core.RoutingTrace
 import java.io.FileDescriptor
 import java.io.PrintWriter
 import java.lang.ref.WeakReference
 import java.util.IdentityHashMap
+import java.util.UUID
 
 /** Telecom-bound non-UI companion; never claims the dialer role or manipulates media profiles. */
 class RouterInCallService : InCallService(), SessionBridge.Control {
@@ -29,6 +31,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private lateinit var classifier: CellularClassifier
     private lateinit var projectionMonitor: ProjectionMonitor
     private lateinit var hfp: HfpMonitor
+    private lateinit var trace: RoutingTrace
     private var projection: Boolean? = null
     private var sequence = 0
     private var disposed = false
@@ -36,6 +39,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private var sessionStarted = false
     private var lastPublished = ""
     private var manualSession = false
+    private var lastTracePolicy: Pair<RoutingPolicy.Phase, RoutingPolicy.ReasonCode>? = null
     private var lastSafety = "No calls"
     private var manualCooldownUntil = 0L
     private data class Record(val id: Int, val callback: Call.Callback, var sawPreActive: Boolean, var lastState: Int)
@@ -47,7 +51,11 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private val evaluateEvent = Runnable { evaluate() }
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != "last_bound" && sessionStarted) {
-            policy.suspend("Settings changed during a call; automatic routing paused for this session")
+            policy.suspend(
+                "Settings changed during a call; automatic routing paused for this session",
+                RoutingPolicy.ReasonCode.SETTINGS_CHANGED
+            )
+            trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
             queueEvaluation()
         }
     }
@@ -62,8 +70,14 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         policy = RoutingPolicy()
         sessionStarted = false
         manualSession = false
+        lastTracePolicy = null
         projection = null
         lastPublished = ""
+        trace = RoutingTrace(
+            now = SystemClock::elapsedRealtime,
+            newSessionId = { UUID.randomUUID().toString().replace("-", "").take(12) },
+            emit = { RouterLog.event("ROUTING_TRACE", it) }
+        )
         settings = RouterSettings(this)
         router = AddressedTelecomRouter(this)
         classifier = CellularClassifier(this)
@@ -71,14 +85,20 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
             val address = settings.targetAddress?.uppercase()
             if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
-                suspendSessionFromEvent("target Bluetooth HFP disappeared; this session stays paused")
+                suspendSessionFromEvent(
+                    "target Bluetooth HFP disappeared; this session stays paused",
+                    RoutingPolicy.ReasonCode.TARGET_HFP_DISCONNECTED
+                )
             }
             queueEvaluation()
         }
         projectionMonitor = ProjectionMonitor(this) { value ->
             projection = value
             if (!manualSession && guardHasActed() && value == false) {
-                suspendSessionFromEvent("Projection disconnected; this session stays paused")
+                suspendSessionFromEvent(
+                    "Projection disconnected; this session stays paused",
+                    RoutingPolicy.ReasonCode.PROJECTION_DISCONNECTED
+                )
             }
             queueEvaluation()
         }
@@ -104,7 +124,10 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             override fun onDetailsChanged(call: Call, details: Call.Details) { handleState(call, details.state) }
             override fun onChildrenChanged(call: Call, children: MutableList<Call>) {
                 if (children.isNotEmpty()) {
-                    suspendSessionFromEvent("Conference children observed; system retains routing")
+                    suspendSessionFromEvent(
+                        "Conference children observed; system retains routing",
+                        RoutingPolicy.ReasonCode.CONFERENCE_OBSERVED
+                    )
                 }
                 queueEvaluation()
             }
@@ -114,14 +137,22 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         records[call] = record
         if (records.size > 1) {
             // Do not let rapid call removal erase the fact that the session was ambiguous.
-            suspendSessionFromEvent("Another call observed; system retains routing for this session")
+            suspendSessionFromEvent(
+                "Another call observed; system retains routing for this session",
+                RoutingPolicy.ReasonCode.MULTIPLE_CALLS
+            )
         }
         call.registerCallback(callback, handler)
         RouterLog.event("CALL_ADDED", "call=$id; state=${stateName(state)}; preActiveObserved=${record.sawPreActive}")
         if (!sessionStarted && state == Call.STATE_ACTIVE) {
             // No observed transition: may be process recovery or binding to an old call.
             sessionStarted = true
-            policy.suspend("Already-active call on service bind; automatic takeover suppressed")
+            trace.begin("automatic", "already_active_bind")
+            policy.suspend(
+                "Already-active call on service bind; automatic takeover suppressed",
+                RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND
+            )
+            trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
         }
         queueEvaluation()
     }
@@ -132,7 +163,10 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         record.lastState = state
         if (sessionStarted && state != Call.STATE_ACTIVE) {
             // Use the callback state, not call.details which can already contain a later state.
-            suspendSessionFromEvent("Observed ${stateName(state)}; no reassertion on resume")
+            suspendSessionFromEvent(
+                "Observed ${stateName(state)}; no reassertion on resume",
+                RoutingPolicy.ReasonCode.CALL_NOT_ACTIVE
+            )
         }
         if (isPreActive(state)) record.sawPreActive = true
         if (state != previous) RouterLog.event("CALL_STATE", "call=${record.id}; ${stateName(previous)} -> ${stateName(state)}")
@@ -140,9 +174,18 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             sessionStarted = true
             manualSession = false
             if (record.sawPreActive && previous != Call.STATE_HOLDING) {
+                trace.begin("automatic", "fresh_active_transition")
                 policy.begin(SystemClock.elapsedRealtime(), currentRoute())
+                trace.event("ACTIVE_TRANSITION", "call" to record.id, "initial_route" to currentRoute())
                 RouterLog.event("SESSION_START", "call=${record.id}; detected ACTIVE transition; target=${RouterLog.deviceId(settings.targetAddress)}")
-            } else policy.suspend("No fresh answered/connected transition observed")
+            } else {
+                trace.begin("automatic", "active_without_fresh_transition")
+                policy.suspend(
+                    "No fresh answered/connected transition observed",
+                    RoutingPolicy.ReasonCode.NO_FRESH_ACTIVE_TRANSITION
+                )
+                trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
+            }
         }
         queueEvaluation()
     }
@@ -154,7 +197,10 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         }
         if (records.isEmpty()) {
             handler.removeCallbacks(tick)
+            trace.finish(policy.phase, policy.reasonCode, "call_removed")
+            router.clearSession()
             policy = RoutingPolicy()
+            lastTracePolicy = null
             sessionStarted = false
             manualSession = false
             manualCooldownUntil = 0L
@@ -170,6 +216,12 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         policy.observeRoute(currentRoute())
         // Device names may contain personal data, so log only type + a salted ID.
         RouterLog.event("ENDPOINT", "type=${callEndpoint.endpointType}; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}")
+        trace.event(
+            "ENDPOINT_CHANGED",
+            "type" to callEndpoint.endpointType,
+            "id" to RouterLog.deviceId(callEndpoint.identifier.toString()),
+            "route" to currentRoute()
+        )
         queueEvaluation()
     }
 
@@ -177,23 +229,38 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         super.onAvailableCallEndpointsChanged(availableEndpoints)
         router.updateAvailable(availableEndpoints)
         RouterLog.event("AVAILABLE_ENDPOINTS", availableEndpoints.joinToString { "type=${it.endpointType},id=${RouterLog.deviceId(it.identifier.toString())}" })
+        trace.event(
+            "ENDPOINT_SNAPSHOT",
+            "count" to availableEndpoints.size,
+            "bluetooth_count" to availableEndpoints.count { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+        )
         queueEvaluation()
     }
 
     /**
-     * Forward-compatible API 37 callback. Compiling against API 36 keeps the build on the latest
-     * stable SDK available to CI; Android 37 dispatches this same virtual method signature.
+     * API 37 virtual callback. The exact public signature is enforced by the service harness until
+     * the API 37 platform package is available to hosted sdkmanager builds.
      */
     @Suppress("unused")
     fun onCallEndpointRequested(callEndpoint: CallEndpoint) {
-        val own = router.isOwnPendingRequest(callEndpoint)
+        val own = router.consumeOwnRequest(callEndpoint)
         RouterLog.event(
             "ENDPOINT_REQUEST_OBSERVED",
             "type=${callEndpoint.endpointType}; ownPending=$own; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}"
         )
+        trace.event(
+            "ENDPOINT_REQUEST_OBSERVED",
+            "type" to callEndpoint.endpointType,
+            "id" to RouterLog.deviceId(callEndpoint.identifier.toString()),
+            "origin" to if (own) "self" else "external"
+        )
         if (sessionStarted && !own) {
-            suspendSessionFromEvent("Another in-call UI requested an endpoint; respecting possible user override")
+            suspendSessionFromEvent(
+                "Another in-call UI requested an endpoint; respecting possible user override",
+                RoutingPolicy.ReasonCode.EXTERNAL_ENDPOINT_REQUEST
+            )
         }
+        queueEvaluation()
     }
 
     private fun guardHasActed(): Boolean = sessionStarted &&
@@ -201,12 +268,14 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             RoutingPolicy.Phase.STABILIZING) && (policy.requests > 0 || policy.verified)
 
     /** Latch safety-relevant events before later callbacks can replace their state. */
-    private fun suspendSessionFromEvent(reason: String) {
+    private fun suspendSessionFromEvent(reason: String, code: RoutingPolicy.ReasonCode) {
         if (disposed) return
         sessionStarted = true
-        policy.suspend(reason)
+        trace.begin("automatic", "safety_event")
+        policy.suspend(reason, code)
         handler.removeCallbacks(tick)
         RouterLog.event("SESSION_PAUSED_EVENT", reason)
+        trace.event("SESSION_SUSPENDED", "reason" to code)
     }
 
     private fun queueEvaluation() {
@@ -288,28 +357,57 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             targetAvailable = endpointAvailable,
             route = currentRoute()
         ))
+        val policyState = policy.phase to policy.reasonCode
+        if (policyState != lastTracePolicy) {
+            lastTracePolicy = policyState
+            trace.event(
+                "POLICY_STATE",
+                "phase" to policy.phase,
+                "reason" to policy.reasonCode,
+                "attempts" to policy.requests
+            )
+        }
         if (decision.requestTarget && target.endpoint != null) {
             try {
                 RouterLog.event("ROUTE_REQUEST", "target=${RouterLog.deviceId(address)}; attempt=${policy.requests}; mode=${if (manualSession) "manual" else "auto"}; backend=Telecom.requestCallEndpointChange; basis=${target.basis}")
+                trace.event(
+                    "REQUEST_SUBMITTED",
+                    "attempt" to policy.requests,
+                    "mode" to if (manualSession) "manual" else "automatic",
+                    "basis" to target.basis,
+                    "target" to RouterLog.deviceId(address)
+                )
                 router.request(
                     target.endpoint,
                     accepted = {
                         RouterLog.event("ROUTE_ACCEPTED", "Telecom accepted the request; awaiting endpoint callback verification")
+                        trace.event("REQUEST_ACCEPTED", "attempt" to policy.requests)
                         queueEvaluation()
                     },
                     rejected = { error ->
                         policy.requestFailed()
                         RouterLog.event("ROUTE_REJECTED", "code=${error.code}")
+                        trace.event("REQUEST_REJECTED", "code" to error.code)
                         queueEvaluation()
                     }
                 )
             } catch (e: RuntimeException) {
                 policy.requestFailed()
                 RouterLog.event("ROUTE_ERROR", e.javaClass.simpleName)
+                trace.event("REQUEST_ERROR", "type" to e.javaClass.simpleName)
             }
         }
-        val sco = address != null && address in hfp.audioConnected
-        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\nSelected device: endpoint resolved=${target.endpoint != null}; HFP connected=${hfpConnected ?: "unknown"}; SCO=$sco\nEndpoint resolution: ${target.reason}\nRoute: ${currentRoute()}\nController: ${policy.phase}; attempts=${policy.requests}\n${policy.reason}"
+        val route = currentRoute()
+        val sco = when {
+            address == null -> false
+            !hfp.known -> null
+            else -> address in hfp.audioConnected
+        }
+        if (route == RoutingPolicy.Route.TARGET) {
+            trace.confirmTelecom()
+            if (sco == true) trace.confirmTargetHfpAudio()
+        }
+        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\nSelected device: endpoint resolved=${target.endpoint != null}; HFP connected=${hfpConnected ?: "unknown"}; SCO=${sco ?: "unknown"}\nEndpoint resolution: ${target.reason}\nRoute: $route\nController: ${policy.phase}; attempts=${policy.requests}; reason=${policy.reasonCode}\n${policy.reason}"
         if (state != lastPublished) {
             lastPublished = state
             RouterLog.event("STATUS", state.replace("\n", " | "))
@@ -329,6 +427,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         // This explicit one-shot bypasses only auto toggle/projection, NOT safety/identity checks.
         sessionStarted = true
         manualSession = true
+        trace.begin("manual", "route_now")
         policy.begin(now, currentRoute(), manualOneShot = true)
         manualCooldownUntil = now + 1_500
         RouterLog.event("MANUAL_TEST", "One request only; projection gate bypassed explicitly")
@@ -337,9 +436,11 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
 
     override fun pauseSession() {
         sessionStarted = true
-        policy.suspend("Paused by user for this call session")
+        trace.begin("manual", "pause")
+        policy.suspend("Paused by user for this call session", RoutingPolicy.ReasonCode.USER_PAUSED)
         handler.removeCallbacks(tick)
         RouterLog.event("USER_PAUSE", "No further requests this session; an already-submitted request cannot be recalled")
+        trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
         evaluate()
     }
 
@@ -352,6 +453,8 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private fun stopObservers() {
         if (disposed) return
         disposed = true
+        trace.finish(policy.phase, policy.reasonCode, "service_stopped")
+        router.clearSession()
         handler.removeCallbacksAndMessages(null)
         records.forEach { (call, record) -> call.unregisterCallback(record.callback) }
         records.clear()

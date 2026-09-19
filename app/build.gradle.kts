@@ -7,12 +7,14 @@ val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
     .orElse("org.carcallrouter.companion")
 val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
     .map { it.toInt() }
-    .getOrElse(3)
+    .getOrElse(4)
 val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
-    .orElse("0.3.0-beta.1")
+    .orElse("0.3.0-beta.2")
 
 android {
     namespace = "org.carcallrouter.companion"
+    // API 37 is not yet available from the hosted sdkmanager repository. The service declares and
+    // regression-tests its exact forward-compatible virtual signature while building on API 36.
     compileSdk = 36
 
     defaultConfig {

@@ -2,7 +2,7 @@
 
 ## Current classification
 
-`0.3.0-beta.1` is a production-hardening beta. The real-device proof of concept validates the core Telecom endpoint approach, but intermittent behavior means the project must not yet be described as production-ready.
+`0.3.0-beta.2` is a production-hardening beta. The real-device proof of concept validates the core Telecom endpoint approach, but intermittent behavior means the project must not yet be described as production-ready.
 
 ## Completed engineering gates
 
@@ -14,6 +14,9 @@
 - Temporary unknown projection/HFP evidence and transient endpoint-list gaps pause safely and can recover without a false disconnect or false user override.
 - Deterministic policy, randomized transition, and production-service callback suites run locally; the service suite is also wired into Gradle CI.
 - Diagnostics redact phone numbers, device names, and raw Bluetooth addresses.
+- The API 37 endpoint-request signature and both callback orders are regression-tested; final
+  dispatch validation remains a real Android 17 device gate until hosted API 37 SDK builds exist.
+- Structured evidence separates Telecom endpoint confirmation from exact target HFP audio/SCO confirmation.
 
 ## Release blockers
 

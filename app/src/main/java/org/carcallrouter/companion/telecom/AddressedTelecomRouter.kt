@@ -20,19 +20,19 @@ class AddressedTelecomRouter(private val service: InCallService) {
     private var available: List<CallEndpoint> = emptyList()
     private var availableSnapshotReceived = false
     private var current: CallEndpoint? = null
-    private var pendingRequestId: String? = null
+    // API 37 may report the request before or after the resulting endpoint change. Counts are
+    // consumed only by onCallEndpointRequested, never by onCallEndpointChanged.
+    private val ownRequestCounts = mutableMapOf<String, Int>()
 
     fun updateAvailable(endpoints: List<CallEndpoint>) {
         availableSnapshotReceived = true
         available = endpoints.toList()
         val ids = available.map { it.identifier.toString() }.toSet()
         if (current?.identifier?.toString() !in ids) current = null
-        if (pendingRequestId !in ids) pendingRequestId = null
     }
 
     fun updateCurrent(endpoint: CallEndpoint) {
         current = endpoint
-        if (pendingRequestId == endpoint.identifier.toString()) pendingRequestId = null
     }
 
     fun current(): CallEndpoint? {
@@ -73,8 +73,16 @@ class AddressedTelecomRouter(private val service: InCallService) {
     fun isCurrent(endpoint: CallEndpoint?): Boolean = endpoint != null &&
         current()?.identifier == endpoint.identifier
 
-    fun isOwnPendingRequest(endpoint: CallEndpoint): Boolean =
-        pendingRequestId == endpoint.identifier.toString()
+    fun consumeOwnRequest(endpoint: CallEndpoint): Boolean {
+        val id = endpoint.identifier.toString()
+        val count = ownRequestCounts[id] ?: return false
+        if (count == 1) ownRequestCounts.remove(id) else ownRequestCounts[id] = count - 1
+        return true
+    }
+
+    fun clearSession() {
+        ownRequestCounts.clear()
+    }
 
     fun request(
         endpoint: CallEndpoint,
@@ -84,17 +92,23 @@ class AddressedTelecomRouter(private val service: InCallService) {
         check(available.any { it.identifier == endpoint.identifier }) {
             "Endpoint is no longer in Telecom's current callback set"
         }
-        pendingRequestId = endpoint.identifier.toString()
-        service.requestCallEndpointChange(
-            endpoint,
-            service.mainExecutor,
-            object : OutcomeReceiver<Void?, CallEndpointException> {
-                override fun onResult(result: Void?) = accepted()
-                override fun onError(error: CallEndpointException) {
-                    pendingRequestId = null
-                    rejected(error)
+        val id = endpoint.identifier.toString()
+        ownRequestCounts[id] = (ownRequestCounts[id] ?: 0) + 1
+        try {
+            service.requestCallEndpointChange(
+                endpoint,
+                service.mainExecutor,
+                object : OutcomeReceiver<Void?, CallEndpointException> {
+                    override fun onResult(result: Void?) = accepted()
+                    // Keep the marker until the API 37 request callback is consumed. That callback
+                    // can be delivered after this result callback.
+                    override fun onError(error: CallEndpointException) = rejected(error)
                 }
-            }
-        )
+            )
+        } catch (error: RuntimeException) {
+            val count = ownRequestCounts[id] ?: 0
+            if (count <= 1) ownRequestCounts.remove(id) else ownRequestCounts[id] = count - 1
+            throw error
+        }
     }
 }

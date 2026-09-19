@@ -18,6 +18,7 @@ sourceSets {
             include("org/carcallrouter/companion/SessionBridge.kt")
             include("org/carcallrouter/companion/core/EndpointIdentity.kt")
             include("org/carcallrouter/companion/core/RoutingPolicy.kt")
+            include("org/carcallrouter/companion/core/RoutingTrace.kt")
             include("org/carcallrouter/companion/telecom/AddressedTelecomRouter.kt")
             include("org/carcallrouter/companion/telecom/RouterInCallService.kt")
         }
