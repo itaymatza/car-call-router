@@ -32,21 +32,38 @@ The permissions button is an explicit user action. Before distributing a customi
 
 ## Call-routing authorization
 
-Android exposes no runtime-permission dialog for this utility. `MANAGE_ONGOING_CALLS` is `signature|appop`; the documented companion route is for physical wearable devices, not arbitrary paired cars. The app therefore does not create a misleading car association or request the default-dialer role. [2][3]
+Android exposes no runtime-permission dialog for this utility. `MANAGE_ONGOING_CALLS` is `signature|appop`; the documented companion route is for physical wearable devices, not arbitrary paired cars. The app therefore does not create a misleading car association or request the default-dialer role. Samsung Phone can remain the default dialer. [2][3]
 
-After selecting a target, open **Set up one-time ADB authorization** and run the exact displayed command from a computer with Android Platform Tools:
-
-```sh
-adb shell cmd appops set --uid org.carcallrouter.companion MANAGE_ONGOING_CALLS allow
-```
-
-Use the actual configured application ID if the build overrides the default. Return to the app and tap **Verify**. The app advances only if `TelecomManager.hasManageOngoingCallsPermission()` returns true. Uninstall/reinstall, a changed application ID, AppOps reset, or some OS upgrades can require repeating the command. To revoke the grant:
+After selecting a target, open **Set up one-time ADB authorization**. Enable USB debugging, connect and unlock the phone, approve its debugging prompt, then list targets:
 
 ```sh
-adb shell cmd appops set --uid org.carcallrouter.companion MANAGE_ONGOING_CALLS default
+adb devices
 ```
 
-Older builds created inappropriate companion associations. The current build removes associations owned by this app once during migration; they are not used for readiness or routing.
+The physical phone must say `device`, not `unauthorized`. If an emulator or another target is also listed, select the phone serial explicitly:
+
+```sh
+adb -s PHONE_SERIAL shell cmd appops set --uid org.carcallrouter.companion MANAGE_ONGOING_CALLS allow
+adb -s PHONE_SERIAL shell cmd appops get --uid org.carcallrouter.companion MANAGE_ONGOING_CALLS
+```
+
+Use the actual configured application ID if the build overrides the default. The expected verification output includes:
+
+```text
+Uid mode: MANAGE_ONGOING_CALLS: allow
+```
+
+Return to the app and tap **Verify**. The app advances only if `TelecomManager.hasManageOngoingCallsPermission()` returns true. An older `AUTH_MISSING` diagnostic event remains historical; the current Technical status is authoritative.
+
+Uninstall/reinstall, a changed application ID, AppOps reset, or some OS upgrades can require repeating the command. To revoke the grant:
+
+```sh
+adb -s PHONE_SERIAL shell cmd appops set --uid org.carcallrouter.companion MANAGE_ONGOING_CALLS default
+```
+
+An on-device ADB client can run the same `cmd appops` operation after Wireless debugging pairing, without the leading `adb shell`. This remains an external developer authorization step: stock Android does not provide an API that lets the app grant the protected AppOp to itself.
+
+Older builds created inappropriate companion associations. The current build removes associations owned by this app once during migration; they are not used for readiness or routing. See [AUTHORIZATION.md](AUTHORIZATION.md) for complete troubleshooting and lifecycle details.
 
 ## Projection integration
 

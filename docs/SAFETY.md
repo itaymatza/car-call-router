@@ -12,6 +12,12 @@ A fresh automatic session has a four-second startup window, waits at least 300 m
 
 Safety-relevant callback edges are latched before deferred evaluation. Therefore, projection loss, target loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session.
 
+## Authorization safety
+
+Run the ADB AppOps command only for the exact installed application ID. Verify that Android reports `MANAGE_ONGOING_CALLS: allow`, then disable USB debugging and Wireless debugging when setup is complete. Do not leave an unknown computer authorized for debugging. The grant can be revoked as documented in [AUTHORIZATION.md](AUTHORIZATION.md).
+
+A generic Bluetooth or Companion Device Manager association is not equivalent to this authorization, and the app must not report it as successful Telecom access.
+
 ## Public-source hygiene
 
 Bluetooth addresses and device names can be personal data in context. Keep real settings local; do not commit exported settings, diagnostic logs, screenshots, issue attachments, or test output that identifies people or hardware. Do not commit signing keys, certificates, credentials, or APKs. Generated content and common sensitive file types are ignored, but review staged changes before every push.

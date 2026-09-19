@@ -52,7 +52,7 @@ The app is configuration-driven at runtime. Grant the requested runtime permissi
 The selected architecture is therefore a non-UI `InCallService` with a one-time ADB AppOps grant. The app checks `TelecomManager.hasManageOngoingCallsPermission()` and never treats a command, button tap, or service declaration as proof of authorization.
 
 
-See [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
+See the exact [authorization and troubleshooting guide](docs/AUTHORIZATION.md), [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
 
 
 ## Download and install the APK
@@ -77,7 +77,7 @@ If Android reports that the package cannot be updated or is incompatible with th
 4. Select **Set up one-time ADB authorization** and follow the displayed steps.
 5. Return to the app and tap **Verify**. Continue only after the status says authorization is detected.
 
-See the full [configuration guidance](docs/CONFIGURATION.md), [research decision](docs/PLATFORM-RESEARCH.md), and [parked-car test procedure](docs/TESTING.md).
+See the exact [authorization and troubleshooting guide](docs/AUTHORIZATION.md), [configuration guidance](docs/CONFIGURATION.md), [research decision](docs/PLATFORM-RESEARCH.md), and [parked-car test procedure](docs/TESTING.md).
 
 ## Project documentation
 
