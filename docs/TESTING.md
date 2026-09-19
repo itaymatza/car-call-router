@@ -25,7 +25,8 @@ The repository workflow runs that command on pushes and pull requests with read-
 The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so
 callback-order and lifecycle regressions cannot be skipped merely because a machine lacks a
 standalone `kotlinc` command. CI verifies that `SOURCE-SHA256SUMS.txt` is current and contains one
-entry per tracked source/documentation file.
+entry per tracked source/documentation file. It also runs the standard-library-only device trace
+analyzer tests.
 
 ## Verify device authorization
 
@@ -39,6 +40,46 @@ adb -s PHONE_SERIAL shell cmd appops get --uid org.carcallrouter.companion MANAG
 The required result includes `MANAGE_ONGOING_CALLS: allow`. Refresh the app's Diagnostics and confirm the current status reports runtime permissions and Telecom authorization as true. Historical `AUTH_MISSING` events may remain after a successful grant and do not override the current status.
 
 `Last Telecom binding: Never observed` is normal before the first eligible call. It becomes a useful failure signal only if it remains unchanged during an authorized normal test call.
+
+## Capture one parked device run
+
+From macOS or Linux with `adb` and Python 3 available, connect the authorized phone and run:
+
+```sh
+bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing
+```
+
+Supported scenarios are `incoming`, `outgoing`, `override`, `hold-resume`, `reconnect`, and
+`other`. Omit `--serial` only when exactly one authorized ADB device is connected. If the build
+uses a custom application ID, also pass `--package YOUR_APPLICATION_ID`.
+
+The script verifies that the package is installed and `MANAGE_ONGOING_CALLS` is allowed. It takes
+a baseline, prompts for one parked non-emergency call, then captures only new, structured
+`ROUTING_TRACE` records. It never starts a call, clears logcat, runs broad `dumpsys` collection, or
+stores the ADB serial, phone number, Bluetooth name, or raw Bluetooth address.
+
+Each local, Git-ignored directory under `verification/device-runs/` contains:
+
+| File | Contents |
+|---|---|
+| `device.txt` | Scenario, UTC capture time, phone model, Android API, app version, and authorization state. |
+| `trace.log` | Only new schema-1 structured routing records; prior sessions are removed. |
+| `report.txt` / `report.json` | Per-session status, confirmations, latencies, finish reason, and anomalies. |
+| `observations.txt` | Parked human checks for native HFP speaker/microphone and preserved Android Auto behavior. |
+| `verdict.txt` | `PASS` only when every new session has complete trace evidence and every required observation is `yes`. |
+
+Review all artifacts before sharing them. They are designed to be privacy-safe, but device model
+and timing can still be identifying context. To analyze a previously exported app log without ADB:
+
+```sh
+python3 tools/analyze_device_trace.py exported-log.txt
+python3 tools/analyze_device_trace.py exported-log.txt --format json
+```
+
+The analyzer reports malformed records, unsupported schemas, sequence gaps, time regressions,
+missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom
+endpoint is `INCOMPLETE`; a session cannot be `PASS` without a finish and exact target HFP audio
+confirmation.
 
 ## Current device evidence
 
@@ -55,7 +96,7 @@ On 2026-09-19, the project owner confirmed the proof of concept on the intended 
 7. Confirm the app reports the target endpoint as verified. Speak and listen through the intended device; ask the helper which microphone is heard.
 8. Confirm navigation/media remains active on Android Auto.
 9. Manually select speaker in the Phone UI. Confirm the app respects that override and does not switch back.
-10. End the call, export the redacted diagnostic log if the route failed, and inspect it before sharing. Only after the one-shot test succeeds should automatic mode be enabled.
+10. End the call and complete the capture prompts. If working manually, export the redacted diagnostic log after a failure and inspect it before sharing. Only after the one-shot test succeeds should automatic mode be enabled.
 
 Repeat separately for outgoing and incoming calls. Then test call hold/resume and a second incoming call; the expected safe behavior is to stop automatic reassertion. Conferences and emergency calls must never be used as positive routing tests.
 
@@ -80,4 +121,4 @@ Do not promote a beta to a production release until one unchanged APK passes all
 | Speaker, handset, wired, or other Bluetooth override | 3 trials per route | User choice is respected immediately and is not fought. |
 | Hold/resume, second call, and conference | 3 trials each | Automatic reassertion stops for the session. |
 
-Acceptance requires no unexplained routing failure, no route fight after a user override, no request outside the eligibility policy, and no loss of Android Auto media/navigation. Export the redacted app log after every failure and record the exact scenario; never publish raw `dumpsys` or Bluetooth data without reviewing it for personal information.
+Acceptance requires no unexplained routing failure, no route fight after a user override, no request outside the eligibility policy, and no loss of Android Auto media/navigation. Use a fresh capture directory for every row, retain failed runs, and keep the APK version unchanged throughout a qualification batch. Never publish raw `dumpsys` or Bluetooth data without reviewing it for personal information.

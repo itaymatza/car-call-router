@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add a privacy-safe parked-device capture harness that records only new structured routing traces,
+  minimal device/app metadata, and explicit speaker, microphone, and Android Auto observations.
+- Add a dependency-free trace analyzer with JSON/CSV output, integrity checks, strict dual-
+  confirmation success semantics, and deterministic CI tests.
+
 ## 0.3.0-beta.2
 
 - Retain stable API 36 builds while enforcing the exact API 37
