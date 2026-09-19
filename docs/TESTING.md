@@ -20,8 +20,19 @@ With a suitable Android SDK:
 bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
 ```
 
-The repository workflow runs that command on pushes and pull requests with read-only workflow permissions. It intentionally retains no APK or build-report uploads.
+The repository workflow runs that command on pushes and pull requests with read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
 
-## Device testing
+## Exact parked-car test
 
-Any real-device work must be planned independently, carried out only while parked, and documented without personal or hardware-identifying data. Confirm that the target device, user intent, system routing behavior, and call safety conditions are appropriate before initiating an ordinary non-emergency test call. Never use a real emergency call for testing.
+1. Park safely, switch off the engine if local conditions require it, and do not begin driving during the test.
+2. Confirm the phone is connected simultaneously to the projection unit and the intended native Bluetooth hands-free device.
+3. Confirm Android Auto navigation/media still works. Select the native hands-free device in the app and leave automatic mode off.
+4. Confirm the app reports runtime permissions granted and protected Telecom authorization detected.
+5. Place an ordinary non-emergency call to a consenting helper or voicemail. Never test with an emergency number.
+6. After the call becomes active, tap **Route this call now** once.
+7. Confirm the app reports the target endpoint as verified. Speak and listen through the intended device; ask the helper which microphone is heard.
+8. Confirm navigation/media remains active on Android Auto.
+9. Manually select speaker in the Phone UI. Confirm the app respects that override and does not switch back.
+10. End the call, export the redacted diagnostic log if the route failed, and inspect it before sharing. Only after the one-shot test succeeds should automatic mode be enabled.
+
+Repeat separately for outgoing and incoming calls. Then test call hold/resume and a second incoming call; the expected safe behavior is to stop automatic reassertion. Conferences and emergency calls must never be used as positive routing tests.

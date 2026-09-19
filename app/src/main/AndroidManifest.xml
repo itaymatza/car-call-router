@@ -1,47 +1,29 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-    <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
-    <uses-feature android:name="android.hardware.telephony" android:required="true" />
-    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- getPhoneAccount requires this to classify a call as SIM-backed. -->
-    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
-    <!-- Granted through Android's companion-device path when supported; local ADB is the fallback. -->
-    <uses-permission android:name="android.permission.MANAGE_ONGOING_CALLS"
-        tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.CALL_COMPANION_APP" />
-    <queries>
-        <provider android:authorities="androidx.car.app.connection" />
-    </queries>
-    <application
-        android:name="org.carcallrouter.companion.RouterApplication"
-        android:allowBackup="false"
-        android:fullBackupContent="false"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:label="Call Route Companion"
-        android:icon="@drawable/ic_router"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity
-            android:name="org.carcallrouter.companion.ui.MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        <service
-            android:name="org.carcallrouter.companion.telecom.RouterInCallService"
-            android:exported="true"
-            android:permission="android.permission.BIND_INCALL_SERVICE">
-            <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="false" />
-            <meta-data android:name="android.telecom.IN_CALL_SERVICE_CAR_MODE_UI" android:value="false" />
-            <meta-data android:name="android.telecom.IN_CALL_SERVICE_RINGING" android:value="false" />
-            <meta-data android:name="android.telecom.INCLUDE_SELF_MANAGED_CALLS" android:value="false" />
-            <intent-filter>
-                <action android:name="android.telecom.InCallService" />
-            </intent-filter>
-        </service>
-    </application>
-</manifest>
+package org.carcallrouter.companion
+
+import android.content.Context
+import android.content.SharedPreferences
+
+class RouterSettings(context: Context) {
+    val prefs: SharedPreferences = context.getSharedPreferences("router_settings", Context.MODE_PRIVATE)
+    var enabled: Boolean
+        get() = prefs.getBoolean("enabled", false)
+        set(value) { prefs.edit().putBoolean("enabled", value).apply() }
+    val targetAddress: String? get() = prefs.getString("target", null)
+    val targetName: String get() = prefs.getString("target_name", "Not selected") ?: "Not selected"
+    val competitorAddress: String? get() = prefs.getString("competitor", null)
+    val competitorName: String get() = prefs.getString("competitor_name", "None — no takeover retries") ?: "None"
+    fun setTarget(address: String, name: String) {
+        val edit = prefs.edit()
+            .putString("target", address)
+            .putString("target_name", name)
+            .putBoolean("enabled", false)
+        if (address.equals(competitorAddress, true)) edit.remove("competitor").remove("competitor_name")
+        edit.apply()
+    }
+    fun setCompetitor(address: String?, name: String?) {
+        require(address == null || !address.equals(targetAddress, true)) { "target device cannot also be the competing device" }
+        prefs.edit().putString("competitor", address).putString("competitor_name", name).apply()
+    }
+    fun markBound() { prefs.edit().putLong("last_bound", System.currentTimeMillis()).apply() }
+    val lastBound: Long get() = prefs.getLong("last_bound", 0)
+}

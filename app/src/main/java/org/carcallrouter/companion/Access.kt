@@ -17,4 +17,5 @@ object Access {
 
     fun authorizationLocal() = "cmd appops set --uid ${BuildConfig.APPLICATION_ID} MANAGE_ONGOING_CALLS allow"
     fun authorizationAdb() = "adb shell ${authorizationLocal()}"
+    fun revocationAdb() = "adb shell cmd appops set --uid ${BuildConfig.APPLICATION_ID} MANAGE_ONGOING_CALLS default"
 }

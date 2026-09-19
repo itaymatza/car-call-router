@@ -2,7 +2,7 @@
 
 ## Eligibility checks
 
-The service makes no route request unless it can establish all of the following: protected Telecom authorization, required runtime permissions, exactly one live active call, a SIM-backed phone account, a non-emergency telephone number classification, a configured target available in Telecom-supported Bluetooth devices, and a connected target in the HFP profile. Automatic mode additionally requires the master toggle and a verified projection-host state.
+The service makes no route request unless it can establish all of the following: protected Telecom authorization, required runtime permissions, exactly one live active call, a SIM-backed phone account, a non-emergency telephone number classification, a configured target uniquely resolved to a current Telecom Bluetooth endpoint, and a connected target in the HFP profile. Automatic mode additionally requires the master toggle and a verified projection-host state.
 
 Calls are rejected when they are emergency or emergency-callback calls, external or self-managed calls, conferences, non-SIM calls, calls with a hidden or non-telephone handle, calls with unavailable emergency classification, or sessions containing multiple calls. The app does not replace the default dialer, manage media profiles, modify A2DP, disconnect Bluetooth, record audio, read contacts, read call logs, or send network telemetry.
 

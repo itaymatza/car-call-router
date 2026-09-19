@@ -9,7 +9,7 @@
     <string name="readiness_permissions_title">Allow required access</string>
     <string name="readiness_permissions_message">Start by allowing nearby Bluetooth device and phone-account access.</string>
     <string name="readiness_authorization_title">Authorize call routing</string>
-    <string name="readiness_authorization_message">Approve the selected call device once so Android can allow protected call routing.</string>
+    <string name="readiness_authorization_message">Complete the one-time ADB authorization. Android provides no normal permission dialog for this non-dialer utility.</string>
     <string name="readiness_target_title">Choose your call device</string>
     <string name="readiness_target_message">Select the paired Bluetooth device that should handle calls.</string>
     <string name="readiness_ready_title">Ready to turn on</string>
@@ -36,19 +36,17 @@
     <string name="permissions_dialog_message">Bluetooth access lets the app identify your already-paired call device. Phone-account access is used only to verify that a call is cellular and not an emergency call. The app does not read contacts, call history, or audio.</string>
     <string name="continue_action">Continue</string>
     <string name="authorization_step_title">3. Call-routing authorization</string>
-    <string name="authorization_missing">Approve the selected device in Android’s one-time companion-device dialog.</string>
-    <string name="authorization_waiting">Waiting for Android’s device-approval dialog…</string>
+    <string name="authorization_missing">Not authorized. A normal car association cannot grant protected Telecom access.</string>
     <string name="authorization_complete">✓ Protected call-routing authorization detected</string>
-    <string name="authorization_action">Authorize call routing</string>
+    <string name="authorization_action">Set up one-time ADB authorization</string>
     <string name="authorization_action_complete">Authorization complete</string>
     <string name="authorization_target_required">Choose the preferred Bluetooth call device first.</string>
-    <string name="authorization_started">Confirm the selected call device in Android’s dialog.</string>
-    <string name="authorization_success">Call-routing authorization completed</string>
-    <string name="authorization_cancelled">Authorization was cancelled. You can try again at any time.</string>
-    <string name="authorization_unavailable">Android’s companion-device authorization is unavailable on this device.</string>
-    <string name="authorization_dialog_title">ADB fallback authorization</string>
-    <string name="authorization_dialog_message">Android did not grant call access through the in-app device approval. Run this fallback command from an authorized local ADB shell using Wireless Debugging. If you use a computer, prefix it with “adb shell”.\n\n%1$s\n\nAfter running it, return here and the status will refresh automatically.</string>
+    <string name="authorization_success">Call-routing authorization detected</string>
+    <string name="authorization_not_detected">Authorization is still missing. Check the package name and rerun the command after reinstalling.</string>
+    <string name="authorization_dialog_title">One-time computer setup</string>
+    <string name="authorization_dialog_message">Android reserves this access for the default dialer, system apps, and eligible wearable companions. This utility must not replace your Phone app, and a car association is not a valid shortcut.\n\n1. On the phone, enable Developer options and USB debugging.\n2. Install Android Platform Tools on the computer.\n3. Connect the phone, unlock it, and approve the USB-debugging prompt.\n4. Run:\n\n%1$s\n\n5. Return here and tap Verify.\n\nThe app will not report success until Android confirms the AppOp. Reinstalling the APK can require this step again.</string>
     <string name="copy_command">Copy command</string>
+    <string name="verify_authorization">Verify</string>
     <string name="command_copied">Authorization command copied</string>
     <string name="target_step_title">2. Preferred call device</string>
     <string name="target_missing">No device selected. Pair the car or headset in Android Bluetooth settings first.</string>
@@ -56,7 +54,7 @@
     <string name="target_action">Choose Bluetooth device</string>
     <string name="target_action_change">Change selected device</string>
     <string name="test_title">Test safely</string>
-    <string name="test_help">While parked, start a normal non-emergency call and tap the button below. This one-shot test keeps all safety and device checks enabled.</string>
+    <string name="test_help">While parked, connect both call devices, start a normal non-emergency call, and tap below. The app uses only a current Telecom endpoint and stops if the selected device cannot be identified uniquely.</string>
     <string name="route_now">Route this call now</string>
     <string name="pause">Pause routing for this call</string>
     <string name="show_advanced">Advanced options ▾</string>
@@ -83,6 +81,6 @@
     <string name="permissions">Allow Bluetooth and phone-account access</string>
     <string name="target">Choose target Bluetooth call device</string>
     <string name="competitor">Choose explicitly competing device (optional)</string>
-    <string name="copy_adb">Copy one-time ADB authorization command</string>
+    <string name="copy_adb">Set up one-time ADB authorization</string>
     <string name="adb_help">Requires MANAGE_ONGOING_CALLS authorization through ADB.</string>
 </resources>

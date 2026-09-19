@@ -2,7 +2,7 @@
 
 ## Design objective
 
-**Call Route Companion** is an Android 14+ reference application that can make a deliberately bounded request to route an eligible call to a user-selected paired Bluetooth device. It is not a dialer, does not own the call lifecycle, and does not promise that a routing request will be honored. Android documents that `InCallService.requestBluetoothAudio(BluetoothDevice)` can route to a device other than the requested device when the Bluetooth stack cannot satisfy the request. The app therefore waits for callback evidence instead of treating a successful method return as proof of a route change. [1]
+**Call Route Companion** is an Android 14+ reference application that can make a deliberately bounded request to route an eligible call to a user-selected Bluetooth call endpoint. It is not a dialer, does not own the call lifecycle, and does not promise that a request will be honored. A successful `requestCallEndpointChange()` outcome means the request was accepted; only `onCallEndpointChanged()` verifies the final route. [1]
 
 The design treats autonomous call-audio routing as a safety-sensitive feature. Its default posture is **fail closed**: when it cannot establish that a condition is safe, it makes no request or stops the current session.
 
@@ -17,7 +17,7 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 | `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | Broadcast extras are not trusted; state is re-queried from the profile service. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
 | `RoutingPolicy` | Pure Kotlin state machine that decides whether a routing request is permitted, delayed, released, or stopped. | Enforces a four-second window, a 300 ms request gap, and a three-request maximum. |
-| `AddressedTelecomRouter` | Matches the selected Bluetooth address against Telecom-supported devices and issues the request. | A target must be a unique supported device; the app does not guess from a name or UUID. |
+| `EndpointIdentity` and `AddressedTelecomRouter` | Resolve the saved paired target against live API 34+ endpoints and issue the request. | Uses only callback-supplied endpoint objects. Unique label or one-to-one HFP topology is required; ambiguity fails closed. |
 | `RouterInCallService` | Coordinates Telecom, route, endpoint, projection, HFP, and call callbacks on the main thread. | Safety-relevant events are latched before deferred evaluation so that later callbacks cannot erase them. |
 
 ## Decision flow
@@ -25,8 +25,8 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 1. Telecom binds `RouterInCallService` and the service starts its projection and HFP observers. The service remains passive until it sees a fresh pre-active-to-active call transition.
 2. The service gathers a current snapshot: authorization, runtime permissions, call safety, number of live calls, projection state, target availability, and observed route.
 3. `RoutingPolicy` rejects the snapshot unless all automatic-mode prerequisites hold. A manual one-shot bypasses only the master-toggle and projection checks.
-4. When eligible, the policy allows at most one outstanding request. `AddressedTelecomRouter` resolves the configured address from Telecom’s supported Bluetooth-device list and calls `requestBluetoothAudio`.
-5. The service waits for audio or endpoint callbacks. A target route is recorded as verification; a void API return is not verification.
+4. When eligible, the policy allows at most one outstanding request. `AddressedTelecomRouter` submits the exact current callback object to `requestCallEndpointChange`.
+5. The service waits for `onCallEndpointChanged`. An accepted outcome is not route verification.
 6. The policy releases control after a verified route or stops permanently for the session after a safety-relevant cancellation condition.
 
 ## State machine
@@ -49,7 +49,9 @@ The master toggle is off by default. Automatic mode requires the projection-host
 
 ## Platform compatibility
 
-The application targets Android API 35 and requires Android API 34 or later. It retains `requestBluetoothAudio(BluetoothDevice)` because it needs address-specific matching and the current public `CallEndpoint` interface does not expose a Bluetooth hardware address. Android marks that method deprecated from API 34 and recommends `requestCallEndpointChange` for endpoint-driven routing. Any migration must preserve deterministic target identity, callback-based verification, and the existing fail-closed policy. [1]
+The application compiles and targets API 36 and requires API 34 or later. It declares API 37's `onCallEndpointRequested(CallEndpoint)` virtual signature without directly linking a newer SDK; Android 37 can dispatch it, while API 34–36 safely ignore it. The callback stops the bounded guard when another in-call UI requests an endpoint. On API 34–36, endpoint-change callbacks and the existing route-observation rules provide the available protection.
+
+`CallEndpoint.identifier` is unique on the device but the public contract does not promise a persistent Bluetooth-address identity, and AOSP keeps the Bluetooth address mapping inside Telecom. The app therefore never persists the identifier. It maps the saved paired device to each live callback set using a unique endpoint label, with a one-endpoint/one-HFP-device fallback. This is intentionally conservative and OEM-dependent.
 
 ## Non-goals
 

@@ -1,10 +1,8 @@
-import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
 import android.content.MemoryPrefs
 import android.os.TestQueue
 import android.telecom.Call
-import android.telecom.CallAudioState
 import android.telecom.CallEndpoint
 import org.carcallrouter.companion.*
 import org.carcallrouter.companion.telecom.*
@@ -16,12 +14,13 @@ import java.io.File
 private const val TARGET="02:00:00:00:00:01"
 private const val COMPETING="02:00:00:00:00:02"
 private const val OTHER="02:00:00:00:00:03"
-private val target=BluetoothDevice(TARGET)
-private val competing=BluetoothDevice(COMPETING)
-private val other=BluetoothDevice(OTHER)
-private fun audio(address:String?=COMPETING,route:Int=CallAudioState.ROUTE_BLUETOOTH,
-                  supported:Collection<BluetoothDevice> = listOf(target,competing,other))=
- CallAudioState(route,address?.let{BluetoothDevice(it)},supported)
+private val TARGET_ID=java.util.UUID.fromString("00000000-0000-0000-0000-000000000001")
+private val COMPETING_ID=java.util.UUID.fromString("00000000-0000-0000-0000-000000000002")
+private val OTHER_ID=java.util.UUID.fromString("00000000-0000-0000-0000-000000000003")
+private val target=CallEndpoint("Target test device",CallEndpoint.TYPE_BLUETOOTH,TARGET_ID)
+private val competing=CallEndpoint("Competing test device",CallEndpoint.TYPE_BLUETOOTH,COMPETING_ID)
+private val other=CallEndpoint("Other test device",CallEndpoint.TYPE_BLUETOOTH,OTHER_ID)
+private val speaker=CallEndpoint("Speaker",CallEndpoint.TYPE_SPEAKER,java.util.UUID.fromString("00000000-0000-0000-0000-000000000004"))
 private fun reset(){
  TestQueue.reset();Context.prefs=MemoryPrefs();Access.authorization=true;Access.runtime=true
  RouterLog.events.clear();ProjectionMonitor.instances.clear();ProjectionMonitor.current=true
@@ -29,28 +28,31 @@ private fun reset(){
  SessionBridge.controller=null
 }
 private class Fixture(enabled:Boolean=true,projected:Boolean?=true,
-                      initialState:Int=Call.STATE_RINGING,initialAudio:CallAudioState=audio()):AutoCloseable{
+                      initialState:Int=Call.STATE_RINGING,
+                      initialEndpoint:CallEndpoint=competing,
+                      available:List<CallEndpoint> = listOf(target,competing,other)):AutoCloseable{
  val service:RouterInCallService
  val call:Call
  init{
   reset();ProjectionMonitor.current=projected
-  val settings=RouterSettings(Context());settings.enabled=enabled
-  settings.setTarget(TARGET,"Target test device");settings.setCompetitor(COMPETING,"Competing test device")
-  service=RouterInCallService();service.callAudioState=initialAudio
-  service.onCreate();service.onBind(Intent());service.onCallAudioStateChanged(initialAudio)
+  val settings=RouterSettings(Context())
+  settings.setTarget(TARGET,"Target test device");settings.setCompetitor(COMPETING,"Competing test device");settings.enabled=enabled
+  service=RouterInCallService();service.currentCallEndpoint=initialEndpoint
+  service.onCreate();service.onBind(Intent());service.onAvailableCallEndpointsChanged(available.toMutableList());service.onCallEndpointChanged(initialEndpoint)
   call=Call(Call.Details(initialState));service.onCallAdded(call);flush()
  }
  fun flush()=TestQueue.runReady()
  fun active(){call.deliverState(Call.STATE_ACTIVE);flush()}
- fun route(a:CallAudioState){service.callAudioState=a;service.onCallAudioStateChanged(a)}
- fun established(){active();check(service.issuedRequests.size==1);route(audio(TARGET));flush();check(SessionBridge.status.contains("STABILIZING"))}
+ fun route(endpoint:CallEndpoint){service.currentCallEndpoint=endpoint;service.onCallEndpointChanged(endpoint)}
+ fun endpoints(value:List<CallEndpoint>){service.onAvailableCallEndpointsChanged(value.toMutableList())}
+ fun established(){active();check(service.issuedRequests.size==1);route(target);flush();check(SessionBridge.status.contains("STABILIZING"))}
  fun count()=service.issuedRequests.size
  override fun close(){service.onDestroy();TestQueue.runReady()}
 }
 private fun countEquals(f:Fixture,expected:Int){check(f.count()==expected){"Expected $expected requests, observed ${f.service.issuedRequests}; status=${SessionBridge.status}"}}
 fun main(args:Array<String>){
  val tests=listOf<Pair<String,()->Unit>>(
- "incoming_ringing_is_passive_then_active_routes" to {Fixture().use{f->countEquals(f,0);f.active();countEquals(f,1);check(f.service.issuedRequests.single().second==TARGET)}},
+ "incoming_ringing_is_passive_then_active_routes" to {Fixture().use{f->countEquals(f,0);f.active();countEquals(f,1);check(f.service.issuedRequests.single().second==TARGET_ID.toString())}},
  "outgoing_dialing_connecting_active_routes" to {Fixture(initialState=Call.STATE_DIALING).use{f->f.call.deliverState(Call.STATE_CONNECTING);f.flush();countEquals(f,0);f.active();countEquals(f,1)}},
  "late_bind_to_active_call_remains_passive" to {Fixture(initialState=Call.STATE_ACTIVE).use{f->countEquals(f,0);f.call.deliverDetails();f.flush();countEquals(f,0)}},
  "default_toggle_off_is_passive" to {Fixture(enabled=false).use{f->f.active();countEquals(f,0)}},
@@ -58,36 +60,36 @@ fun main(args:Array<String>){
  "missing_runtime_permission_is_passive" to {Fixture().use{f->Access.runtime=false;f.active();countEquals(f,0)}},
  "unsafe_call_is_passive" to {Fixture().use{f->f.call.rejection="Emergency test boundary";f.active();countEquals(f,0)}},
  "missing_projection_is_passive" to {Fixture(projected=null).use{f->f.active();countEquals(f,0)}},
- "target_missing_from_supported_devices_is_passive" to {Fixture(initialAudio=audio(supported=listOf(competing))).use{f->f.active();countEquals(f,0)}},
+ "target_missing_from_supported_devices_is_passive" to {Fixture(available=listOf(competing)).use{f->f.active();countEquals(f,0)}},
  "target_not_hfp_connected_is_passive" to {Fixture().use{f->HfpMonitor.emit(setOf(COMPETING));f.active();countEquals(f,0)}},
- "duplicate_target_address_is_not_guessed" to {Fixture(initialAudio=audio(supported=listOf(target,target,competing))).use{f->f.active();countEquals(f,0)}},
+ "duplicate_target_name_is_not_guessed" to {Fixture(available=listOf(target,CallEndpoint("Target test device",CallEndpoint.TYPE_BLUETOOTH),competing)).use{f->f.active();countEquals(f,0)}},
  "explicit_one_shot_bypasses_toggle_and_projection" to {Fixture(enabled=false,projected=false).use{f->f.active();f.service.routeNow();countEquals(f,1);f.service.routeNow();countEquals(f,1)}},
  "one_shot_still_requires_authorization" to {Fixture(enabled=false,projected=false).use{f->Access.authorization=false;f.active();f.service.routeNow();countEquals(f,0)}},
- "manual_pause_survives_competitor_event" to {Fixture().use{f->f.established();TestQueue.now=350;f.service.pauseSession();f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "speaker_then_competitor_same_batch_respects_override" to {Fixture().use{f->f.established();TestQueue.now=350;f.route(audio(null,CallAudioState.ROUTE_SPEAKER));f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "endpoint_speaker_then_bluetooth_same_batch_respects_override" to {Fixture().use{f->f.established();TestQueue.now=350;f.service.onCallEndpointChanged(CallEndpoint(CallEndpoint.TYPE_SPEAKER));f.service.onCallEndpointChanged(CallEndpoint(CallEndpoint.TYPE_BLUETOOTH));f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "settings_off_then_on_same_batch_stays_paused" to {Fixture().use{f->f.established();TestQueue.now=350;val s=RouterSettings(f.service);s.enabled=false;s.enabled=true;f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "separate_hold_evaluation_cancels_guard" to {Fixture().use{f->f.established();TestQueue.now=350;f.call.deliverState(Call.STATE_HOLDING);f.flush();f.call.deliverState(Call.STATE_ACTIVE);f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "coalesced_hold_resume_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;f.call.deliverState(Call.STATE_HOLDING);f.call.deliverState(Call.STATE_ACTIVE);f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "coalesced_second_call_add_remove_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;val other=Call(Call.Details(Call.STATE_RINGING));f.service.onCallAdded(other);f.service.onCallRemoved(other);f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "coalesced_projection_disconnect_reconnect_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;ProjectionMonitor.emit(false);ProjectionMonitor.emit(true);f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "coalesced_hfp_disconnect_reconnect_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;HfpMonitor.emit(setOf(COMPETING));HfpMonitor.emit(setOf(TARGET,COMPETING));f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "positive_known_competitor_retries_are_bounded" to {Fixture().use{f->f.established();for(t in listOf(350L,700L,1050L)){TestQueue.now=t;f.route(audio(COMPETING));f.flush();f.route(audio(TARGET));f.flush()};countEquals(f,3)}},
- "deadline_stops_further_requests" to {Fixture().use{f->f.established();TestQueue.advanceTo(4000);f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "telecom_exception_prevents_blind_retry" to {Fixture().use{f->f.service.requestException=SecurityException("test boundary");f.active();countEquals(f,0);check(SessionBridge.status.contains("FAILED"));f.service.requestException=null;TestQueue.advanceTo(1600);f.route(audio(COMPETING));f.flush();countEquals(f,0)}},
+ "manual_pause_survives_competitor_event" to {Fixture().use{f->f.established();TestQueue.now=350;f.service.pauseSession();f.route(competing);f.flush();countEquals(f,1)}},
+ "speaker_then_competitor_same_batch_respects_override" to {Fixture().use{f->f.established();TestQueue.now=350;f.route(speaker);f.route(competing);f.flush();countEquals(f,1)}},
+ "endpoint_speaker_then_bluetooth_same_batch_respects_override" to {Fixture().use{f->f.established();TestQueue.now=350;f.service.onCallEndpointChanged(speaker);f.service.onCallEndpointChanged(competing);f.flush();countEquals(f,1)}},
+ "settings_off_then_on_same_batch_stays_paused" to {Fixture().use{f->f.established();TestQueue.now=350;val s=RouterSettings(f.service);s.enabled=false;s.enabled=true;f.route(competing);f.flush();countEquals(f,1)}},
+ "separate_hold_evaluation_cancels_guard" to {Fixture().use{f->f.established();TestQueue.now=350;f.call.deliverState(Call.STATE_HOLDING);f.flush();f.call.deliverState(Call.STATE_ACTIVE);f.route(competing);f.flush();countEquals(f,1)}},
+ "coalesced_hold_resume_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;f.call.deliverState(Call.STATE_HOLDING);f.call.deliverState(Call.STATE_ACTIVE);f.route(competing);f.flush();countEquals(f,1)}},
+ "coalesced_second_call_add_remove_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;val second=Call(Call.Details(Call.STATE_RINGING));f.service.onCallAdded(second);f.service.onCallRemoved(second);f.route(competing);f.flush();countEquals(f,1)}},
+ "coalesced_projection_disconnect_reconnect_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;ProjectionMonitor.emit(false);ProjectionMonitor.emit(true);f.route(competing);f.flush();countEquals(f,1)}},
+ "coalesced_hfp_disconnect_reconnect_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;HfpMonitor.emit(setOf(COMPETING));HfpMonitor.emit(setOf(TARGET,COMPETING));f.route(competing);f.flush();countEquals(f,1)}},
+ "positive_known_competitor_retries_are_bounded" to {Fixture().use{f->f.established();for(t in listOf(350L,700L,1050L)){TestQueue.now=t;f.route(competing);f.flush();f.route(target);f.flush()};countEquals(f,3)}},
+ "deadline_stops_further_requests" to {Fixture().use{f->f.established();TestQueue.advanceTo(4000);f.route(competing);f.flush();countEquals(f,1)}},
+ "telecom_exception_prevents_blind_retry" to {Fixture().use{f->f.service.requestException=SecurityException("test boundary");f.active();countEquals(f,0);check(SessionBridge.status.contains("FAILED"));f.service.requestException=null;TestQueue.advanceTo(1600);f.route(competing);f.flush();countEquals(f,0)}},
  "destroy_removes_callbacks_and_scheduled_work" to {Fixture().use{f->f.active();f.service.onDestroy();check(f.call.callbacks.isEmpty());check(TestQueue.size()==0);TestQueue.advanceTo(5000);countEquals(f,1)}},
  "call_removal_cancels_pending_timeout" to {Fixture().use{f->f.active();f.call.deliverState(Call.STATE_DISCONNECTED);f.service.onCallRemoved(f.call);f.flush();TestQueue.advanceTo(5000);countEquals(f,1);check(f.call.callbacks.isEmpty())}},
- "unknown_bluetooth_override_is_not_fought" to {Fixture().use{f->f.established();TestQueue.now=350;f.route(audio(OTHER));f.route(audio(COMPETING));f.flush();countEquals(f,1)}}
+ "unknown_bluetooth_override_is_not_fought" to {Fixture().use{f->f.established();TestQueue.now=350;f.route(other);f.route(competing);f.flush();countEquals(f,1)}}
  )
  val extraTests=listOf<Pair<String,()->Unit>>(
- "coalesced_telecom_target_loss_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;f.route(audio(COMPETING,supported=listOf(competing)));f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "coalesced_conference_children_event_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;val child=Call(Call.Details(Call.STATE_ACTIVE));f.call.callbacks.toList().forEach{it.onChildrenChanged(f.call,mutableListOf(child));it.onChildrenChanged(f.call,mutableListOf())};f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
- "old_hold_callback_with_newer_active_details_must_cancel" to {Fixture().use{f->f.established();TestQueue.now=350;check(f.call.details.state==Call.STATE_ACTIVE);f.call.callbacks.toList().forEach{it.onStateChanged(f.call,Call.STATE_HOLDING);it.onStateChanged(f.call,Call.STATE_ACTIVE)};f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
+ "coalesced_telecom_target_loss_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;f.endpoints(listOf(competing));f.endpoints(listOf(target,competing,other));f.route(competing);f.flush();countEquals(f,1)}},
+ "coalesced_conference_children_event_must_cancel_guard" to {Fixture().use{f->f.established();TestQueue.now=350;val child=Call(Call.Details(Call.STATE_ACTIVE));f.call.callbacks.toList().forEach{it.onChildrenChanged(f.call,mutableListOf(child));it.onChildrenChanged(f.call,mutableListOf())};f.route(competing);f.flush();countEquals(f,1)}},
+ "old_hold_callback_with_newer_active_details_must_cancel" to {Fixture().use{f->f.established();TestQueue.now=350;check(f.call.details.state==Call.STATE_ACTIVE);f.call.callbacks.toList().forEach{it.onStateChanged(f.call,Call.STATE_HOLDING);it.onStateChanged(f.call,Call.STATE_ACTIVE)};f.route(competing);f.flush();countEquals(f,1)}},
  "projection_becoming_available_before_first_request_is_allowed" to {Fixture(projected=null).use{f->f.active();countEquals(f,0);ProjectionMonitor.emit(true);f.flush();countEquals(f,1)}},
  "hfp_becoming_available_before_first_request_is_allowed" to {Fixture().use{f->HfpMonitor.emit(emptySet(),known=false);f.active();countEquals(f,0);HfpMonitor.emit(setOf(TARGET,COMPETING));f.flush();countEquals(f,1)}},
- "manual_one_shot_keeps_projection_bypass" to {Fixture(enabled=false).use{f->f.active();f.service.routeNow();countEquals(f,1);ProjectionMonitor.emit(false);f.route(audio(TARGET));f.flush();check(SessionBridge.status.contains("RELEASED"))}},
- "a_fresh_session_after_complete_call_cleanup_can_route" to {Fixture().use{f->f.established();val other=Call(Call.Details(Call.STATE_RINGING));f.service.onCallAdded(other);f.flush();f.service.onCallRemoved(other);f.service.onCallRemoved(f.call);f.flush();val next=Call(Call.Details(Call.STATE_RINGING));f.route(audio(COMPETING));f.service.onCallAdded(next);f.flush();next.deliverState(Call.STATE_ACTIVE);f.flush();countEquals(f,2)}},
- "rebind_to_existing_active_call_does_not_retake_route" to {Fixture().use{f->f.established();f.service.onUnbind(Intent());f.service.onBind(Intent());f.service.onCallAdded(f.call);f.route(audio(COMPETING));f.flush();countEquals(f,1)}},
+ "manual_one_shot_keeps_projection_bypass" to {Fixture(enabled=false).use{f->f.active();f.service.routeNow();countEquals(f,1);ProjectionMonitor.emit(false);f.route(target);f.flush();check(SessionBridge.status.contains("RELEASED"))}},
+ "a_fresh_session_after_complete_call_cleanup_can_route" to {Fixture().use{f->f.established();val second=Call(Call.Details(Call.STATE_RINGING));f.service.onCallAdded(second);f.flush();f.service.onCallRemoved(second);f.service.onCallRemoved(f.call);f.flush();val next=Call(Call.Details(Call.STATE_RINGING));f.route(competing);f.service.onCallAdded(next);f.flush();next.deliverState(Call.STATE_ACTIVE);f.flush();countEquals(f,2)}},
+ "rebind_to_existing_active_call_does_not_retake_route" to {Fixture().use{f->f.established();f.service.onUnbind(Intent());f.service.onBind(Intent());f.service.onAvailableCallEndpointsChanged(mutableListOf(target,competing,other));f.service.onCallAdded(f.call);f.route(competing);f.flush();countEquals(f,1)}},
  "duplicate_active_callbacks_do_not_reset_request_budget" to {Fixture().use{f->f.active();repeat(5){f.call.deliverState(Call.STATE_ACTIVE);f.call.deliverDetails();f.flush()};countEquals(f,1)}}
  )
  val allTests=tests+extraTests
