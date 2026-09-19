@@ -53,12 +53,14 @@ The master toggle is off by default. Automatic mode requires the projection-host
 
 ## Platform compatibility
 
-The application compiles against API 37, targets stable API 36, and requires API 34 or later. API 37's
-`onCallEndpointRequested(CallEndpoint)` override is therefore compiler-verified. Telecom may report
+The application compiles and targets stable API 36 and requires API 34 or later. It declares API
+37's exact `onCallEndpointRequested(CallEndpoint)` virtual signature, which is enforced by the
+service harness while the API 37 platform package is unavailable to hosted SDK Manager builds.
+Android 17 can dispatch the method; API 34–36 safely ignore it. Telecom may report
 an initiating request before or after the resulting endpoint change, so self-request markers are
 consumed only by the request callback and are cleared at session teardown. A non-self request stops
-the bounded guard as a possible user override. On API 34–36, endpoint-change callbacks and the
-existing route-observation rules provide the available protection.
+the bounded guard as a possible user override. Endpoint-change callbacks and the existing
+route-observation rules provide the available protection on earlier versions.
 
 `CallEndpoint.identifier` is unique on the device but the public contract does not promise a persistent Bluetooth-address identity, and AOSP keeps the Bluetooth address mapping inside Telecom. The app therefore never persists the identifier. It maps the saved paired device to each live callback set using a unique endpoint label, with a one-endpoint/one-HFP-device fallback. This is intentionally conservative and OEM-dependent.
 

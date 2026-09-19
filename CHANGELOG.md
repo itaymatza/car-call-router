@@ -2,8 +2,8 @@
 
 ## 0.3.0-beta.2
 
-- Compile against API 37 while retaining target API 36, and compiler-verify
-  `onCallEndpointRequested()`.
+- Retain stable API 36 builds while enforcing the exact API 37
+  `onCallEndpointRequested()` virtual signature in the service harness.
 - Preserve self-request identity across either API 37 callback order so an app request is not
   mistaken for an external/user override after the endpoint changes.
 - Add stable routing reason codes and versioned, redacted, session-sequenced trace events.

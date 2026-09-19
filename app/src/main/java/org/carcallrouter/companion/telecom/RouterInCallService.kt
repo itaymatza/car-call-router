@@ -237,7 +237,12 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         queueEvaluation()
     }
 
-    override fun onCallEndpointRequested(callEndpoint: CallEndpoint) {
+    /**
+     * API 37 virtual callback. The exact public signature is enforced by the service harness until
+     * the API 37 platform package is available to hosted sdkmanager builds.
+     */
+    @Suppress("unused")
+    fun onCallEndpointRequested(callEndpoint: CallEndpoint) {
         val own = router.consumeOwnRequest(callEndpoint)
         RouterLog.event(
             "ENDPOINT_REQUEST_OBSERVED",

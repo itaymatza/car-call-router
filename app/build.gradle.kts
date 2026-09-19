@@ -13,9 +13,9 @@ val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
 
 android {
     namespace = "org.carcallrouter.companion"
-    // API 37 compiler verification is required for onCallEndpointRequested(). Keep the runtime
-    // behavior target on stable API 36 until Android 17 behavior changes are qualified separately.
-    compileSdk = 37
+    // API 37 is not yet available from the hosted sdkmanager repository. The service declares and
+    // regression-tests its exact forward-compatible virtual signature while building on API 36.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = configuredApplicationId.get()

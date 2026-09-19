@@ -41,7 +41,6 @@ open class InCallService:Context(){
  open fun onCallAdded(c:Call){}
  open fun onCallRemoved(c:Call){}
  open fun onCallEndpointChanged(e:CallEndpoint){}
- open fun onCallEndpointRequested(e:CallEndpoint){}
  open fun onAvailableCallEndpointsChanged(e:MutableList<CallEndpoint>){}
  open fun onUnbind(i:Intent)=false
  open fun onDestroy(){}

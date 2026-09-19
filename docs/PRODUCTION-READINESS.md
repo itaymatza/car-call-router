@@ -14,7 +14,8 @@
 - Temporary unknown projection/HFP evidence and transient endpoint-list gaps pause safely and can recover without a false disconnect or false user override.
 - Deterministic policy, randomized transition, and production-service callback suites run locally; the service suite is also wired into Gradle CI.
 - Diagnostics redact phone numbers, device names, and raw Bluetooth addresses.
-- API 37 endpoint-request observation is compiler-verified and tested in both callback orders.
+- The API 37 endpoint-request signature and both callback orders are regression-tested; final
+  dispatch validation remains a real Android 17 device gate until hosted API 37 SDK builds exist.
 - Structured evidence separates Telecom endpoint confirmation from exact target HFP audio/SCO confirmation.
 
 ## Release blockers

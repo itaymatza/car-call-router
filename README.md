@@ -11,7 +11,7 @@ Call Route Companion is a Kotlin and framework-XML Android utility. When an elig
 
 ## Project status
 
-The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.2` adds structured real-device evidence and compiler-verified Android 17 callback handling; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
+The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.2` adds structured real-device evidence and callback-order-hardened Android 17 handling; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
 
 
 ## Public-repository posture
