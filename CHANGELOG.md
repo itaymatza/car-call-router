@@ -6,6 +6,10 @@
   minimal device/app metadata, and explicit speaker, microphone, and Android Auto observations.
 - Add a dependency-free trace analyzer with JSON/CSV output, integrity checks, strict dual-
   confirmation success semantics, and deterministic CI tests.
+- Add CI and installer enforcement for APK signature, package/version identity, SDK bounds,
+  required permissions, debuggability, and SHA-256 evidence.
+- Add service regressions for mid-call authorization/runtime-permission revocation and safe process
+  recreation during an already-active call.
 
 ## 0.3.0-beta.2
 

@@ -20,13 +20,18 @@
 - A privacy-bounded ADB harness isolates each new device session, validates trace integrity, records
   physical speaker/microphone and Android Auto observations, and emits a conservative combined
   pass/fail verdict. Its parser has deterministic CI coverage.
+- CI fails on APK signature rejection, package/version or SDK drift, missing required permissions,
+  and unexpected debuggability; its artifact includes the exact APK and certificate SHA-256 values.
+- Service regressions cover authorization and runtime-permission revocation during a pending route,
+  plus process recreation without taking over an already-active call.
 
 ## Release blockers
 
 - Complete the real-car stability matrix in [TESTING.md](TESTING.md) using one unchanged APK and
   retain one capture-harness record per trial.
 - Classify every observed failure from the redacted event sequence and add a deterministic regression before changing routing behavior.
-- Pass the complete Gradle build, JVM tests, service tests, Android lint, APK package/manifest inspection, and signature verification for the release commit.
+- Pass the complete Gradle build, JVM tests, service tests, Android lint, and APK verification for
+  the release commit; repeat the APK gate against the separately signed, non-debuggable release.
 - Verify upgrade and fresh-install flows, including AppOps authorization detection, revocation, reboot, process death, and settings preservation.
 - Produce a signed release APK with a protected release key and publish its SHA-256 digest. Debug artifacts are not production releases.
 - Confirm the privacy and safety documentation matches the final behavior and that no real device identifiers or private logs are committed.

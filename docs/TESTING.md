@@ -8,7 +8,10 @@ Install a JDK 17 or newer and a Kotlin compiler, then run:
 bash tools/test-all.sh
 ```
 
-The script compiles and runs three deterministic checks: explicit routing-policy cases, seeded policy-state exploration, and production-service scenarios against local Android-framework doubles. It writes fresh local logs under `verification/current/`, which is intentionally ignored by Git.
+The script compiles and runs four deterministic groups: explicit routing-policy cases, seeded
+policy-state exploration, production-service scenarios against local Android-framework doubles,
+and the Python trace/APK-tooling tests. It writes fresh local logs under `verification/current/`,
+which is intentionally ignored by Git.
 
 These checks exercise decision rules and lifecycle behavior. They do not install an APK, emulate Android Telecom, validate protected-permission admission, or test a real Bluetooth stack, microphone, projection host, headset, or vehicle.
 
@@ -26,7 +29,9 @@ The Gradle workflow and both installation scripts also run `:verification:servic
 callback-order and lifecycle regressions cannot be skipped merely because a machine lacks a
 standalone `kotlinc` command. CI verifies that `SOURCE-SHA256SUMS.txt` is current and contains one
 entry per tracked source/documentation file. It also runs the standard-library-only device trace
-analyzer tests.
+analyzer and APK-verifier tests. After building, CI verifies the generated APK's signature,
+package/version identity, SDK bounds, required permissions, and debuggable state, then publishes
+the verification record beside the APK.
 
 ## Verify device authorization
 

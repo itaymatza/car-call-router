@@ -2,6 +2,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGE="${APP_APPLICATION_ID:-org.carcallrouter.companion}"
+VERSION_CODE="${APP_VERSION_CODE:-4}"
+VERSION_NAME="${APP_VERSION_NAME:-0.3.0-beta.2}"
 SOURCE_ACTIVITY='org.carcallrouter.companion.ui.MainActivity'
 if [[ -z "${ANDROID_HOME:-}" ]]; then
     for dir in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
@@ -11,9 +13,13 @@ fi
 ADB="${ADB:-${ANDROID_HOME:+$ANDROID_HOME/platform-tools/adb}}"
 ADB="${ADB:-adb}"
 SERIAL="${1:-}"
-[[ "${SKIP_BUILD:-0}" == 1 ]] || bash "$ROOT/gradlew" "-PAPP_APPLICATION_ID=$PACKAGE" :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --console=plain
+[[ "${SKIP_BUILD:-0}" == 1 ]] || bash "$ROOT/gradlew" "-PAPP_APPLICATION_ID=$PACKAGE" \
+    "-PAPP_VERSION_CODE=$VERSION_CODE" "-PAPP_VERSION_NAME=$VERSION_NAME" \
+    :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --console=plain
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
 [[ -f "$APK" ]] || { echo "Missing APK: $APK" >&2; exit 1; }
+ANDROID_BUILD_TOOLS="${ANDROID_BUILD_TOOLS:-${ANDROID_HOME:-}/build-tools/36.0.0}" \
+    bash "$ROOT/tools/verify-apk.sh" "$APK" "$PACKAGE" "$VERSION_CODE" "$VERSION_NAME" 34 36 true
 if [[ -z "$SERIAL" ]]; then
     DEVICES="$("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')"
     COUNT="$(printf '%s\n' "$DEVICES" | awk 'NF {n++} END {print n+0}')"
