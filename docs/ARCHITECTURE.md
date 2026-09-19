@@ -13,7 +13,7 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 | `MainActivity` | Collects runtime permission, device selection, master-toggle, manual-test, pause, and diagnostic-export choices. | User actions are explicit. It cannot enable automation without a configured target and granted prerequisites. |
 | `RouterSettings` | Persists the enabled state plus the locally chosen target and optional competing Bluetooth devices in app-private preferences. | No device identifiers are compiled into the source tree or sent over the network. |
 | `Access` | Checks runtime permissions and the protected ongoing-call authorization. | Missing or revoked access stops routing eligibility. The displayed AppOps command derives from the installed application ID. |
-| `ProjectionMonitor` | Reads the AndroidX host-provider state for optional projection gating. | Missing, unknown, or lost state blocks new automatic requests. It does not infer state from names, Wi-Fi, or process activity. |
+| `ProjectionMonitor` | Reads the AndroidX host-provider state for optional projection gating. | Missing or unknown evidence freezes requests; confirmed loss stops an active guard. It does not infer state from names, Wi-Fi, or process activity. |
 | `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | Broadcast extras are not trusted; state is re-queried from the profile service. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
 | `RoutingPolicy` | Pure Kotlin state machine that decides whether a routing request is permitted, delayed, released, or stopped. | Enforces a four-second window, a 300 ms request gap, and a three-request maximum. |
@@ -27,7 +27,7 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 3. `RoutingPolicy` rejects the snapshot unless all automatic-mode prerequisites hold. A manual one-shot bypasses only the master-toggle and projection checks.
 4. When eligible, the policy allows at most one outstanding request. `AddressedTelecomRouter` submits the exact current callback object to `requestCallEndpointChange`.
 5. The service waits for `onCallEndpointChanged`. An accepted outcome is not route verification.
-6. The policy releases control after a verified route or stops permanently for the session after a safety-relevant cancellation condition.
+6. Temporary unknown observer evidence freezes requests until a fresh callback arrives. Confirmed loss or a user alternative stops the session. The policy releases control after the bounded startup guard.
 
 ## State machine
 

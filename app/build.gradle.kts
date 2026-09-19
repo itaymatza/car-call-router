@@ -7,9 +7,9 @@ val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
     .orElse("org.carcallrouter.companion")
 val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
     .map { it.toInt() }
-    .getOrElse(2)
+    .getOrElse(3)
 val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
-    .orElse("0.2.0")
+    .orElse("0.3.0-beta.1")
 
 android {
     namespace = "org.carcallrouter.companion"

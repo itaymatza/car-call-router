@@ -21,8 +21,8 @@ jobs:
           java-version: '17'
       - name: Install SDK packages
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
-      - name: Compile, unit-test and lint
-        run: bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
+      - name: Compile, unit-test, service-test and lint
+        run: bash gradlew :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
       - name: Upload debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

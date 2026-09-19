@@ -7,7 +7,11 @@
 Call Route Companion is a Kotlin and framework-XML Android utility. When an eligible cellular call makes a fresh transition to `ACTIVE`, it asks Android Telecom to select a **current, user-chosen Bluetooth call endpoint**. It does not change Android Auto media/navigation routing, become the default dialer, or manipulate `AudioManager`.
 
 
-> This repository contains source code, deterministic tests, and a build workflow. The tracked source tree does **not** include device configurations, Bluetooth addresses, signing materials, APKs, exported logs, or a claim of real-device behavior. Successful GitHub Actions runs publish a generated debug APK as a downloadable build artifact.
+> This repository contains source code, deterministic tests, and a build workflow. The tracked source tree does **not** include device configurations, Bluetooth addresses, signing materials, APKs, or exported logs. Successful GitHub Actions runs publish a generated debug APK as a downloadable build artifact.
+
+## Project status
+
+The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.1` begins the stability-qualification phase; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
 
 
 ## Public-repository posture
@@ -31,13 +35,13 @@ The source namespace is the generic value `org.carcallrouter.companion`. Overrid
 ```sh
 bash gradlew \
   -PAPP_APPLICATION_ID=example.callroute \
-  -PAPP_VERSION_CODE=2 \
-  -PAPP_VERSION_NAME=0.2.0 \
+  -PAPP_VERSION_CODE=3 \
+  -PAPP_VERSION_NAME=0.3.0-beta.1 \
   :app:assembleDebug
 ```
 
 
-`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `2`; and `APP_VERSION_NAME` defaults to `0.2.0`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
+`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `3`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.1`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
 
 
 ### Runtime configuration
@@ -88,7 +92,7 @@ Read the [architecture reference](docs/ARCHITECTURE.md) for the component bounda
 ## Safety model and limitations
 
 
-The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. It makes at most three automatic requests in a four-second startup window, observes route changes, and stops on safety-relevant events, possible user overrides, authorization loss, projection loss, target loss, call hold, a second call, or a routing exception. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.
+The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. It makes at most three automatic requests in a four-second startup window, observes route changes, and stops on confirmed safety-relevant events, possible user overrides, authorization loss, projection loss, target HFP loss, call hold, a second call, or a routing exception. Temporary unknown projection/HFP evidence and transient endpoint-list gaps freeze requests until fresh evidence arrives instead of being misclassified as a disconnect or user override. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.
 
 
 Routing uses API 34+ `requestCallEndpointChange()` with an endpoint object from the latest `onAvailableCallEndpointsChanged()` callback. The deprecated `requestBluetoothAudio(BluetoothDevice)` path has been removed. Because the public endpoint API exposes a name and UUID but no Bluetooth address, the app resolves identity only when the saved device name is unique among live Bluetooth endpoints, or when exactly one HFP device and one Bluetooth endpoint exist. Ambiguity fails closed. Endpoint UUIDs are not persisted.
@@ -99,4 +103,4 @@ Routing uses API 34+ `requestCallEndpointChange()` with an endpoint object from 
 
 ## Verification
 
-Run `bash tools/test-all.sh` for the deterministic policy and service-callback suites. The pull-request workflow is the authoritative reproducible Android build check: it assembles the APK, runs JVM unit tests, and runs Android lint before publishing the APK artifact. Passing those checks does not establish Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure in [testing guidance](docs/TESTING.md).
+Run `bash tools/test-all.sh` for the deterministic policy, property, and service-callback suites. The pull-request workflow also executes the production-service callback harness through Gradle, assembles the APK, runs JVM unit tests, and runs Android lint before publishing the APK artifact. Passing those checks does not establish stable Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure and stability matrix in [testing guidance](docs/TESTING.md).
