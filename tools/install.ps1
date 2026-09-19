@@ -16,7 +16,7 @@ if (-not $Adb) {
 }
 if (-not $SkipBuild) {
     if (-not $env:ANDROID_HOME -and -not (Test-Path (Join-Path $Root 'local.properties'))) {
-        throw 'Android SDK not configured. Open this project in Android Studio and install Android SDK Platform Cinnamon Bun and Build-Tools 36.0.0.'
+        throw 'Android SDK not configured. Open this project in Android Studio and install Android SDK Platform 37 and Build-Tools 36.0.0.'
     }
     & (Join-Path $Root 'gradlew.bat') "-PAPP_APPLICATION_ID=$ApplicationId" ':app:assembleDebug' ':app:testDebugUnitTest' ':verification:service-tests:run' ':app:lintDebug' '--console=plain'
     if ($LASTEXITCODE -ne 0) { throw 'Build or verification failed. Nothing was installed.' }
