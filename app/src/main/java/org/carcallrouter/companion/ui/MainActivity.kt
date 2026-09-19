@@ -16,16 +16,45 @@ import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import org.carcallrouter.companion.*
+import org.carcallrouter.companion.Access
+import org.carcallrouter.companion.BuildConfig
+import org.carcallrouter.companion.ProjectionMonitor
+import org.carcallrouter.companion.R
+import org.carcallrouter.companion.RouterLog
+import org.carcallrouter.companion.RouterSettings
+import org.carcallrouter.companion.SessionBridge
 import java.text.DateFormat
 import java.util.Date
 
 class MainActivity : Activity() {
     private lateinit var settings: RouterSettings
     private lateinit var master: Switch
+    private lateinit var readinessCard: View
+    private lateinit var readinessEyebrow: TextView
+    private lateinit var readinessTitle: TextView
+    private lateinit var readinessMessage: TextView
+    private lateinit var setupProgress: TextView
+    private lateinit var masterHelp: TextView
+    private lateinit var projectionValue: TextView
+    private lateinit var permissionsState: TextView
+    private lateinit var authorizationState: TextView
+    private lateinit var targetValue: TextView
+    private lateinit var competitorValue: TextView
+    private lateinit var permissionsButton: Button
+    private lateinit var authorizationButton: Button
+    private lateinit var targetButton: Button
+    private lateinit var routeNowButton: Button
+    private lateinit var pauseButton: Button
+    private lateinit var advancedToggle: Button
+    private lateinit var advancedContent: View
+    private lateinit var diagnosticsToggle: Button
+    private lateinit var diagnosticsContent: View
     private lateinit var status: TextView
     private lateinit var logs: TextView
+
     private var syncing = false
+    private var advancedVisible = false
+    private var diagnosticsVisible = false
     private var monitor: ProjectionMonitor? = null
     private var projection: Boolean? = null
     private val statusListener: () -> Unit = { refresh() }
@@ -39,66 +68,96 @@ class MainActivity : Activity() {
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
+
         settings = RouterSettings(this)
-        master = findViewById(R.id.master)
-        status = findViewById(R.id.status)
-        logs = findViewById(R.id.logs)
+        bindViews()
         logs.movementMethod = ScrollingMovementMethod()
+
         master.setOnCheckedChangeListener { _, checked ->
-            if (!syncing) {
-                if (checked && (!Access.runtimeGranted(this) || !Access.ongoingCalls(this) || settings.targetAddress == null)) {
-                    toast("Grant permissions, authorize Telecom access and select a target call device first.")
-                    refresh()
-                } else {
-                    settings.enabled = checked
-                    RouterLog.event("MASTER_TOGGLE", "enabled=$checked")
-                    refresh()
-                }
+            if (syncing) return@setOnCheckedChangeListener
+            val setup = currentSetupState()
+            if (checked && !setup.ready) {
+                toast("Complete the required setup before enabling automatic routing.")
+            } else {
+                settings.enabled = checked
+                RouterLog.event("MASTER_TOGGLE", "enabled=$checked")
             }
+            refresh()
         }
-        button(R.id.permissions) { requestPermissions(Access.runtimePermissions, 10) }
+
+        button(R.id.permissions) { explainAndRequestPermissions() }
+        button(R.id.copy_adb) { showAuthorizationGuide() }
         button(R.id.target) { chooseDevice(false) }
         button(R.id.competitor) { chooseDevice(true) }
-        button(R.id.copy_adb) {
-            getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Local ADB authorization", Access.authorizationLocal()))
-            AlertDialog.Builder(this).setTitle("One-time authorization — phone or computer")
-                .setMessage("On this phone, run the copied command from an authorized local ADB shell (Wireless Debugging):\n\n" + Access.authorizationLocal() + "\n\nWith a computer, prefix the command with adb shell.\n\nThis authorizes a non-UI call service. Your selected system dialer remains in control. Install and authorize before starting a test call.")
-                .setPositiveButton("Copied", null).show()
-        }
         button(R.id.route_now) {
             val controller = SessionBridge.controller?.get()
-            if (controller == null) toast("No Telecom service bound. Authorize first, then start a normal call while parked.")
-            else controller.routeNow()
-        }
-        button(R.id.pause) { SessionBridge.controller?.get()?.pauseSession() ?: toast("No call session") }
-        button(R.id.refresh) { refresh() }
-        button(R.id.battery_settings) {
-            AlertDialog.Builder(this).setTitle("Optional battery settings")
-                .setMessage("Use this only if idle tests show missed calls. Android battery exemption does not guarantee deep-sleep exclusion or Telecom binding. No setting is changed automatically.")
-                .setPositiveButton("Open settings") { _, _ ->
-                    try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
-                    catch (_: RuntimeException) { toast("Battery settings are unavailable on this build.") }
-                }.setNegativeButton("Cancel", null).show()
-        }
-        button(R.id.export) {
-            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TITLE, "car-call-router-${System.currentTimeMillis()}.txt")
+            if (controller == null) {
+                toast("Start a normal call first, then try again while parked.")
+            } else {
+                controller.routeNow()
             }
-            @Suppress("DEPRECATION")
-            startActivityForResult(intent, 20)
         }
+        button(R.id.pause) {
+            SessionBridge.controller?.get()?.pauseSession() ?: toast("No active call session to pause.")
+        }
+        button(R.id.refresh) { refresh() }
+        button(R.id.advanced_toggle) {
+            advancedVisible = !advancedVisible
+            advancedContent.visibility = if (advancedVisible) View.VISIBLE else View.GONE
+            advancedToggle.setText(if (advancedVisible) R.string.hide_advanced else R.string.show_advanced)
+        }
+        button(R.id.diagnostics_toggle) {
+            diagnosticsVisible = !diagnosticsVisible
+            diagnosticsContent.visibility = if (diagnosticsVisible) View.VISIBLE else View.GONE
+            diagnosticsToggle.setText(if (diagnosticsVisible) R.string.hide_diagnostics else R.string.show_diagnostics)
+        }
+        button(R.id.battery_settings) { showBatterySettingsGuide() }
+        button(R.id.export) { exportLog() }
         refresh()
     }
+
+    private fun bindViews() {
+        master = findViewById(R.id.master)
+        readinessCard = findViewById(R.id.readiness_card)
+        readinessEyebrow = findViewById(R.id.readiness_eyebrow)
+        readinessTitle = findViewById(R.id.readiness_title)
+        readinessMessage = findViewById(R.id.readiness_message)
+        setupProgress = findViewById(R.id.setup_progress)
+        masterHelp = findViewById(R.id.master_help)
+        projectionValue = findViewById(R.id.projection_value)
+        permissionsState = findViewById(R.id.permissions_state)
+        authorizationState = findViewById(R.id.authorization_state)
+        targetValue = findViewById(R.id.target_value)
+        competitorValue = findViewById(R.id.competitor_value)
+        permissionsButton = findViewById(R.id.permissions)
+        authorizationButton = findViewById(R.id.copy_adb)
+        targetButton = findViewById(R.id.target)
+        routeNowButton = findViewById(R.id.route_now)
+        pauseButton = findViewById(R.id.pause)
+        advancedToggle = findViewById(R.id.advanced_toggle)
+        advancedContent = findViewById(R.id.advanced_content)
+        diagnosticsToggle = findViewById(R.id.diagnostics_toggle)
+        diagnosticsContent = findViewById(R.id.diagnostics_content)
+        status = findViewById(R.id.status)
+        logs = findViewById(R.id.logs)
+    }
+
     override fun onStart() {
         super.onStart()
         SessionBridge.observe(statusListener)
         RouterLog.observe(logListener)
-        monitor = ProjectionMonitor(this) { projection = it; refresh() }.also { it.start() }
+        monitor = ProjectionMonitor(this) {
+            projection = it
+            refresh()
+        }.also { it.start() }
         logs.text = RouterLog.recentText()
     }
-    override fun onResume() { super.onResume(); refresh() }
+
+    override fun onResume() {
+        super.onResume()
+        refresh()
+    }
+
     override fun onStop() {
         SessionBridge.remove(statusListener)
         RouterLog.remove(logListener)
@@ -106,55 +165,272 @@ class MainActivity : Activity() {
         monitor = null
         super.onStop()
     }
-    private fun button(id: Int, action: () -> Unit) { findViewById<Button>(id).setOnClickListener { action() } }
-    private fun toast(text: String) { Toast.makeText(this, text, Toast.LENGTH_LONG).show() }
+
+    private fun currentSetupState() = SetupState(
+        runtimePermissionsGranted = Access.runtimeGranted(this),
+        telecomAuthorized = Access.ongoingCalls(this),
+        targetSelected = settings.targetAddress != null,
+        automationEnabled = settings.enabled
+    )
 
     @SuppressLint("SetTextI18n")
     private fun refresh() {
+        val setup = currentSetupState()
         syncing = true
         master.isChecked = settings.enabled
+        // Keep the switch operable when an enabled setup loses a prerequisite,
+        // so the user can always turn automation off.
+        master.isEnabled = setup.ready || settings.enabled
         syncing = false
-        findViewById<TextView>(R.id.target_value).text = "${settings.targetName}\n${settings.targetAddress ?: "No target selected"}"
-        findViewById<TextView>(R.id.competitor_value).text = "${settings.competitorName}\n${settings.competitorAddress ?: ""}"
-        val bound = if (settings.lastBound == 0L) "Never observed" else DateFormat.getDateTimeInstance().format(Date(settings.lastBound))
-        status.text = "Version: ${BuildConfig.VERSION_NAME}\nSDK: ${android.os.Build.VERSION.SDK_INT}\nRuntime permissions: ${Access.runtimeGranted(this)}\nTelecom authorization: ${Access.ongoingCalls(this)}\nprojection-host state: ${projection ?: "unknown"}\nLast Telecom binding: $bound\n\n${SessionBridge.status}"
+
+        setupProgress.text = getString(
+            R.string.setup_progress,
+            setup.completedSteps,
+            SetupState.REQUIRED_STEPS
+        )
+        updateReadiness(setup)
+
+        masterHelp.setText(
+            when {
+                !setup.ready -> R.string.master_help_locked
+                settings.enabled -> R.string.master_help_active
+                else -> R.string.master_help_ready
+            }
+        )
+        projectionValue.setText(
+            when (projection) {
+                true -> R.string.projection_connected
+                false -> R.string.projection_not_connected
+                null -> R.string.projection_unknown
+            }
+        )
+
+        permissionsState.setText(if (setup.runtimePermissionsGranted) R.string.permissions_complete else R.string.permissions_missing)
+        permissionsButton.setText(if (setup.runtimePermissionsGranted) R.string.permissions_action_complete else R.string.permissions_action)
+        permissionsButton.isEnabled = !setup.runtimePermissionsGranted
+
+        authorizationState.setText(if (setup.telecomAuthorized) R.string.authorization_complete else R.string.authorization_missing)
+        authorizationButton.setText(if (setup.telecomAuthorized) R.string.authorization_action_complete else R.string.authorization_action)
+        authorizationButton.isEnabled = !setup.telecomAuthorized
+
+        targetValue.text = if (setup.targetSelected) {
+            getString(R.string.target_selected, settings.targetName)
+        } else {
+            getString(R.string.target_missing)
+        }
+        targetButton.setText(if (setup.targetSelected) R.string.target_action_change else R.string.target_action)
+
+        competitorValue.text = if (settings.competitorAddress == null) {
+            getString(R.string.competitor_none)
+        } else {
+            getString(R.string.competitor_selected, settings.competitorName)
+        }
+
+        routeNowButton.isEnabled = setup.ready
+        pauseButton.isEnabled = SessionBridge.controller?.get() != null
+
+        val bound = if (settings.lastBound == 0L) {
+            "Never observed"
+        } else {
+            DateFormat.getDateTimeInstance().format(Date(settings.lastBound))
+        }
+        status.text = "Version: ${BuildConfig.VERSION_NAME}\n" +
+            "Android SDK: ${android.os.Build.VERSION.SDK_INT}\n" +
+            "Runtime permissions: ${setup.runtimePermissionsGranted}\n" +
+            "Telecom authorization: ${setup.telecomAuthorized}\n" +
+            "Projection state: ${projection ?: "unknown"}\n" +
+            "Last Telecom binding: $bound\n\n" +
+            SessionBridge.status
+    }
+
+    private fun updateReadiness(setup: SetupState) {
+        when (setup.phase) {
+            SetupPhase.NEEDS_RUNTIME_PERMISSIONS -> setReadiness(
+                R.drawable.bg_status_warning,
+                R.color.warning,
+                R.string.setup_required,
+                R.string.readiness_permissions_title,
+                R.string.readiness_permissions_message
+            )
+            SetupPhase.NEEDS_TELECOM_AUTHORIZATION -> setReadiness(
+                R.drawable.bg_status_warning,
+                R.color.warning,
+                R.string.setup_required,
+                R.string.readiness_authorization_title,
+                R.string.readiness_authorization_message
+            )
+            SetupPhase.NEEDS_TARGET_DEVICE -> setReadiness(
+                R.drawable.bg_status_warning,
+                R.color.warning,
+                R.string.setup_required,
+                R.string.readiness_target_title,
+                R.string.readiness_target_message
+            )
+            SetupPhase.READY -> setReadiness(
+                R.drawable.bg_status_ready,
+                R.color.success,
+                R.string.ready_label,
+                R.string.readiness_ready_title,
+                R.string.readiness_ready_message
+            )
+            SetupPhase.ACTIVE -> setReadiness(
+                R.drawable.bg_status_active,
+                R.color.primary,
+                R.string.active_label,
+                R.string.readiness_active_title,
+                R.string.readiness_active_message
+            )
+        }
+    }
+
+    private fun setReadiness(
+        background: Int,
+        accent: Int,
+        eyebrow: Int,
+        title: Int,
+        message: Int
+    ) {
+        readinessCard.setBackgroundResource(background)
+        readinessEyebrow.setText(eyebrow)
+        readinessEyebrow.setTextColor(getColor(accent))
+        readinessTitle.setText(title)
+        readinessMessage.setText(message)
+    }
+
+    private fun explainAndRequestPermissions() {
+        if (Access.runtimeGranted(this)) {
+            toast(getString(R.string.permissions_action_complete))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.permissions_dialog_title)
+            .setMessage(R.string.permissions_dialog_message)
+            .setPositiveButton(R.string.continue_action) { _, _ ->
+                requestPermissions(Access.runtimePermissions, REQUEST_PERMISSIONS)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showAuthorizationGuide() {
+        if (Access.ongoingCalls(this)) {
+            toast(getString(R.string.authorization_action_complete))
+            return
+        }
+        val command = Access.authorizationLocal()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.authorization_dialog_title)
+            .setMessage(getString(R.string.authorization_dialog_message, command))
+            .setPositiveButton(R.string.copy_command) { _, _ ->
+                getSystemService(ClipboardManager::class.java)?.setPrimaryClip(
+                    ClipData.newPlainText("Call-routing authorization", command)
+                )
+                toast(getString(R.string.command_copied))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showBatterySettingsGuide() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.battery_dialog_title)
+            .setMessage(R.string.battery_dialog_message)
+            .setPositiveButton(R.string.open_settings) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                } catch (_: RuntimeException) {
+                    toast("Battery settings are unavailable on this Android build.")
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun exportLog() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TITLE, "car-call-router-${System.currentTimeMillis()}.txt")
+        }
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, REQUEST_EXPORT)
     }
 
     @SuppressLint("MissingPermission")
     private fun chooseDevice(competing: Boolean) {
-        if (!Access.bluetoothGranted(this)) { requestPermissions(Access.runtimePermissions, 10); return }
+        if (!Access.bluetoothGranted(this)) {
+            explainAndRequestPermissions()
+            return
+        }
         try {
             val devices = getSystemService(BluetoothManager::class.java)?.adapter?.bondedDevices
                 ?.filter { !competing || !it.address.equals(settings.targetAddress, true) }
-                ?.sortedWith(compareBy({ it.name ?: "" }, { it.address })) ?: emptyList()
-            val labels = devices.map { "${it.name ?: "Unnamed device"}\n${it.address}" }.toMutableList()
-            if (competing) labels.add(0, "None — single initial attempt, no takeover retries")
-            if (labels.isEmpty()) { toast("No paired devices. Pair a target Bluetooth call device in Bluetooth settings first."); return }
-            AlertDialog.Builder(this).setTitle(if (competing) "Competing Bluetooth call device" else "Target Bluetooth call device")
+                ?.sortedWith(compareBy({ it.name ?: "" }, { it.address }))
+                ?: emptyList()
+            val labels = devices.map { it.name ?: "Unnamed Bluetooth device" }.toMutableList()
+            if (competing) labels.add(0, getString(R.string.competitor_none))
+            if (labels.isEmpty()) {
+                toast("No paired Bluetooth devices found. Pair the car or headset in Android settings first.")
+                return
+            }
+            AlertDialog.Builder(this)
+                .setTitle(if (competing) R.string.competitor_title else R.string.target_step_title)
                 .setItems(labels.toTypedArray()) { _, index ->
-                    if (competing && index == 0) settings.setCompetitor(null, null)
-                    else {
+                    if (competing && index == 0) {
+                        settings.setCompetitor(null, null)
+                    } else {
                         val device = devices[index - if (competing) 1 else 0]
-                        if (competing) settings.setCompetitor(device.address, device.name ?: "Unnamed")
-                        else settings.setTarget(device.address, device.name ?: "Unnamed")
-                        RouterLog.event("DEVICE_SELECTED", "role=${if (competing) "competitor" else "target"}; id=${RouterLog.deviceId(device.address)}")
+                        if (competing) {
+                            settings.setCompetitor(device.address, device.name ?: "Unnamed")
+                        } else {
+                            settings.setTarget(device.address, device.name ?: "Unnamed")
+                        }
+                        RouterLog.event(
+                            "DEVICE_SELECTED",
+                            "role=${if (competing) "competitor" else "target"}; id=${RouterLog.deviceId(device.address)}"
+                        )
                     }
                     refresh()
-                }.setNegativeButton("Cancel", null).show()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         } catch (e: RuntimeException) {
             RouterLog.event("DEVICE_SELECTION_ERROR", e.javaClass.simpleName)
-            toast("Bluetooth device access failed. Check permission and turn Bluetooth on.")
+            toast("Bluetooth access failed. Check permission and make sure Bluetooth is on.")
         }
     }
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+
+    private fun button(id: Int, action: () -> Unit) {
+        findViewById<Button>(id).setOnClickListener { action() }
+    }
+
+    private fun toast(text: String) {
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         refresh()
     }
+
     @Deprecated("Framework Activity compatibility callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 20 && resultCode == RESULT_OK) data?.data?.let { uri ->
-            RouterLog.export(applicationContext, uri) { ok -> toast(if (ok) "Log exported" else "Export failed") }
+        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK) {
+            data?.data?.let { uri ->
+                RouterLog.export(applicationContext, uri) { ok ->
+                    toast(if (ok) "Log exported" else "Export failed")
+                }
+            }
         }
+    }
+
+    companion object {
+        private const val REQUEST_PERMISSIONS = 10
+        private const val REQUEST_EXPORT = 20
     }
 }
