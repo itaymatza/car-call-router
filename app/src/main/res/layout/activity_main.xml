@@ -155,20 +155,6 @@
             android:layout_marginTop="12dp" android:background="@drawable/bg_card"
             android:elevation="1dp" android:orientation="vertical" android:padding="18dp">
             <TextView style="@style/CardTitle" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="@string/authorization_step_title" />
-            <TextView android:id="@+id/authorization_state" style="@style/BodyText"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="4dp" />
-            <Button android:id="@+id/copy_adb" style="@style/SecondaryButton"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="10dp" android:text="@string/authorization_action" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:background="@drawable/bg_card"
-            android:elevation="1dp" android:orientation="vertical" android:padding="18dp">
-            <TextView style="@style/CardTitle" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="@string/target_step_title" />
             <TextView android:id="@+id/target_value" style="@style/BodyText"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -176,6 +162,20 @@
             <Button android:id="@+id/target" style="@style/SecondaryButton"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="10dp" android:text="@string/target_action" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:background="@drawable/bg_card"
+            android:elevation="1dp" android:orientation="vertical" android:padding="18dp">
+            <TextView style="@style/CardTitle" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="@string/authorization_step_title" />
+            <TextView android:id="@+id/authorization_state" style="@style/BodyText"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" />
+            <Button android:id="@+id/copy_adb" style="@style/SecondaryButton"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="10dp" android:text="@string/authorization_action" />
         </LinearLayout>
 
         <TextView style="@style/SectionTitle"
