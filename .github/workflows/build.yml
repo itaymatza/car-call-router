@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install SDK packages
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;36.0.0"'
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --channel=3 "platforms;android-CinnamonBun" "build-tools;36.0.0"'
       - name: Verify source checksum manifest
         run: bash tools/update-checksums.sh --check
       - name: Compile, unit-test, service-test and lint

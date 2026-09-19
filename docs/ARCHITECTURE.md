@@ -53,7 +53,8 @@ The master toggle is off by default. Automatic mode requires the projection-host
 
 ## Platform compatibility
 
-The application compiles against API 37, targets API 36, and requires API 34 or later. API 37's
+The application compiles against the Android 17 Cinnamon Bun preview SDK (API 37), targets stable
+API 36, and requires API 34 or later. API 37's
 `onCallEndpointRequested(CallEndpoint)` override is therefore compiler-verified. Telecom may report
 an initiating request before or after the resulting endpoint change, so self-request markers are
 consumed only by the request callback and are cleared at session teardown. A non-self request stops

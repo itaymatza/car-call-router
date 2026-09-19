@@ -1,13 +1,13 @@
 942488f863a3b2a02dc07d74b9070e78c28cd4f63faa1afe0206abebae622849  ./.github/ISSUE_TEMPLATE/bug_report.yml
 e9c9b284355d257bce3e616d131e4eb705edc814c32de700b821dcf45254cbb7  ./.github/pull_request_template.md
-1c4f16c60d5c45a0cea705a9a604d1cf0dbc83effc8679e70882b700130e3b30  ./.github/workflows/build.yml
+f01e3cc47a591895e3d677285f683541ceae2ee8a5a0272dd11e5e18fb7b909e  ./.github/workflows/build.yml
 7a648629c5296732d4d0a48054ef0600383e49d165b18382f80c52c0a758d1e7  ./.gitignore
 cf84d8bcf9014c546cf5df5d7e72ecf12e7b935d02f1f671cda092459178849e  ./CHANGELOG.md
 354cadb3261f654502b730eaf7c1f2478e2279dbfe842c376db737230c9059ba  ./CONTRIBUTING.md
 8ae5647c2653ddce6c3ab583077c0c3d275fb934ec0818a20c994a91a301c081  ./LICENSE
 908bf4a9c80d73e42c23d2624d12f0cf7092fb242bedd77d0cf6b0bbb3980f4b  ./README.md
 8d18cadb5a2d25ffd2c1df6c144e7a8eb69da4e3862b86c5f096b7e44b4e91a7  ./SECURITY.md
-de54c8b0dc9909eced841deab9bd26ec3821cdf8a0a33f0b1627cd2cb643dd21  ./app/build.gradle.kts
+9bef5ca24eaf6e5dd042a4c74b81b3acc48c9027ab1bdcf450b1066699b007db  ./app/build.gradle.kts
 1d2c0aef8f9f1d609b2f9c47aecbb9047421e36dd00e635b40ff7e25f031bf69  ./app/src/main/AndroidManifest.xml
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  ./app/src/main/assets/LICENSE-Apache-2.0.txt
 e2ce0538785bc411a64803bd9fb813615154bb2a294a61fb3c42a8cd5fc621bc  ./app/src/main/assets/THIRD_PARTY_NOTICES.txt
@@ -44,7 +44,7 @@ a078e31d42f9d4e161aff6b39cea9fc8ca685d6e571c88dbcce37be35f4d52d4  ./app/src/test
 3aaff6f1e2d499cefc14cdcd6b7e4a7f11e9b9a1f4bcde45596ca4f2544b20d2  ./app/src/test/java/org/carcallrouter/companion/core/PolicyTest.kt
 7f5006339a6007f8de9f2519751b7f249ba7ac9a7b75b9dceb7d3871f0c12813  ./app/src/test/java/org/carcallrouter/companion/ui/SetupStateTest.kt
 4fad99dfbba0c28919f2c40cc89251b4d2fa2f985cb5fa115cfe0a48b5f8ad48  ./build.gradle.kts
-86fa3af77db2a5cf98b93416dd662cc85fe0689da177e04b3e8395049c86ef49  ./docs/ARCHITECTURE.md
+aa863b669ce4055b340a806bf7de5583d7582e9bc7d1921983365a12cbe6de8f  ./docs/ARCHITECTURE.md
 5178e7fcb5370b5125e233040d6d6aaed04785847a9dad3d6341be73dcebb49c  ./docs/AUTHORIZATION.md
 c439696d0462087761d540a7452c7fa4ad21467897166ce6e4131fa9eddc5381  ./docs/CONFIGURATION.md
 e3f1e8ab4513f443d5cbdb0d87cedb0cbb59166994d5cc4d560413c75bf7645c  ./docs/PLATFORM-RESEARCH.md
@@ -62,7 +62,7 @@ aad77e3a17dac0ccca4cc3379b904f48c409352b4484a43f036eab72c5a633f9  ./tools/Proper
 e4032f389debbea5bb29674c218bd7b6a28e1f7da783065abe53d2c3248dd004  ./tools/SignVerify.java
 7676a7f61c29b082e36482d2e9237a45d0559bde8733388140b9d4a59b5a5e36  ./tools/bootstrap-gradle.ps1
 2c1068b81dfd619e1f459d2d5c1af093d44f9f4d0e874db410f93271ffffd266  ./tools/bootstrap-gradle.sh
-1394543c6a59af0ec23b763d64548706d0815267986a5d6272cd91b3c5985d1d  ./tools/install.ps1
+ae99300326da6e9bed900107cca64facda0406f98ff7a7d5e3555b3c70e4def7  ./tools/install.ps1
 45fcd5569aa3b36d4e54b96d439799bf23f3318caeaa8780454c22734856e606  ./tools/install.sh
 d6e62579f14cc52efbb7f7d44f44da89b5e97c233aed05f4ff7e26fdfc747cf6  ./tools/test-all.sh
 a1bcd398d8a62f1eb3ea16a20f8bf9b4da142eb54a86d8725080ee413419b06f  ./tools/test-core.sh

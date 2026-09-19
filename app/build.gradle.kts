@@ -13,9 +13,9 @@ val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
 
 android {
     namespace = "org.carcallrouter.companion"
-    // API 37 compiler verification is required for onCallEndpointRequested(). Keep the runtime
-    // behavior target on 36 until the Android 17 behavior changes are qualified separately.
-    compileSdk = 37
+    // API 37 compiler verification is required for onCallEndpointRequested(). Android 17 is still
+    // distributed as the Cinnamon Bun preview SDK; keep runtime targeting on stable API 36.
+    compileSdkPreview = "CinnamonBun"
 
     defaultConfig {
         applicationId = configuredApplicationId.get()
