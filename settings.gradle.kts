@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Call Route Companion"
 include(":app")
+include(":verification:service-tests")

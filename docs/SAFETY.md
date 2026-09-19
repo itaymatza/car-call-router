@@ -10,7 +10,7 @@ Calls are rejected when they are emergency or emergency-callback calls, external
 
 A fresh automatic session has a four-second startup window, waits at least 300 milliseconds between attempts, and has a maximum budget of three route requests. Once the target route is observed, only a specifically configured competing route can cause a bounded reassertion. Speaker, handset, wired, streaming, unknown Bluetooth, or other route changes are treated as possible user choices and are not fought. Routing errors stop the session without blind retry.
 
-Safety-relevant callback edges are latched before deferred evaluation. Therefore, projection loss, target loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session.
+Safety-relevant callback edges are latched before deferred evaluation. Therefore, confirmed projection loss, confirmed target HFP loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session. Temporary unknown projection/HFP evidence and transient Telecom endpoint-list gaps are not treated as confirmed loss: requests pause, stale endpoints are never submitted, and evaluation resumes only from fresh callback evidence within the bounded window.
 
 ## Authorization safety
 
