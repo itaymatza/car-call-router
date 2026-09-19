@@ -17,10 +17,14 @@
 - The API 37 endpoint-request signature and both callback orders are regression-tested; final
   dispatch validation remains a real Android 17 device gate until hosted API 37 SDK builds exist.
 - Structured evidence separates Telecom endpoint confirmation from exact target HFP audio/SCO confirmation.
+- A privacy-bounded ADB harness isolates each new device session, validates trace integrity, records
+  physical speaker/microphone and Android Auto observations, and emits a conservative combined
+  pass/fail verdict. Its parser has deterministic CI coverage.
 
 ## Release blockers
 
-- Complete the real-car stability matrix in [TESTING.md](TESTING.md) using one unchanged APK.
+- Complete the real-car stability matrix in [TESTING.md](TESTING.md) using one unchanged APK and
+  retain one capture-harness record per trial.
 - Classify every observed failure from the redacted event sequence and add a deterministic regression before changing routing behavior.
 - Pass the complete Gradle build, JVM tests, service tests, Android lint, APK package/manifest inspection, and signature verification for the release commit.
 - Verify upgrade and fresh-install flows, including AppOps authorization detection, revocation, reboot, process death, and settings preservation.

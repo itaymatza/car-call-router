@@ -11,7 +11,9 @@ trap 'rm -f "$TEMP"' EXIT
         -not -path './.git/*' \
         -not -path './.gradle/*' \
         -not -path './.tools/*' \
+        -not -path '*/__pycache__/*' \
         -not -path '*/build/*' \
+        -not -name '*.pyc' \
         -not -path './verification/current/*' \
         -not -path './SOURCE-SHA256SUMS.txt' \
         -print0 | LC_ALL=C sort -z | xargs -0 sha256sum

@@ -1,0 +1,108 @@
+import importlib.util
+import io
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+MODULE_PATH = Path(__file__).parents[1] / "analyze_device_trace.py"
+SPEC = importlib.util.spec_from_file_location("analyze_device_trace", MODULE_PATH)
+trace = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+sys.modules[SPEC.name] = trace
+SPEC.loader.exec_module(trace)
+
+
+def line(session, seq, elapsed, event, fields=""):
+    suffix = f" {fields}" if fields else ""
+    return (f"2026-09-19T12:00:00Z +123ms ROUTING_TRACE schema=1 session={session} "
+            f"seq={seq} elapsed_ms={elapsed} event={event}{suffix}\n")
+
+
+class TraceAnalyzerTest(unittest.TestCase):
+    def parse(self, content):
+        events, warnings = trace.parse_lines(io.StringIO(content))
+        return trace.summarize(events), warnings
+
+    def test_dual_confirmation_finished_session_passes(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=manual trigger=route_now")
+            + line("abc", 2, 10, "REQUEST_SUBMITTED", "attempt=1")
+            + line("abc", 3, 50, "TELECOM_ENDPOINT_CONFIRMED")
+            + line("abc", 4, 80, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 5, 900, "SESSION_FINISHED",
+                   "phase=SUCCEEDED reason=TARGET_VERIFIED termination=call_removed best_confirmation=TARGET_HFP_AUDIO")
+        )
+        summaries, warnings = self.parse(content)
+        self.assertEqual([], warnings)
+        self.assertEqual("PASS", summaries[0].status)
+        self.assertEqual(1, summaries[0].requests)
+        self.assertEqual(50, summaries[0].endpoint_latency_ms)
+        self.assertEqual(80, summaries[0].hfp_latency_ms)
+
+    def test_endpoint_only_is_incomplete(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 20, "TELECOM_ENDPOINT_CONFIRMED")
+            + line("abc", 3, 100, "SESSION_FINISHED",
+                   "phase=VERIFYING reason=AWAITING_TARGET_HFP_AUDIO termination=call_removed best_confirmation=TELECOM_ENDPOINT")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("INCOMPLETE", summaries[0].status)
+        self.assertFalse(summaries[0].hfp_audio_confirmed)
+
+    def test_sequence_gap_is_invalid(self):
+        content = line("abc", 1, 0, "SESSION_STARTED") + line("abc", 3, 10, "SESSION_FINISHED")
+        summaries, _ = self.parse(content)
+        self.assertEqual("INVALID", summaries[0].status)
+        self.assertIn("expected seq 2", summaries[0].anomalies[0])
+
+    def test_open_session_is_not_a_pass(self):
+        content = (line("abc", 1, 0, "SESSION_STARTED")
+                   + line("abc", 2, 5, "TELECOM_ENDPOINT_CONFIRMED")
+                   + line("abc", 3, 10, "TARGET_HFP_AUDIO_CONFIRMED"))
+        summaries, _ = self.parse(content)
+        self.assertEqual("OPEN", summaries[0].status)
+
+    def test_multiple_sessions_and_exclusion(self):
+        content = line("old", 1, 0, "SESSION_STARTED") + line("new", 1, 0, "SESSION_STARTED")
+        events, _ = trace.parse_lines(io.StringIO(content))
+        summaries = trace.summarize(events, {"old"})
+        self.assertEqual(["new"], [item.session for item in summaries])
+
+    def test_nontrace_ignored_and_malformed_warned(self):
+        content = "ordinary app message\nROUTING_TRACE schema=1 session=abc seq=x elapsed_ms=0 event=START\n"
+        events, warnings = trace.parse_lines(io.StringIO(content))
+        self.assertEqual([], events)
+        self.assertEqual(1, len(warnings))
+
+    def test_json_cli_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.log"
+            path.write_text(line("abc", 1, 0, "SESSION_STARTED"), encoding="utf-8")
+            output = io.StringIO()
+            original = trace.sys.stdout
+            try:
+                trace.sys.stdout = output
+                self.assertEqual(0, trace.main([str(path), "--format", "json"]))
+            finally:
+                trace.sys.stdout = original
+            parsed = json.loads(output.getvalue())
+            self.assertEqual("abc", parsed["sessions"][0]["session"])
+
+    def test_filtered_trace_omits_prior_sessions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "filtered.log"
+            events, _ = trace.parse_lines(io.StringIO(
+                line("old", 1, 0, "SESSION_STARTED") + line("new", 1, 0, "SESSION_STARTED")
+            ))
+            trace.write_filtered_trace(output, events, {"old"})
+            content = output.read_text(encoding="utf-8")
+            self.assertNotIn("session=old", content)
+            self.assertIn("session=new", content)
+
+
+if __name__ == "__main__":
+    unittest.main()

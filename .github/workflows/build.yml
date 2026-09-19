@@ -23,6 +23,8 @@ jobs:
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Verify source checksum manifest
         run: bash tools/update-checksums.sh --check
+      - name: Test device trace analyzer
+        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
       - name: Compile, unit-test, service-test and lint
         run: bash gradlew :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
       - name: Upload debug APK

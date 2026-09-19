@@ -109,3 +109,9 @@ Neither replaces a parked physical microphone and speaker test.
 ## Verification
 
 Run `bash tools/test-all.sh` for the deterministic policy, property, and service-callback suites. The pull-request workflow also executes the production-service callback harness through Gradle, assembles the APK, runs JVM unit tests, and runs Android lint before publishing the APK artifact. Passing those checks does not establish stable Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure and stability matrix in [testing guidance](docs/TESTING.md).
+
+For repeatable real-device evidence, run
+`bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing` while parked. The
+harness stores only new structured app traces plus explicit physical observations in a local,
+Git-ignored run directory and emits `PASS` only when exact HFP audio and all required observations
+agree.
