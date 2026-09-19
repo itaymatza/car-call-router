@@ -27,9 +27,8 @@ The repository workflow runs that command on pushes and pull requests with read-
 
 The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so
 callback-order and lifecycle regressions cannot be skipped merely because a machine lacks a
-standalone `kotlinc` command. CI verifies that `SOURCE-SHA256SUMS.txt` is current and contains one
-entry per tracked source/documentation file. It also runs the standard-library-only device trace
-analyzer and APK-verifier tests. After building, CI verifies the generated APK's signature,
+standalone `kotlinc` command. CI also runs the standard-library-only device trace analyzer and
+APK-verifier tests. After building, CI verifies the generated APK's signature,
 package/version identity, SDK bounds, required permissions, and debuggable state, then publishes
 the verification record beside the APK.
 
@@ -67,7 +66,7 @@ Each local, Git-ignored directory under `verification/device-runs/` contains:
 
 | File | Contents |
 |---|---|
-| `device.txt` | Scenario, UTC capture time, phone model, Android API, app version, and authorization state. |
+| `device.txt` | Scenario, UTC capture time, phone model, Android API/build fingerprint, app version, and authorization state. |
 | `trace.log` | Only new schema-1 structured routing records; prior sessions are removed. |
 | `report.txt` / `report.json` | Per-session status, confirmations, latencies, finish reason, and anomalies. |
 | `observations.txt` | Parked human checks for native HFP speaker/microphone and preserved Android Auto behavior. |
@@ -119,6 +118,7 @@ Do not promote a beta to a production release until one unchanged APK passes all
 |---|---:|---|
 | Incoming and outgoing calls | 20 of each | BMW speaker and microphone selected; Android Auto navigation/media remains available. |
 | Cold start, warm start, screen off, and post-reboot | 5 calls per state | Same routing result without opening the app. |
+| Samsung unrestricted, optimized, and restricted battery states | 5 calls per state | Binding behavior is measured explicitly; unsupported restricted behavior is documented rather than guessed. |
 | Android Auto first vs BMW Bluetooth first | 10 calls per connection order | Callback ordering does not change the result. |
 | Consecutive calls and calls after idle | 10 calls | No stale session, request budget, or endpoint identity leaks into the next call. |
 | Temporary projection/HFP unknown callbacks | Instrumented logs for each occurrence | Requests freeze and recover inside the bounded window; no false user-override classification. |
@@ -127,3 +127,9 @@ Do not promote a beta to a production release until one unchanged APK passes all
 | Hold/resume, second call, and conference | 3 trials each | Automatic reassertion stops for the session. |
 
 Acceptance requires no unexplained routing failure, no route fight after a user override, no request outside the eligibility policy, and no loss of Android Auto media/navigation. Use a fresh capture directory for every row, retain failed runs, and keep the APK version unchanged throughout a qualification batch. Never publish raw `dumpsys` or Bluetooth data without reviewing it for personal information.
+
+Record the full Android build fingerprint for every qualification batch and repeat the baseline
+after an OS or major One UI update. Freeze features during a batch; every failure must first become
+a deterministic regression fixture. With zero failures in `n` independent trials, the approximate
+one-sided 95% upper bound on the failure rate is `3/n`: 60 clean trials support a bound below 5%,
+and 100 clean trials support a bound below 3%.

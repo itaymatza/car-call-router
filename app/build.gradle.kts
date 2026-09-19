@@ -7,9 +7,12 @@ val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
     .orElse("org.carcallrouter.companion")
 val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
     .map { it.toInt() }
-    .getOrElse(4)
+    .getOrElse(5)
 val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
-    .orElse("0.3.0-beta.2")
+    .orElse("0.3.0-beta.3")
+val enableBetaSigning = providers.gradleProperty("ENABLE_BETA_SIGNING")
+    .map { it.toBoolean() }
+    .getOrElse(false)
 
 android {
     namespace = "org.carcallrouter.companion"
@@ -26,9 +29,24 @@ android {
     }
 
     buildFeatures { buildConfig = true }
+    signingConfigs {
+        if (enableBetaSigning) {
+            create("beta") {
+                storeFile = file(providers.environmentVariable("BETA_KEYSTORE_FILE").get())
+                storePassword = providers.environmentVariable("BETA_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("BETA_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("BETA_KEY_PASSWORD").get()
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (enableBetaSigning) signingConfig = signingConfigs.getByName("beta")
         }
     }
     compileOptions {

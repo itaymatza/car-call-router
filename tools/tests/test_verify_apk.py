@@ -15,7 +15,7 @@ set -eu
 case "$2" in
   badging)
     cat <<'EOF'
-package: name='org.carcallrouter.companion' versionCode='4' versionName='0.3.0-beta.2'
+package: name='org.carcallrouter.companion' versionCode='5' versionName='0.3.0-beta.3'
 sdkVersion:'34'
 targetSdkVersion:'36'
 application-debuggable
@@ -59,7 +59,7 @@ class VerifyApkTest(unittest.TestCase):
         environment["ANDROID_BUILD_TOOLS"] = str(root)
         environment["REPORT_FILE"] = str(report)
         result = subprocess.run(
-            ["bash", str(SCRIPT), str(apk), package, "4", "0.3.0-beta.2", "34", "36", "true"],
+            ["bash", str(SCRIPT), str(apk), package, "5", "0.3.0-beta.3", "34", "36", "true"],
             text=True,
             capture_output=True,
             env=environment,

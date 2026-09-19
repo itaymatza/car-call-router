@@ -11,7 +11,7 @@ Call Route Companion is a Kotlin and framework-XML Android utility. When an elig
 
 ## Project status
 
-The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.2` adds structured real-device evidence and callback-order-hardened Android 17 handling; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
+The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.3` adds non-overlapping, outcome-aware requests, separate evidence/action deadlines, transient-route debounce, persistent last-call results, and a protected signed-beta pipeline; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
 
 
 ## Public-repository posture
@@ -35,13 +35,13 @@ The source namespace is the generic value `org.carcallrouter.companion`. Overrid
 ```sh
 bash gradlew \
   -PAPP_APPLICATION_ID=example.callroute \
-  -PAPP_VERSION_CODE=4 \
-  -PAPP_VERSION_NAME=0.3.0-beta.2 \
+  -PAPP_VERSION_CODE=5 \
+  -PAPP_VERSION_NAME=0.3.0-beta.3 \
   :app:assembleDebug
 ```
 
 
-`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `4`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.2`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
+`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `5`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.3`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
 
 
 ### Runtime configuration
@@ -83,6 +83,10 @@ If Android reports that the package cannot be updated or is incompatible with th
 
 See the exact [authorization and troubleshooting guide](docs/AUTHORIZATION.md), [configuration guidance](docs/CONFIGURATION.md), [research decision](docs/PLATFORM-RESEARCH.md), and [parked-car test procedure](docs/TESTING.md).
 
+For repeatable in-place beta upgrades, configure the protected signed build described in
+[stable beta signing](docs/SIGNING.md). Ordinary GitHub debug artifacts do not have a stable
+certificate across hosted runners.
+
 ## Project documentation
 
 
@@ -92,7 +96,7 @@ Read the [architecture reference](docs/ARCHITECTURE.md) for the component bounda
 ## Safety model and limitations
 
 
-The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. It makes at most three automatic requests in a four-second startup window, observes route changes, and stops on confirmed safety-relevant events, possible user overrides, authorization loss, projection loss, target HFP loss, call hold, a second call, or a routing exception. Temporary unknown projection/HFP evidence and transient endpoint-list gaps freeze requests until fresh evidence arrives instead of being misclassified as a disconnect or user override. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.
+The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. Evidence may arrive for up to ten seconds; once routing starts, a separate 5.5-second action/guard window applies. At most three requests are allowed, never concurrently and never less than 2.5 seconds apart. Timeout and stale-endpoint failures have typed, bounded recovery; external cancellation and unknown failures stop the session. A possible alternative route during the first second after the app's request must persist before it is classified as a user override. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.
 
 
 Routing uses API 34+ `requestCallEndpointChange()` with an endpoint object from the latest `onAvailableCallEndpointsChanged()` callback. The deprecated `requestBluetoothAudio(BluetoothDevice)` path has been removed. Because the public endpoint API exposes a name and UUID but no Bluetooth address, the app resolves identity only when the saved device name is unique among live Bluetooth endpoints, or when exactly one HFP device and one Bluetooth endpoint exist. Ambiguity fails closed. Endpoint UUIDs are not persisted.

@@ -26,6 +26,7 @@ class ProjectionMonitor(context: Context, private val changed: (Boolean?) -> Uni
     private var open = false
     private var registered = false
     private var generation = 0
+    private var lastLoggedState = "uninitialized"
     private val query = object : AsyncQueryHandler(app.contentResolver) {
         override fun onQueryComplete(token: Int, cookie: Any?, cursor: Cursor?) {
             val value: Boolean? = try {
@@ -39,7 +40,11 @@ class ProjectionMonitor(context: Context, private val changed: (Boolean?) -> Uni
                 null
             }
             if (open && cookie == generation) {
-                RouterLog.event("PROJECTION", "active=$value; source=AndroidX_host_provider")
+                val state = value?.toString() ?: "unknown"
+                if (state != lastLoggedState) {
+                    lastLoggedState = state
+                    RouterLog.event("PROJECTION", "active=$value; source=AndroidX_host_provider")
+                }
                 changed(value)
             }
         }

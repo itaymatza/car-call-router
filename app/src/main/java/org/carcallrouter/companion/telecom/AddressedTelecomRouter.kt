@@ -19,6 +19,7 @@ class AddressedTelecomRouter(private val service: InCallService) {
 
     private var available: List<CallEndpoint> = emptyList()
     private var availableSnapshotReceived = false
+    private var availableRevision = 0L
     private var current: CallEndpoint? = null
     // API 37 may report the request before or after the resulting endpoint change. Counts are
     // consumed only by onCallEndpointRequested, never by onCallEndpointChanged.
@@ -26,6 +27,7 @@ class AddressedTelecomRouter(private val service: InCallService) {
 
     fun updateAvailable(endpoints: List<CallEndpoint>) {
         availableSnapshotReceived = true
+        availableRevision++
         available = endpoints.toList()
         val ids = available.map { it.identifier.toString() }.toSet()
         if (current?.identifier?.toString() !in ids) current = null
@@ -45,6 +47,7 @@ class AddressedTelecomRouter(private val service: InCallService) {
     }
 
     fun hasAvailableSnapshot(): Boolean = availableSnapshotReceived
+    fun endpointRevision(): Long = availableRevision
 
     fun target(
         savedLabel: String,

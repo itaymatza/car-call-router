@@ -25,7 +25,9 @@ git diff --cached --check
 git diff --cached
 ```
 
-Regenerate `SOURCE-SHA256SUMS.txt` after an intentional source change. The manifest is an integrity aid for the checked-out tree; it is not a signature, release attestation, or substitute for code review.
+Release trust comes from the protected signing key, the published APK digest, GitHub's artifact
+attestation, immutable action revisions, and review of the tagged source. A checksum manifest
+stored and updated in the same source tree is intentionally not used as a trust boundary.
 
 For a full Android verification where an Android SDK is available, run:
 
@@ -33,7 +35,7 @@ For a full Android verification where an Android SDK is available, run:
 bash gradlew :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run \
   :app:lintDebug --stacktrace --console=plain
 bash tools/verify-apk.sh app/build/outputs/apk/debug/app-debug.apk \
-  org.carcallrouter.companion 4 0.3.0-beta.2 34 36 true
+  org.carcallrouter.companion 5 0.3.0-beta.3 34 36 true
 ```
 
 The APK verifier fails closed on a signature error, unexpected package or version, SDK drift,

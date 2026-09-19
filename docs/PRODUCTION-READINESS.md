@@ -2,7 +2,7 @@
 
 ## Current classification
 
-`0.3.0-beta.2` is a production-hardening beta. The real-device proof of concept validates the core Telecom endpoint approach, but intermittent behavior means the project must not yet be described as production-ready.
+`0.3.0-beta.3` is a production-hardening beta. The real-device proof of concept validates the core Telecom endpoint approach, but intermittent behavior means the project must not yet be described as production-ready.
 
 ## Completed engineering gates
 
@@ -24,6 +24,14 @@
   and unexpected debuggability; its artifact includes the exact APK and certificate SHA-256 values.
 - Service regressions cover authorization and runtime-permission revocation during a pending route,
   plus process recreation without taking over an already-active call.
+- Requests are single-flight and generation-tokened. AOSP's two-second timeout is respected, new
+  requests are separated by 2.5 seconds, timeout/stale-endpoint errors have bounded typed recovery,
+  and an endpoint-gone retry requires a newer endpoint snapshot.
+- Evidence collection and routing action use separate deadlines, transient alternative routes are
+  debounced only during the immediate post-request settling period, and the UI persists the last
+  completed session result.
+- A protected, manually triggered/tag-triggered workflow builds a non-debuggable signed APK,
+  verifies its identity, publishes its SHA-256 digest, and creates a GitHub artifact attestation.
 
 ## Release blockers
 
@@ -33,7 +41,8 @@
 - Pass the complete Gradle build, JVM tests, service tests, Android lint, and APK verification for
   the release commit; repeat the APK gate against the separately signed, non-debuggable release.
 - Verify upgrade and fresh-install flows, including AppOps authorization detection, revocation, reboot, process death, and settings preservation.
-- Produce a signed release APK with a protected release key and publish its SHA-256 digest. Debug artifacts are not production releases.
+- Configure and protect the `beta-signing` environment secrets, run the signed workflow, and prove
+  that an update signed with the same key retains application data and the AppOps authorization.
 - Confirm the privacy and safety documentation matches the final behavior and that no real device identifiers or private logs are committed.
 
 ## Stability rule
