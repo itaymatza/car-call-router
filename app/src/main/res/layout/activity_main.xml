@@ -101,6 +101,21 @@
 
         <TextView style="@style/SectionTitle"
             android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/last_call_title" />
+
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:background="@drawable/bg_card" android:elevation="1dp"
+            android:orientation="vertical" android:padding="18dp">
+
+            <TextView
+                android:id="@+id/last_call_result" style="@style/BodyText"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/last_call_none" android:textIsSelectable="true" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionTitle"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="@string/automation_title" />
 
         <LinearLayout

@@ -23,14 +23,13 @@ fun main() {
                 else -> Route.values().random(random)
             }
             if (random.nextInt(100) == 0) p.suspend("explicit pause")
-            if (random.nextInt(100) == 0) p.requestFailed()
-            if (random.nextInt(4) == 0) p.observeRoute(route)
+            if (random.nextInt(4) == 0) p.observeRoute(route, now)
             fun evidence(): Boolean? = when (random.nextInt(100)) { 0 -> false; in 1..4 -> null; else -> true }
             val s = Snapshot(now, enabled = random.nextInt(100) > 1,
                 authorized = random.nextInt(100) > 1, active = random.nextInt(100) > 1,
                 singleCall = random.nextInt(100) > 1, safeCellularCall = random.nextInt(100) > 1,
                 projection = evidence(), targetHfpConnected = evidence(),
-                targetAvailable = evidence(), route = route)
+                targetAvailable = evidence(), endpointRevision = it.toLong() + 1, route = route)
             val before = p.phase
             val d = p.evaluate(s)
             transitions++
@@ -40,8 +39,8 @@ fun main() {
                 check(s.authorized && s.active && s.singleCall && s.safeCellularCall &&
                     s.targetHfpConnected == true && s.targetAvailable == true)
                 check(manual || (s.enabled && s.projection == true))
-                check(s.now < 4000)
-                check(lastRequest == null || s.now - lastRequest!! >= 300)
+                check(s.now < 15_500)
+                check(lastRequest == null || s.now - lastRequest!! >= 2_500)
                 lastRequest = s.now
                 requests++
             }

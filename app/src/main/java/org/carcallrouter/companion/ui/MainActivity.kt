@@ -35,6 +35,7 @@ class MainActivity : Activity() {
     private lateinit var readinessTitle: TextView
     private lateinit var readinessMessage: TextView
     private lateinit var setupProgress: TextView
+    private lateinit var lastCallResult: TextView
     private lateinit var masterHelp: TextView
     private lateinit var projectionValue: TextView
     private lateinit var permissionsState: TextView
@@ -125,6 +126,7 @@ class MainActivity : Activity() {
         readinessTitle = findViewById(R.id.readiness_title)
         readinessMessage = findViewById(R.id.readiness_message)
         setupProgress = findViewById(R.id.setup_progress)
+        lastCallResult = findViewById(R.id.last_call_result)
         masterHelp = findViewById(R.id.master_help)
         projectionValue = findViewById(R.id.projection_value)
         permissionsState = findViewById(R.id.permissions_state)
@@ -191,6 +193,19 @@ class MainActivity : Activity() {
             SetupState.REQUIRED_STEPS
         )
         updateReadiness(setup)
+
+        val lastSession = settings.lastSession
+        lastCallResult.text = if (lastSession == null) {
+            getString(R.string.last_call_none)
+        } else {
+            getString(
+                R.string.last_call_summary,
+                DateFormat.getDateTimeInstance().format(Date(lastSession.completedAt)),
+                lastSession.phase,
+                lastSession.reason,
+                lastSession.confirmation
+            )
+        }
 
         masterHelp.setText(
             when {
