@@ -1,7 +1,16 @@
-param([string]$Serial, [string]$Adb, [string]$ApplicationId = $env:APP_APPLICATION_ID, [switch]$SkipBuild)
+param(
+    [string]$Serial,
+    [string]$Adb,
+    [string]$ApplicationId = $env:APP_APPLICATION_ID,
+    [string]$VersionCode = $env:APP_VERSION_CODE,
+    [string]$VersionName = $env:APP_VERSION_NAME,
+    [switch]$SkipBuild
+)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path $PSScriptRoot -Parent
 if (-not $ApplicationId) { $ApplicationId = 'org.carcallrouter.companion' }
+if (-not $VersionCode) { $VersionCode = '4' }
+if (-not $VersionName) { $VersionName = '0.3.0-beta.2' }
 $SourceActivity = 'org.carcallrouter.companion.ui.MainActivity'
 if (-not $env:ANDROID_HOME -and $env:LOCALAPPDATA) {
     $Candidate = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
@@ -18,11 +27,37 @@ if (-not $SkipBuild) {
     if (-not $env:ANDROID_HOME -and -not (Test-Path (Join-Path $Root 'local.properties'))) {
         throw 'Android SDK not configured. Open this project in Android Studio and install SDK Platform 36 and Build-Tools 36.0.0.'
     }
-    & (Join-Path $Root 'gradlew.bat') "-PAPP_APPLICATION_ID=$ApplicationId" ':app:assembleDebug' ':app:testDebugUnitTest' ':verification:service-tests:run' ':app:lintDebug' '--console=plain'
+    & (Join-Path $Root 'gradlew.bat') "-PAPP_APPLICATION_ID=$ApplicationId" "-PAPP_VERSION_CODE=$VersionCode" "-PAPP_VERSION_NAME=$VersionName" ':app:assembleDebug' ':app:testDebugUnitTest' ':verification:service-tests:run' ':app:lintDebug' '--console=plain'
     if ($LASTEXITCODE -ne 0) { throw 'Build or verification failed. Nothing was installed.' }
 }
 $Apk = Join-Path $Root 'app\build\outputs\apk\debug\app-debug.apk'
 if (-not (Test-Path $Apk)) { throw "APK not found: $Apk" }
+$BuildTools = if ($env:ANDROID_BUILD_TOOLS) { $env:ANDROID_BUILD_TOOLS } else { Join-Path $env:ANDROID_HOME 'build-tools\36.0.0' }
+$Aapt = Join-Path $BuildTools 'aapt.exe'
+$ApkSigner = Join-Path $BuildTools 'apksigner.bat'
+if (-not (Test-Path $Aapt)) { throw "aapt not found: $Aapt" }
+if (-not (Test-Path $ApkSigner)) { throw "apksigner not found: $ApkSigner" }
+$Badging = (& $Aapt dump badging $Apk | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'aapt failed to inspect the APK.' }
+$ExpectedPackage = "package: name='$ApplicationId'"
+if (-not $Badging.Contains($ExpectedPackage)) { throw "APK package does not match $ApplicationId" }
+if (-not $Badging.Contains("versionCode='$VersionCode'")) { throw "APK version code does not match $VersionCode" }
+if (-not $Badging.Contains("versionName='$VersionName'")) { throw "APK version name does not match $VersionName" }
+if (-not $Badging.Contains("sdkVersion:'34'")) { throw 'APK minimum SDK is not 34.' }
+if (-not $Badging.Contains("targetSdkVersion:'36'")) { throw 'APK target SDK is not 36.' }
+if (-not $Badging.Contains('application-debuggable')) { throw 'Expected a debuggable test APK.' }
+$Permissions = (& $Aapt dump permissions $Apk | Out-String)
+foreach ($Permission in @('android.permission.BLUETOOTH_CONNECT', 'android.permission.READ_PHONE_NUMBERS', 'android.permission.MANAGE_ONGOING_CALLS')) {
+    if (-not $Permissions.Contains($Permission)) { throw "APK is missing $Permission" }
+}
+$ManifestTree = (& $Aapt dump xmltree $Apk AndroidManifest.xml | Out-String)
+foreach ($ManifestValue in @('org.carcallrouter.companion.telecom.RouterInCallService', 'android.permission.BIND_INCALL_SERVICE', 'android.telecom.InCallService')) {
+    if (-not $ManifestTree.Contains($ManifestValue)) { throw "APK manifest is missing $ManifestValue" }
+}
+& $ApkSigner verify --verbose --print-certs $Apk
+if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }
+$ApkSha256 = (Get-FileHash -Algorithm SHA256 $Apk).Hash.ToLowerInvariant()
+Write-Host "APK verified: package=$ApplicationId version=$VersionName ($VersionCode) SHA-256=$ApkSha256"
 $DeviceText = & $Adb devices
 if ($LASTEXITCODE -ne 0) { throw 'adb devices failed' }
 $Online = @($DeviceText | ForEach-Object { if ($_ -match '^(\S+)\s+device$') { $Matches[1] } })

@@ -30,14 +30,33 @@ Regenerate `SOURCE-SHA256SUMS.txt` after an intentional source change. The manif
 For a full Android verification where an Android SDK is available, run:
 
 ```sh
-bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
+bash gradlew :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run \
+  :app:lintDebug --stacktrace --console=plain
+bash tools/verify-apk.sh app/build/outputs/apk/debug/app-debug.apk \
+  org.carcallrouter.companion 4 0.3.0-beta.2 34 36 true
 ```
+
+The APK verifier fails closed on a signature error, unexpected package or version, SDK drift,
+missing required permissions, or an unexpected debuggable state. It prints the signing-certificate
+and whole-APK SHA-256 digests. CI saves the same record beside the debug APK artifact.
 
 A successful build or CI job does not demonstrate protected-permission admission, call routing, Bluetooth audio, microphone behavior, or projection coexistence on a physical device.
 
 ## Release checklist
 
 A release candidate should have a clean working tree, passing deterministic tests, a passing Android build and lint job, reviewed dependency changes, and documentation that matches the source. Keep build artifacts out of the repository. If distributing an APK, sign it outside the repository with controlled signing material and publish its checksum separately from the source tree.
+
+After signing a non-debuggable release APK, verify the exact release identity before distribution:
+
+```sh
+REPORT_FILE=release-apk-verification.txt \
+  bash tools/verify-apk.sh signed-release.apk \
+  YOUR_APPLICATION_ID VERSION_CODE VERSION_NAME 34 36 false
+```
+
+Publish the generated verification record with the APK. It is evidence about that exact byte
+sequence and certificate, not proof of physical-device stability. Never store the keystore,
+password, or signing configuration in this repository.
 
 Use a new application ID that the distributor controls when creating a separately distributed app. Document the application ID, version code, version name, supported Android versions, and device-test limitations for that release. Do not imply that a generic source repository has been validated on a particular phone, vehicle, headset, dialer, or projection environment unless reproducible evidence is published without exposing personal data.
 

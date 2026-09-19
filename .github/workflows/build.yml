@@ -23,13 +23,23 @@ jobs:
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Verify source checksum manifest
         run: bash tools/update-checksums.sh --check
-      - name: Test device trace analyzer
-        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
+      - name: Test host tooling
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_*.py'
+          bash -n tools/*.sh verification/service-tests/run.sh
+          pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "tools/install.ps1"), [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
       - name: Compile, unit-test, service-test and lint
         run: bash gradlew :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
+      - name: Verify APK signature and manifest identity
+        env:
+          REPORT_FILE: verification/current/apk-verification.txt
+        run: bash tools/verify-apk.sh app/build/outputs/apk/debug/app-debug.apk org.carcallrouter.companion 4 0.3.0-beta.2 34 36 true
       - name: Upload debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: car-call-router-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            verification/current/apk-verification.txt
           if-no-files-found: error
+          retention-days: 14
