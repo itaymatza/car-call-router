@@ -7,8 +7,8 @@ The Android Gradle module accepts three optional Gradle properties. They may be 
 | Property | Default | Purpose |
 |---|---|---|
 | `APP_APPLICATION_ID` | `org.carcallrouter.companion` | Installable Android application ID. Choose an ID controlled by the build owner. |
-| `APP_VERSION_CODE` | `2` | Monotonically increasing Android version code. |
-| `APP_VERSION_NAME` | `0.2.0` | Human-readable version string. |
+| `APP_VERSION_CODE` | `3` | Monotonically increasing Android version code. |
+| `APP_VERSION_NAME` | `0.3.0-beta.1` | Human-readable version string. |
 
 Example:
 
@@ -50,7 +50,7 @@ Older builds created inappropriate companion associations. The current build rem
 
 ## Projection integration
 
-Automatic mode uses the AndroidX car-app host-provider protocol as an optional projection-state gate. The monitor deliberately avoids inferring projection state from Bluetooth names, Wi-Fi networks, package process state, or broadcast extras. A missing, unknown, or lost projection state prevents new automatic route requests. The manual one-shot has an explicit projection-gate bypass for parked testing only.
+Automatic mode uses the AndroidX car-app host-provider protocol as an optional projection-state gate. The monitor deliberately avoids inferring projection state from Bluetooth names, Wi-Fi networks, package process state, or broadcast extras. A missing or temporarily unknown projection state freezes new automatic route requests until fresh evidence arrives; a confirmed disconnect stops an active guard. The manual one-shot has an explicit projection-gate bypass for parked testing only.
 
 ## References
 

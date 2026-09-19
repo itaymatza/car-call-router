@@ -70,15 +70,15 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         hfp = HfpMonitor(this) {
             // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
             val address = settings.targetAddress?.uppercase()
-            if (guardHasActed() && (address == null || !hfp.known || address !in hfp.connected)) {
+            if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
                 suspendSessionFromEvent("target Bluetooth HFP disappeared; this session stays paused")
             }
             queueEvaluation()
         }
         projectionMonitor = ProjectionMonitor(this) { value ->
             projection = value
-            if (!manualSession && guardHasActed() && value != true) {
-                suspendSessionFromEvent("Projection disappeared or became unknown; this session stays paused")
+            if (!manualSession && guardHasActed() && value == false) {
+                suspendSessionFromEvent("Projection disconnected; this session stays paused")
             }
             queueEvaluation()
         }
@@ -176,9 +176,6 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     override fun onAvailableCallEndpointsChanged(availableEndpoints: MutableList<CallEndpoint>) {
         super.onAvailableCallEndpointsChanged(availableEndpoints)
         router.updateAvailable(availableEndpoints)
-        if (guardHasActed() && targetEndpoint().endpoint == null) {
-            suspendSessionFromEvent("selected call endpoint disappeared or became ambiguous; this session stays paused")
-        }
         RouterLog.event("AVAILABLE_ENDPOINTS", availableEndpoints.joinToString { "type=${it.endpointType},id=${RouterLog.deviceId(it.identifier.toString())}" })
         queueEvaluation()
     }
@@ -226,6 +223,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             CallEndpoint.TYPE_WIRED_HEADSET -> RoutingPolicy.Route.WIRED
             CallEndpoint.TYPE_STREAMING -> RoutingPolicy.Route.STREAMING
             CallEndpoint.TYPE_BLUETOOTH -> when {
+                !hfp.known -> RoutingPolicy.Route.UNKNOWN
                 router.isCurrent(targetEndpoint().endpoint) -> RoutingPolicy.Route.TARGET
                 router.isCurrent(competitorEndpoint().endpoint) -> RoutingPolicy.Route.COMPETING_DEVICE
                 else -> RoutingPolicy.Route.OTHER_BLUETOOTH
@@ -270,9 +268,13 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             else -> "SIM-backed call and emergency-number checks passed"
         }
         val address = settings.targetAddress?.uppercase()
-        val connected = address != null && hfp.known && address in hfp.connected
+        val hfpConnected = when {
+            address == null -> false
+            !hfp.known -> null
+            else -> address in hfp.connected
+        }
         val target = targetEndpoint()
-        val available = target.endpoint != null && connected
+        val endpointAvailable = if (router.hasAvailableSnapshot()) target.endpoint != null else null
         val now = SystemClock.elapsedRealtime()
         val decision = policy.evaluate(RoutingPolicy.Snapshot(
             now = now,
@@ -282,7 +284,8 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             singleCall = live.size == 1 && records.size == 1,
             safeCellularCall = safe,
             projection = projection,
-            targetAvailable = available,
+            targetHfpConnected = hfpConnected,
+            targetAvailable = endpointAvailable,
             route = currentRoute()
         ))
         if (decision.requestTarget && target.endpoint != null) {
@@ -306,7 +309,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             }
         }
         val sco = address != null && address in hfp.audioConnected
-        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\nSelected device: endpoint resolved=${target.endpoint != null}; HFP connected=$connected; SCO=$sco\nEndpoint resolution: ${target.reason}\nRoute: ${currentRoute()}\nController: ${policy.phase}; attempts=${policy.requests}\n${policy.reason}"
+        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\nSelected device: endpoint resolved=${target.endpoint != null}; HFP connected=${hfpConnected ?: "unknown"}; SCO=$sco\nEndpoint resolution: ${target.reason}\nRoute: ${currentRoute()}\nController: ${policy.phase}; attempts=${policy.requests}\n${policy.reason}"
         if (state != lastPublished) {
             lastPublished = state
             RouterLog.event("STATUS", state.replace("\n", " | "))

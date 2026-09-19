@@ -18,12 +18,15 @@ class AddressedTelecomRouter(private val service: InCallService) {
     )
 
     private var available: List<CallEndpoint> = emptyList()
+    private var availableSnapshotReceived = false
     private var current: CallEndpoint? = null
     private var pendingRequestId: String? = null
 
     fun updateAvailable(endpoints: List<CallEndpoint>) {
+        availableSnapshotReceived = true
         available = endpoints.toList()
         val ids = available.map { it.identifier.toString() }.toSet()
+        if (current?.identifier?.toString() !in ids) current = null
         if (pendingRequestId !in ids) pendingRequestId = null
     }
 
@@ -32,9 +35,16 @@ class AddressedTelecomRouter(private val service: InCallService) {
         if (pendingRequestId == endpoint.identifier.toString()) pendingRequestId = null
     }
 
-    fun current(): CallEndpoint? = current ?: try {
-        service.currentCallEndpoint.also { current = it }
-    } catch (_: RuntimeException) { null }
+    fun current(): CallEndpoint? {
+        current?.let { return it }
+        return try {
+            service.currentCallEndpoint.takeIf { endpoint ->
+                !availableSnapshotReceived || available.any { it.identifier == endpoint.identifier }
+            }?.also { current = it }
+        } catch (_: RuntimeException) { null }
+    }
+
+    fun hasAvailableSnapshot(): Boolean = availableSnapshotReceived
 
     fun target(
         savedLabel: String,

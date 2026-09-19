@@ -17,7 +17,10 @@ class RoutingPolicy(
         val singleCall: Boolean = true,
         val safeCellularCall: Boolean = true,
         val projection: Boolean? = true,
-        val targetAvailable: Boolean = true,
+        /** null means the Bluetooth profile service cannot currently provide evidence. */
+        val targetHfpConnected: Boolean? = true,
+        /** null means Telecom has not delivered its first endpoint snapshot yet. */
+        val targetAvailable: Boolean? = true,
         val route: Route = Route.COMPETING_DEVICE
     )
     data class Decision(val requestTarget: Boolean = false, val wakeAt: Long? = null)
@@ -87,14 +90,29 @@ class RoutingPolicy(
             pendingUntil = null
             return Decision()
         }
-        if (!manual && s.projection != true) {
-            if (requests > 0 || verified) return stop("Projection disappeared or became unknown")
-            reason = "Waiting for verified projection-host state"
+        if (!manual && s.projection == false) {
+            if (requests > 0 || verified) return stop("Projection disconnected")
+            reason = "Waiting for Android Auto projection"
             return Decision(wakeAt = deadline)
         }
-        if (!s.targetAvailable) {
-            if (requests > 0 || verified) return stop("Configured target device call device disappeared")
-            reason = "Waiting for configured target device in Telecom's supported Bluetooth devices"
+        if (!manual && s.projection == null) {
+            reason = "Projection state temporarily unknown; routing paused pending fresh evidence"
+            return Decision(wakeAt = deadline)
+        }
+        if (s.targetHfpConnected == false) {
+            if (requests > 0 || verified) return stop("Configured target disconnected from Bluetooth HFP")
+            reason = "Waiting for configured target Bluetooth HFP connection"
+            return Decision(wakeAt = deadline)
+        }
+        if (s.targetHfpConnected == null) {
+            reason = "Bluetooth HFP state temporarily unknown; routing paused pending fresh evidence"
+            return Decision(wakeAt = deadline)
+        }
+        if (s.targetAvailable != true) {
+            reason = if (s.targetAvailable == null)
+                "Waiting for Telecom's first call-endpoint snapshot"
+            else
+                "Waiting for configured target in Telecom's current call endpoints"
             return Decision(wakeAt = deadline)
         }
         if (s.route == Route.TARGET) {
