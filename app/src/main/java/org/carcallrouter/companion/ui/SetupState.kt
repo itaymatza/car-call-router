@@ -24,8 +24,8 @@ data class SetupState(
 
     val phase: SetupPhase = when {
         !runtimePermissionsGranted -> SetupPhase.NEEDS_RUNTIME_PERMISSIONS
-        !telecomAuthorized -> SetupPhase.NEEDS_TELECOM_AUTHORIZATION
         !targetSelected -> SetupPhase.NEEDS_TARGET_DEVICE
+        !telecomAuthorized -> SetupPhase.NEEDS_TELECOM_AUTHORIZATION
         automationEnabled -> SetupPhase.ACTIVE
         else -> SetupPhase.READY
     }
