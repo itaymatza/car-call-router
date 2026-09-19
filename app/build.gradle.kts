@@ -7,13 +7,15 @@ val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
     .orElse("org.carcallrouter.companion")
 val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
     .map { it.toInt() }
-    .getOrElse(3)
+    .getOrElse(4)
 val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
-    .orElse("0.3.0-beta.1")
+    .orElse("0.3.0-beta.2")
 
 android {
     namespace = "org.carcallrouter.companion"
-    compileSdk = 36
+    // API 37 compiler verification is required for onCallEndpointRequested(). Keep the runtime
+    // behavior target on 36 until the Android 17 behavior changes are qualified separately.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = configuredApplicationId.get()

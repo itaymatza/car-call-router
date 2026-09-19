@@ -17,6 +17,7 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 | `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | Broadcast extras are not trusted; state is re-queried from the profile service. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
 | `RoutingPolicy` | Pure Kotlin state machine that decides whether a routing request is permitted, delayed, released, or stopped. | Enforces a four-second window, a 300 ms request gap, and a three-request maximum. |
+| `RoutingTrace` | Emits versioned, redacted, session-sequenced evidence with stable reason codes and elapsed timings. | Separates a Telecom endpoint observation from exact target HFP audio/SCO evidence; it does not claim physical microphone quality. |
 | `EndpointIdentity` and `AddressedTelecomRouter` | Resolve the saved paired target against live API 34+ endpoints and issue the request. | Uses only callback-supplied endpoint objects. Unique label or one-to-one HFP topology is required; ambiguity fails closed. |
 | `RouterInCallService` | Coordinates Telecom, route, endpoint, projection, HFP, and call callbacks on the main thread. | Safety-relevant events are latched before deferred evaluation so that later callbacks cannot erase them. |
 
@@ -27,7 +28,10 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 3. `RoutingPolicy` rejects the snapshot unless all automatic-mode prerequisites hold. A manual one-shot bypasses only the master-toggle and projection checks.
 4. When eligible, the policy allows at most one outstanding request. `AddressedTelecomRouter` submits the exact current callback object to `requestCallEndpointChange`.
 5. The service waits for `onCallEndpointChanged`. An accepted outcome is not route verification.
-6. Temporary unknown observer evidence freezes requests until a fresh callback arrives. Confirmed loss or a user alternative stops the session. The policy releases control after the bounded startup guard.
+6. A matching endpoint produces `TELECOM_ENDPOINT_CONFIRMED`. Only a matching endpoint together
+   with the exact configured Bluetooth address in HFP audio/SCO state produces
+   `TARGET_HFP_AUDIO_CONFIRMED`.
+7. Temporary unknown observer evidence freezes requests until a fresh callback arrives. Confirmed loss or a user alternative stops the session. The policy releases control after the bounded startup guard.
 
 ## State machine
 
@@ -49,7 +53,12 @@ The master toggle is off by default. Automatic mode requires the projection-host
 
 ## Platform compatibility
 
-The application compiles and targets API 36 and requires API 34 or later. It declares API 37's `onCallEndpointRequested(CallEndpoint)` virtual signature without directly linking a newer SDK; Android 37 can dispatch it, while API 34–36 safely ignore it. The callback stops the bounded guard when another in-call UI requests an endpoint. On API 34–36, endpoint-change callbacks and the existing route-observation rules provide the available protection.
+The application compiles against API 37, targets API 36, and requires API 34 or later. API 37's
+`onCallEndpointRequested(CallEndpoint)` override is therefore compiler-verified. Telecom may report
+an initiating request before or after the resulting endpoint change, so self-request markers are
+consumed only by the request callback and are cleared at session teardown. A non-self request stops
+the bounded guard as a possible user override. On API 34–36, endpoint-change callbacks and the
+existing route-observation rules provide the available protection.
 
 `CallEndpoint.identifier` is unique on the device but the public contract does not promise a persistent Bluetooth-address identity, and AOSP keeps the Bluetooth address mapping inside Telecom. The app therefore never persists the identifier. It maps the saved paired device to each live callback set using a unique endpoint label, with a one-endpoint/one-HFP-device fallback. This is intentionally conservative and OEM-dependent.
 

@@ -16,9 +16,9 @@ if (-not $Adb) {
 }
 if (-not $SkipBuild) {
     if (-not $env:ANDROID_HOME -and -not (Test-Path (Join-Path $Root 'local.properties'))) {
-        throw 'Android SDK not configured. Open this project in Android Studio and install SDK Platform 36 and Build-Tools 35.0.0.'
+        throw 'Android SDK not configured. Open this project in Android Studio and install SDK Platform 37 and Build-Tools 36.0.0.'
     }
-    & (Join-Path $Root 'gradlew.bat') "-PAPP_APPLICATION_ID=$ApplicationId" ':app:assembleDebug' ':app:testDebugUnitTest' ':app:lintDebug' '--console=plain'
+    & (Join-Path $Root 'gradlew.bat') "-PAPP_APPLICATION_ID=$ApplicationId" ':app:assembleDebug' ':app:testDebugUnitTest' ':verification:service-tests:run' ':app:lintDebug' '--console=plain'
     if ($LASTEXITCODE -ne 0) { throw 'Build or verification failed. Nothing was installed.' }
 }
 $Apk = Join-Path $Root 'app\build\outputs\apk\debug\app-debug.apk'

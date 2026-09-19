@@ -11,7 +11,7 @@ Call Route Companion is a Kotlin and framework-XML Android utility. When an elig
 
 ## Project status
 
-The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.1` begins the stability-qualification phase; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
+The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.2` adds structured real-device evidence and compiler-verified Android 17 callback handling; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
 
 
 ## Public-repository posture
@@ -35,13 +35,13 @@ The source namespace is the generic value `org.carcallrouter.companion`. Overrid
 ```sh
 bash gradlew \
   -PAPP_APPLICATION_ID=example.callroute \
-  -PAPP_VERSION_CODE=3 \
-  -PAPP_VERSION_NAME=0.3.0-beta.1 \
+  -PAPP_VERSION_CODE=4 \
+  -PAPP_VERSION_NAME=0.3.0-beta.2 \
   :app:assembleDebug
 ```
 
 
-`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `3`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.1`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
+`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `4`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.2`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
 
 
 ### Runtime configuration
@@ -96,6 +96,11 @@ The policy fails closed. It requires Telecom authorization, runtime permissions,
 
 
 Routing uses API 34+ `requestCallEndpointChange()` with an endpoint object from the latest `onAvailableCallEndpointsChanged()` callback. The deprecated `requestBluetoothAudio(BluetoothDevice)` path has been removed. Because the public endpoint API exposes a name and UUID but no Bluetooth address, the app resolves identity only when the saved device name is unique among live Bluetooth endpoints, or when exactly one HFP device and one Bluetooth endpoint exist. Ambiguity fails closed. Endpoint UUIDs are not persisted.
+
+Diagnostics deliberately distinguish `TELECOM_ENDPOINT_CONFIRMED` from
+`TARGET_HFP_AUDIO_CONFIRMED`. The former means Telecom selected the intended endpoint object; the
+latter also corroborates that the exact locally configured Bluetooth address owns HFP audio/SCO.
+Neither replaces a parked physical microphone and speaker test.
 
 
 > Configure and test only while parked. Do not rely on this project for emergency, safety-critical, or hands-free compliance use cases.

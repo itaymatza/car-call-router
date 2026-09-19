@@ -11,7 +11,7 @@ fi
 ADB="${ADB:-${ANDROID_HOME:+$ANDROID_HOME/platform-tools/adb}}"
 ADB="${ADB:-adb}"
 SERIAL="${1:-}"
-[[ "${SKIP_BUILD:-0}" == 1 ]] || bash "$ROOT/gradlew" "-PAPP_APPLICATION_ID=$PACKAGE" :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
+[[ "${SKIP_BUILD:-0}" == 1 ]] || bash "$ROOT/gradlew" "-PAPP_APPLICATION_ID=$PACKAGE" :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:run :app:lintDebug --console=plain
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
 [[ -f "$APK" ]] || { echo "Missing APK: $APK" >&2; exit 1; }
 if [[ -z "$SERIAL" ]]; then

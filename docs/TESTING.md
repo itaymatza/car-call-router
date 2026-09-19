@@ -22,7 +22,10 @@ bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktra
 
 The repository workflow runs that command on pushes and pull requests with read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
 
-The Gradle workflow also runs `:verification:service-tests:run`, so callback-order and lifecycle regressions cannot be skipped merely because a machine lacks a standalone `kotlinc` command.
+The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so
+callback-order and lifecycle regressions cannot be skipped merely because a machine lacks a
+standalone `kotlinc` command. CI verifies that `SOURCE-SHA256SUMS.txt` is current and contains one
+entry per tracked source/documentation file.
 
 ## Verify device authorization
 
@@ -55,6 +58,12 @@ On 2026-09-19, the project owner confirmed the proof of concept on the intended 
 10. End the call, export the redacted diagnostic log if the route failed, and inspect it before sharing. Only after the one-shot test succeeds should automatic mode be enabled.
 
 Repeat separately for outgoing and incoming calls. Then test call hold/resume and a second incoming call; the expected safe behavior is to stop automatic reassertion. Conferences and emergency calls must never be used as positive routing tests.
+
+For a successful run, the exported trace should contain both
+`TELECOM_ENDPOINT_CONFIRMED` and `TARGET_HFP_AUDIO_CONFIRMED` for the same `session`. The events
+include a schema version, sequence, and elapsed milliseconds. Endpoint confirmation without HFP
+audio confirmation is incomplete evidence and must not be counted as a successful microphone and
+speaker result.
 
 ## Production stability matrix
 

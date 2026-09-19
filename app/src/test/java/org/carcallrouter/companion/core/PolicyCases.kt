@@ -49,7 +49,7 @@ object PolicyCases {
         "manual success releases immediately" to { val p=policy(manual=true); p.evaluate(Snapshot(0)); p.evaluate(Snapshot(50,route=Route.TARGET)); check(p.phase==Phase.RELEASED) },
         "request exception prevents retries" to { val p=policy(); p.evaluate(Snapshot(0)); p.requestFailed(); check(!p.evaluate(Snapshot(1600)).requestTarget) },
         "new session resets pause and counters" to { val p=policy(); p.evaluate(Snapshot(0)); p.suspend("pause"); p.begin(9000,Route.COMPETING_DEVICE); check(p.evaluate(Snapshot(9000)).requestTarget); check(p.requests==1) }
-    ) + auditCases() + safetyCases()
+    ) + auditCases() + safetyCases() + traceCases()
 
     private fun auditCases(): List<Pair<String, () -> Unit>> = listOf(
         "manual one-shot cannot bypass Telecom authorization" to {
@@ -124,4 +124,41 @@ object PolicyCases {
             "conference rejected" to { check(CallSafety.rejection(safe.copy(conference=true))!=null) }
         )
     }
+
+    private fun traceCases(): List<Pair<String, () -> Unit>> = listOf(
+        "routing trace is structured and sequenced" to {
+            var now = 100L
+            val lines = mutableListOf<String>()
+            val trace = RoutingTrace({ now }, { "test session" }, lines::add)
+            trace.begin("automatic", "fresh active")
+            now = 125
+            trace.event("REQUEST_SUBMITTED", "attempt" to 1)
+            check(lines[0].contains("schema=1 session=test_session seq=1 elapsed_ms=0 event=SESSION_STARTED"))
+            check(lines[1].contains("seq=2 elapsed_ms=25 event=REQUEST_SUBMITTED attempt=1"))
+        },
+        "routing trace distinguishes Telecom from HFP audio confirmation" to {
+            var now = 0L
+            val lines = mutableListOf<String>()
+            val trace = RoutingTrace({ now }, { "session" }, lines::add)
+            trace.begin("automatic", "active")
+            now = 40
+            trace.confirmTelecom()
+            now = 70
+            trace.confirmTargetHfpAudio()
+            now = 100
+            trace.finish(Phase.RELEASED, RoutingPolicy.ReasonCode.STARTUP_COMPLETE, "test_complete")
+            check(lines.any { it.contains("event=TELECOM_ENDPOINT_CONFIRMED") })
+            check(lines.any { it.contains("event=TARGET_HFP_AUDIO_CONFIRMED") })
+            check(lines.last().contains("best_confirmation=TARGET_HFP_AUDIO"))
+        },
+        "routing trace never fabricates HFP confirmation" to {
+            val lines = mutableListOf<String>()
+            val trace = RoutingTrace({ 0L }, { "session" }, lines::add)
+            trace.begin("automatic", "active")
+            trace.confirmTelecom()
+            trace.finish(Phase.FAILED, RoutingPolicy.ReasonCode.REQUEST_NOT_VERIFIED, "test_complete")
+            check(lines.none { it.contains("event=TARGET_HFP_AUDIO_CONFIRMED") })
+            check(lines.last().contains("best_confirmation=TELECOM_ENDPOINT"))
+        }
+    )
 }
