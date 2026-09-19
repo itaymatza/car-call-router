@@ -32,5 +32,6 @@ class MemoryPrefs:SharedPreferences{
 }
 open class Context {
  fun getSharedPreferences(name:String,mode:Int):SharedPreferences=prefs
+ val mainExecutor:java.util.concurrent.Executor get()=java.util.concurrent.Executor{it.run()}
  companion object {const val MODE_PRIVATE=0;var prefs:SharedPreferences=MemoryPrefs()}
 }

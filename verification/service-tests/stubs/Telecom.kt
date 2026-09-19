@@ -4,7 +4,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
 import android.os.SystemClock
-import android.bluetooth.BluetoothDevice
+import android.os.OutcomeReceiver
 import java.io.FileDescriptor
 import java.io.PrintWriter
 class Call(var details:Details){
@@ -26,22 +26,20 @@ class Call(var details:Details){
   const val STATE_SELECT_PHONE_ACCOUNT=8;const val STATE_CONNECTING=9;const val STATE_DISCONNECTING=10
  }
 }
-class CallAudioState(val route:Int,val activeBluetoothDevice:BluetoothDevice?,val supportedBluetoothDevices:Collection<BluetoothDevice>){
- companion object{const val ROUTE_EARPIECE=1;const val ROUTE_BLUETOOTH=2;const val ROUTE_WIRED_HEADSET=4;const val ROUTE_SPEAKER=8}
-}
-class CallEndpoint(val endpointType:Int,val identifier:java.util.UUID=java.util.UUID.randomUUID()){
+class CallEndpoint(val endpointName:CharSequence,val endpointType:Int,val identifier:java.util.UUID=java.util.UUID.randomUUID()){
+ constructor(endpointType:Int):this("",endpointType)
  companion object{const val TYPE_UNKNOWN=-1;const val TYPE_EARPIECE=1;const val TYPE_BLUETOOTH=2;const val TYPE_WIRED_HEADSET=3;const val TYPE_SPEAKER=4;const val TYPE_STREAMING=5}
 }
+class CallEndpointException(val code:Int,message:String="test endpoint error"):RuntimeException(message)
 open class InCallService:Context(){
- var callAudioState:CallAudioState?=null
  val issuedRequests=mutableListOf<Pair<Long,String>>()
  var requestException:RuntimeException?=null
- fun requestBluetoothAudio(device:BluetoothDevice){requestException?.let{throw it};issuedRequests.add(SystemClock.elapsedRealtime() to device.address)}
+ var currentCallEndpoint:CallEndpoint=CallEndpoint("Handset",CallEndpoint.TYPE_EARPIECE)
+ fun requestCallEndpointChange(endpoint:CallEndpoint,executor:java.util.concurrent.Executor,receiver:OutcomeReceiver<Void?,CallEndpointException>){requestException?.let{throw it};issuedRequests.add(SystemClock.elapsedRealtime() to endpoint.identifier.toString());executor.execute{receiver.onResult(null)}}
  open fun onCreate(){}
  open fun onBind(i:Intent):IBinder?=object:IBinder{}
  open fun onCallAdded(c:Call){}
  open fun onCallRemoved(c:Call){}
- open fun onCallAudioStateChanged(s:CallAudioState){}
  open fun onCallEndpointChanged(e:CallEndpoint){}
  open fun onAvailableCallEndpointsChanged(e:MutableList<CallEndpoint>){}
  open fun onUnbind(i:Intent)=false

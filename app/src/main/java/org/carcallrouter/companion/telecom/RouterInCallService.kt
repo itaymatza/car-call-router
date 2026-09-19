@@ -8,7 +8,6 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.telecom.Call
-import android.telecom.CallAudioState
 import android.telecom.CallEndpoint
 import android.telecom.InCallService
 import org.carcallrouter.companion.Access
@@ -31,9 +30,6 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private lateinit var projectionMonitor: ProjectionMonitor
     private lateinit var hfp: HfpMonitor
     private var projection: Boolean? = null
-    private var audio: CallAudioState? = null
-    private var endpoint: CallEndpoint? = null
-    private var lastRouteSource = "audio"
     private var sequence = 0
     private var disposed = false
     private var policy = RoutingPolicy()
@@ -46,7 +42,6 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private val records = IdentityHashMap<Call, Record>()
     private val tick = Runnable {
         // One-shot deadline verification, not continuous polling.
-        router.state()?.let { audio = it; lastRouteSource = "audio" }
         evaluate()
     }
     private val evaluateEvent = Runnable { evaluate() }
@@ -68,9 +63,6 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         sessionStarted = false
         manualSession = false
         projection = null
-        audio = null
-        endpoint = null
-        lastRouteSource = "audio"
         lastPublished = ""
         settings = RouterSettings(this)
         router = AddressedTelecomRouter(this)
@@ -147,8 +139,6 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         if (!sessionStarted && state == Call.STATE_ACTIVE) {
             sessionStarted = true
             manualSession = false
-            audio = router.state()
-            lastRouteSource = "audio"
             if (record.sawPreActive && previous != Call.STATE_HOLDING) {
                 policy.begin(SystemClock.elapsedRealtime(), currentRoute())
                 RouterLog.event("SESSION_START", "call=${record.id}; detected ACTIVE transition; target=${RouterLog.deviceId(settings.targetAddress)}")
@@ -174,25 +164,10 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         super.onCallRemoved(call)
     }
 
-    override fun onCallAudioStateChanged(audioState: CallAudioState) {
-        super.onCallAudioStateChanged(audioState)
-        audio = audioState
-        lastRouteSource = "audio"
-        policy.observeRoute(currentRoute())
-        if (guardHasActed() && router.supported(audioState, settings.targetAddress) == null) {
-            suspendSessionFromEvent("target device disappeared from Telecom devices; this session stays paused")
-        }
-        RouterLog.event("TELECOM_AUDIO", "route=${audioState.route}; active=${RouterLog.deviceId(router.activeAddress(audioState))}; targetAvailable=${router.supported(audioState, settings.targetAddress) != null}")
-        queueEvaluation()
-    }
-
     override fun onCallEndpointChanged(callEndpoint: CallEndpoint) {
         super.onCallEndpointChanged(callEndpoint)
-        endpoint = callEndpoint
-        lastRouteSource = "endpoint"
-        if (callEndpoint.endpointType != CallEndpoint.TYPE_BLUETOOTH) {
-            policy.observeRoute(currentRoute())
-        }
+        router.updateCurrent(callEndpoint)
+        policy.observeRoute(currentRoute())
         // Device names may contain personal data, so log only type + a salted ID.
         RouterLog.event("ENDPOINT", "type=${callEndpoint.endpointType}; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}")
         queueEvaluation()
@@ -200,8 +175,28 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
 
     override fun onAvailableCallEndpointsChanged(availableEndpoints: MutableList<CallEndpoint>) {
         super.onAvailableCallEndpointsChanged(availableEndpoints)
+        router.updateAvailable(availableEndpoints)
+        if (guardHasActed() && targetEndpoint().endpoint == null) {
+            suspendSessionFromEvent("selected call endpoint disappeared or became ambiguous; this session stays paused")
+        }
         RouterLog.event("AVAILABLE_ENDPOINTS", availableEndpoints.joinToString { "type=${it.endpointType},id=${RouterLog.deviceId(it.identifier.toString())}" })
         queueEvaluation()
+    }
+
+    /**
+     * Forward-compatible API 37 callback. Compiling against API 36 keeps the build on the latest
+     * stable SDK available to CI; Android 37 dispatches this same virtual method signature.
+     */
+    @Suppress("unused")
+    fun onCallEndpointRequested(callEndpoint: CallEndpoint) {
+        val own = router.isOwnPendingRequest(callEndpoint)
+        RouterLog.event(
+            "ENDPOINT_REQUEST_OBSERVED",
+            "type=${callEndpoint.endpointType}; ownPending=$own; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}"
+        )
+        if (sessionStarted && !own) {
+            suspendSessionFromEvent("Another in-call UI requested an endpoint; respecting possible user override")
+        }
     }
 
     private fun guardHasActed(): Boolean = sessionStarted &&
@@ -224,32 +219,37 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     }
 
     private fun currentRoute(): RoutingPolicy.Route {
-        val e = endpoint
-        if (lastRouteSource == "endpoint" && e != null) {
-            when (e.endpointType) {
-                CallEndpoint.TYPE_SPEAKER -> return RoutingPolicy.Route.SPEAKER
-                CallEndpoint.TYPE_EARPIECE -> return RoutingPolicy.Route.HANDSET
-                CallEndpoint.TYPE_WIRED_HEADSET -> return RoutingPolicy.Route.WIRED
-                CallEndpoint.TYPE_STREAMING -> return RoutingPolicy.Route.STREAMING
-                CallEndpoint.TYPE_UNKNOWN -> return RoutingPolicy.Route.UNKNOWN
-                CallEndpoint.TYPE_BLUETOOTH -> if (audio?.route != CallAudioState.ROUTE_BLUETOOTH) return RoutingPolicy.Route.UNKNOWN
+        val current = router.current() ?: return RoutingPolicy.Route.UNKNOWN
+        return when (current.endpointType) {
+            CallEndpoint.TYPE_SPEAKER -> RoutingPolicy.Route.SPEAKER
+            CallEndpoint.TYPE_EARPIECE -> RoutingPolicy.Route.HANDSET
+            CallEndpoint.TYPE_WIRED_HEADSET -> RoutingPolicy.Route.WIRED
+            CallEndpoint.TYPE_STREAMING -> RoutingPolicy.Route.STREAMING
+            CallEndpoint.TYPE_BLUETOOTH -> when {
+                router.isCurrent(targetEndpoint().endpoint) -> RoutingPolicy.Route.TARGET
+                router.isCurrent(competitorEndpoint().endpoint) -> RoutingPolicy.Route.COMPETING_DEVICE
+                else -> RoutingPolicy.Route.OTHER_BLUETOOTH
             }
-        }
-        return when (audio?.route) {
-            CallAudioState.ROUTE_BLUETOOTH -> {
-                val address = router.activeAddress(audio)
-                when {
-                    address == null -> RoutingPolicy.Route.UNKNOWN
-                    address.equals(settings.targetAddress, true) -> RoutingPolicy.Route.TARGET
-                    address.equals(settings.competitorAddress, true) -> RoutingPolicy.Route.COMPETING_DEVICE
-                    else -> RoutingPolicy.Route.OTHER_BLUETOOTH
-                }
-            }
-            CallAudioState.ROUTE_SPEAKER -> RoutingPolicy.Route.SPEAKER
-            CallAudioState.ROUTE_EARPIECE -> RoutingPolicy.Route.HANDSET
-            CallAudioState.ROUTE_WIRED_HEADSET -> RoutingPolicy.Route.WIRED
             else -> RoutingPolicy.Route.UNKNOWN
         }
+    }
+
+    private fun targetEndpoint(): AddressedTelecomRouter.Target {
+        val address = settings.targetAddress?.uppercase()
+        return router.target(
+            savedLabel = settings.targetName,
+            targetHfpConnected = address != null && hfp.known && address in hfp.connected,
+            connectedHfpCount = if (hfp.known) hfp.connected.size else 0
+        )
+    }
+
+    private fun competitorEndpoint(): AddressedTelecomRouter.Target {
+        val address = settings.competitorAddress?.uppercase()
+        return router.target(
+            savedLabel = settings.competitorName,
+            targetHfpConnected = address != null && hfp.known && address in hfp.connected,
+            connectedHfpCount = if (hfp.known) hfp.connected.size else 0
+        )
     }
 
     private fun liveCalls(): List<Call> = records.keys.filter {
@@ -270,9 +270,9 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             else -> "SIM-backed call and emergency-number checks passed"
         }
         val address = settings.targetAddress?.uppercase()
-        val supported = router.supported(audio, address)
         val connected = address != null && hfp.known && address in hfp.connected
-        val available = supported != null && connected
+        val target = targetEndpoint()
+        val available = target.endpoint != null && connected
         val now = SystemClock.elapsedRealtime()
         val decision = policy.evaluate(RoutingPolicy.Snapshot(
             now = now,
@@ -285,18 +285,28 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             targetAvailable = available,
             route = currentRoute()
         ))
-        if (decision.requestTarget && supported != null) {
+        if (decision.requestTarget && target.endpoint != null) {
             try {
-                RouterLog.event("ROUTE_REQUEST", "target=${RouterLog.deviceId(address)}; attempt=${policy.requests}; mode=${if (manualSession) "manual" else "auto"}; backend=Telecom.requestBluetoothAudio")
-                router.request(supported)
-                RouterLog.event("ROUTE_SUBMITTED", "Void API returned; NOT proof of route success. Awaiting callbacks.")
+                RouterLog.event("ROUTE_REQUEST", "target=${RouterLog.deviceId(address)}; attempt=${policy.requests}; mode=${if (manualSession) "manual" else "auto"}; backend=Telecom.requestCallEndpointChange; basis=${target.basis}")
+                router.request(
+                    target.endpoint,
+                    accepted = {
+                        RouterLog.event("ROUTE_ACCEPTED", "Telecom accepted the request; awaiting endpoint callback verification")
+                        queueEvaluation()
+                    },
+                    rejected = { error ->
+                        policy.requestFailed()
+                        RouterLog.event("ROUTE_REJECTED", "code=${error.code}")
+                        queueEvaluation()
+                    }
+                )
             } catch (e: RuntimeException) {
                 policy.requestFailed()
                 RouterLog.event("ROUTE_ERROR", e.javaClass.simpleName)
             }
         }
         val sco = address != null && address in hfp.audioConnected
-        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\ntarget device: Telecom available=${supported != null}; HFP connected=$connected; SCO=$sco\nRoute: ${currentRoute()}\nController: ${policy.phase}; attempts=${policy.requests}\n${policy.reason}"
+        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\nSelected device: endpoint resolved=${target.endpoint != null}; HFP connected=$connected; SCO=$sco\nEndpoint resolution: ${target.reason}\nRoute: ${currentRoute()}\nController: ${policy.phase}; attempts=${policy.requests}\n${policy.reason}"
         if (state != lastPublished) {
             lastPublished = state
             RouterLog.event("STATUS", state.replace("\n", " | "))
@@ -314,8 +324,6 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             return
         }
         // This explicit one-shot bypasses only auto toggle/projection, NOT safety/identity checks.
-        audio = router.state()
-        lastRouteSource = "audio"
         sessionStarted = true
         manualSession = true
         policy.begin(now, currentRoute(), manualOneShot = true)

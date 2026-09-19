@@ -13,7 +13,10 @@ class RouterSettings(context: Context) {
     val competitorAddress: String? get() = prefs.getString("competitor", null)
     val competitorName: String get() = prefs.getString("competitor_name", "None — no takeover retries") ?: "None"
     fun setTarget(address: String, name: String) {
-        val edit = prefs.edit().putString("target", address).putString("target_name", name)
+        val edit = prefs.edit()
+            .putString("target", address)
+            .putString("target_name", name)
+            .putBoolean("enabled", false)
         if (address.equals(competitorAddress, true)) edit.remove("competitor").remove("competitor_name")
         edit.apply()
     }

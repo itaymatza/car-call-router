@@ -3,14 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
-    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- getPhoneAccount requires this to classify a call as SIM-backed. -->
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
-    <!-- Granted through Android's companion-device path when supported; local ADB is the fallback. -->
+    <!-- signature|appop: a normal non-wearable APK has no runtime permission dialog for this. -->
     <uses-permission android:name="android.permission.MANAGE_ONGOING_CALLS"
         tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.CALL_COMPANION_APP" />
     <queries>
         <provider android:authorities="androidx.car.app.connection" />
     </queries>

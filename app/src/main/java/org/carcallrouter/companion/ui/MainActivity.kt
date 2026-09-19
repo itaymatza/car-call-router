@@ -4,14 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
-import android.companion.AssociationInfo
-import android.companion.AssociationRequest
-import android.companion.BluetoothDeviceFilter
-import android.companion.CompanionDeviceManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
-import android.content.IntentSender
 import android.os.Bundle
 import android.provider.Settings
 import android.text.method.ScrollingMovementMethod
@@ -23,6 +18,7 @@ import android.widget.TextView
 import android.widget.Toast
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.BuildConfig
+import org.carcallrouter.companion.LegacyAssociationCleanup
 import org.carcallrouter.companion.ProjectionMonitor
 import org.carcallrouter.companion.R
 import org.carcallrouter.companion.RouterLog
@@ -60,8 +56,6 @@ class MainActivity : Activity() {
     private var syncing = false
     private var advancedVisible = false
     private var diagnosticsVisible = false
-    private var authorizationPending = false
-    private var authorizationDialogLaunched = false
     private var monitor: ProjectionMonitor? = null
     private var projection: Boolean? = null
     private val statusListener: () -> Unit = { refresh() }
@@ -77,6 +71,7 @@ class MainActivity : Activity() {
         }
 
         settings = RouterSettings(this)
+        LegacyAssociationCleanup.run(this, settings)
         bindViews()
         logs.movementMethod = ScrollingMovementMethod()
 
@@ -217,14 +212,10 @@ class MainActivity : Activity() {
         permissionsButton.isEnabled = !setup.runtimePermissionsGranted
 
         authorizationState.setText(
-            when {
-                setup.telecomAuthorized -> R.string.authorization_complete
-                authorizationPending -> R.string.authorization_waiting
-                else -> R.string.authorization_missing
-            }
+            if (setup.telecomAuthorized) R.string.authorization_complete else R.string.authorization_missing
         )
         authorizationButton.setText(if (setup.telecomAuthorized) R.string.authorization_action_complete else R.string.authorization_action)
-        authorizationButton.isEnabled = !setup.telecomAuthorized && !authorizationPending && setup.targetSelected
+        authorizationButton.isEnabled = !setup.telecomAuthorized && setup.targetSelected
 
         targetValue.text = if (setup.targetSelected) {
             getString(R.string.target_selected, settings.targetName)
@@ -335,112 +326,24 @@ class MainActivity : Activity() {
             toast(getString(R.string.authorization_target_required))
             return
         }
-        val manager = getSystemService(CompanionDeviceManager::class.java)
-        if (manager == null) {
-            toast(getString(R.string.authorization_unavailable))
-            showAuthorizationGuide()
-            return
-        }
-        val alreadyAssociated = runCatching {
-            manager.myAssociations.any {
-                it.deviceMacAddress?.toString()?.equals(targetAddress, ignoreCase = true) == true
-            }
-        }.getOrDefault(false)
-        if (alreadyAssociated) {
-            RouterLog.event("AUTH_ASSOCIATION", "target already associated; checking Telecom access")
-            showAuthorizationGuide()
-            return
-        }
-
-        val request = AssociationRequest.Builder()
-            .addDeviceFilter(
-                BluetoothDeviceFilter.Builder()
-                    .setAddress(targetAddress)
-                    .build()
-            )
-            .setSingleDevice(true)
-            .build()
-
-        authorizationPending = true
-        refresh()
-        RouterLog.event("AUTH_ASSOCIATION", "requesting exact selected Bluetooth device")
-        try {
-            manager.associate(
-                request,
-                mainExecutor,
-                object : CompanionDeviceManager.Callback() {
-                    override fun onAssociationPending(intentSender: IntentSender) {
-                        try {
-                            authorizationDialogLaunched = true
-                            toast(getString(R.string.authorization_started))
-                            startIntentSenderForResult(
-                                intentSender,
-                                REQUEST_CALL_AUTHORIZATION,
-                                null,
-                                0,
-                                0,
-                                0
-                            )
-                        } catch (e: IntentSender.SendIntentException) {
-                            authorizationFailed(e.javaClass.simpleName)
-                        }
-                    }
-
-                    override fun onAssociationCreated(associationInfo: AssociationInfo) {
-                        authorizationDialogLaunched = false
-                        RouterLog.event("AUTH_ASSOCIATION", "Android approved companion device")
-                        verifyCallAuthorization(0)
-                    }
-
-                    override fun onFailure(errorMessage: CharSequence?) {
-                        val reason = errorMessage?.toString() ?: "unknown"
-                        if (authorizationDialogLaunched) {
-                            // Android also reports the chooser outcome through onActivityResult.
-                            // Let that callback distinguish a user cancellation from a setup error.
-                            RouterLog.event("AUTH_ASSOCIATION_ERROR", reason)
-                        } else {
-                            authorizationFailed(reason)
-                        }
-                    }
-                }
-            )
-        } catch (e: RuntimeException) {
-            authorizationFailed(e.javaClass.simpleName)
-        }
+        RouterLog.event("AUTH_GUIDE", "Protected AppOp is not granted; showing one-time ADB setup")
+        showAuthorizationGuide()
     }
 
-    private fun verifyCallAuthorization(attempt: Int) {
+    private fun verifyCallAuthorization() {
         if (Access.ongoingCalls(this)) {
-            authorizationPending = false
-            RouterLog.event("AUTH_COMPLETE", "MANAGE_ONGOING_CALLS detected after association")
+            RouterLog.event("AUTH_COMPLETE", "MANAGE_ONGOING_CALLS detected")
             refresh()
             toast(getString(R.string.authorization_success))
             return
         }
-        if (attempt < AUTHORIZATION_CHECK_ATTEMPTS) {
-            window.decorView.postDelayed(
-                { verifyCallAuthorization(attempt + 1) },
-                AUTHORIZATION_CHECK_DELAY_MS
-            )
-            return
-        }
-        authorizationPending = false
-        RouterLog.event("AUTH_FALLBACK", "companion association did not grant Telecom access")
+        RouterLog.event("AUTH_MISSING", "MANAGE_ONGOING_CALLS still unavailable after user verification")
         refresh()
-        showAuthorizationGuide()
-    }
-
-    private fun authorizationFailed(reason: String) {
-        authorizationPending = false
-        authorizationDialogLaunched = false
-        RouterLog.event("AUTH_ASSOCIATION_ERROR", reason)
-        refresh()
-        toast(getString(R.string.authorization_unavailable))
-        showAuthorizationGuide()
+        toast(getString(R.string.authorization_not_detected))
     }
 
     private fun showAuthorizationGuide() {
-        val command = Access.authorizationLocal()
+        val command = Access.authorizationAdb()
         AlertDialog.Builder(this)
             .setTitle(R.string.authorization_dialog_title)
             .setMessage(getString(R.string.authorization_dialog_message, command))
@@ -450,6 +353,7 @@ class MainActivity : Activity() {
                 )
                 toast(getString(R.string.command_copied))
             }
+            .setNeutralButton(R.string.verify_authorization) { _, _ -> verifyCallAuthorization() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -490,7 +394,10 @@ class MainActivity : Activity() {
                 ?.filter { !competing || !it.address.equals(settings.targetAddress, true) }
                 ?.sortedWith(compareBy({ it.name ?: "" }, { it.address }))
                 ?: emptyList()
-            val labels = devices.map { it.name ?: "Unnamed Bluetooth device" }.toMutableList()
+            val labels = devices.map {
+                val suffix = it.address.takeLast(5)
+                "${it.alias ?: it.name ?: "Unnamed Bluetooth device"} • $suffix"
+            }.toMutableList()
             if (competing) labels.add(0, getString(R.string.competitor_none))
             if (labels.isEmpty()) {
                 toast("No paired Bluetooth devices found. Pair the car or headset in Android settings first.")
@@ -504,9 +411,9 @@ class MainActivity : Activity() {
                     } else {
                         val device = devices[index - if (competing) 1 else 0]
                         if (competing) {
-                            settings.setCompetitor(device.address, device.name ?: "Unnamed")
+                            settings.setCompetitor(device.address, device.alias ?: device.name ?: "Unnamed")
                         } else {
-                            settings.setTarget(device.address, device.name ?: "Unnamed")
+                            settings.setTarget(device.address, device.alias ?: device.name ?: "Unnamed")
                         }
                         RouterLog.event(
                             "DEVICE_SELECTED",
@@ -543,13 +450,6 @@ class MainActivity : Activity() {
     @Deprecated("Framework Activity compatibility callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_CALL_AUTHORIZATION && resultCode != RESULT_OK) {
-            authorizationPending = false
-            authorizationDialogLaunched = false
-            RouterLog.event("AUTH_ASSOCIATION", "Android approval cancelled")
-            refresh()
-            toast(getString(R.string.authorization_cancelled))
-        }
         if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK) {
             data?.data?.let { uri ->
                 RouterLog.export(applicationContext, uri) { ok ->
@@ -562,8 +462,5 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_PERMISSIONS = 10
         private const val REQUEST_EXPORT = 20
-        private const val REQUEST_CALL_AUTHORIZATION = 30
-        private const val AUTHORIZATION_CHECK_ATTEMPTS = 5
-        private const val AUTHORIZATION_CHECK_DELAY_MS = 350L
     }
 }

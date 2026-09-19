@@ -4,7 +4,7 @@
 **A generic Android 14+ reference implementation for a safety-bounded, user-configured call-audio route request.**
 
 
-Call Route Companion is a Kotlin and framework-XML Android companion application. When an eligible cellular call makes a fresh transition to `ACTIVE`, it can request Telecom to route call audio to a **locally selected paired Bluetooth device**. The optional projection-state gate is based on the AndroidX host-provider protocol, rather than a particular hardware ecosystem, handset, dialer, or projection product.
+Call Route Companion is a Kotlin and framework-XML Android utility. When an eligible cellular call makes a fresh transition to `ACTIVE`, it asks Android Telecom to select a **current, user-chosen Bluetooth call endpoint**. It does not change Android Auto media/navigation routing, become the default dialer, or manipulate `AudioManager`.
 
 
 > This repository contains source code, deterministic tests, and a build workflow. The tracked source tree does **not** include device configurations, Bluetooth addresses, signing materials, APKs, exported logs, or a claim of real-device behavior. Successful GitHub Actions runs publish a generated debug APK as a downloadable build artifact.
@@ -31,19 +31,25 @@ The source namespace is the generic value `org.carcallrouter.companion`. Overrid
 ```sh
 bash gradlew \
   -PAPP_APPLICATION_ID=example.callroute \
-  -PAPP_VERSION_CODE=1 \
-  -PAPP_VERSION_NAME=0.1.0 \
+  -PAPP_VERSION_CODE=2 \
+  -PAPP_VERSION_NAME=0.2.0 \
   :app:assembleDebug
 ```
 
 
-`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `1`; and `APP_VERSION_NAME` defaults to `0.1.0`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
+`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `2`; and `APP_VERSION_NAME` defaults to `0.2.0`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
 
 
 ### Runtime configuration
 
 
-The app is deliberately configuration-driven at runtime. Before enabling automation, grant the requested runtime permissions, select a paired target Bluetooth call device, and use **Authorize call routing**. The app then opens Android's one-time companion-device approval for that exact Bluetooth address and verifies whether Telecom access was granted. If the device does not grant access through that supported flow, the app displays the existing local-ADB command as a fallback. You may also select the only competing device that may receive a bounded reassertion. The UI does not contain a built-in device name, address, car brand, phone brand, or dialer requirement.
+The app is configuration-driven at runtime. Grant the requested runtime permissions, select the exact paired call device, complete the one-time ADB authorization, and verify the result in the app. You may also select the only competing device that may receive a bounded reassertion. The UI contains no built-in device name, address, car brand, phone brand, or dialer requirement.
+
+## Why ADB is required
+
+`MANAGE_ONGOING_CALLS` is a `signature|appop` permission. Android documents the companion path specifically for a physical **wearable**; associating a car is not a supported general grant mechanism. A normal utility APK also cannot request this permission through a runtime dialog. The other supported route is becoming the default dialer, which requires a complete dial pad plus incoming and ongoing call UI and would replace the user's existing Phone experience. This project deliberately does not impersonate an incomplete dialer.
+
+The selected architecture is therefore a non-UI `InCallService` with a one-time ADB AppOps grant. The app checks `TelecomManager.hasManageOngoingCallsPermission()` and never treats a command, button tap, or service declaration as proof of authorization.
 
 
 See [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
@@ -68,10 +74,10 @@ If Android reports that the package cannot be updated or is incompatible with th
 1. Pair the intended car or headset in Android's Bluetooth settings and keep it nearby and powered on.
 2. Open Call Route Companion and select **Allow permissions**.
 3. Select **Choose Bluetooth device**, then choose the intended call device.
-4. Select **Authorize call routing** and approve the exact device in Android's system dialog.
-5. Wait for the app to report **Authorization complete**. If the phone does not grant Telecom access through the association, use the ADB fallback shown by the app.
+4. Select **Set up one-time ADB authorization** and follow the displayed steps.
+5. Return to the app and tap **Verify**. Continue only after the status says authorization is detected.
 
-Android deliberately owns the confirmation dialog; the app cannot approve it on your behalf. Companion-device association records an app-to-device relationship but does not pair or connect Bluetooth by itself. See the full [configuration guidance](docs/CONFIGURATION.md) for limitations and fallback instructions.
+See the full [configuration guidance](docs/CONFIGURATION.md), [research decision](docs/PLATFORM-RESEARCH.md), and [parked-car test procedure](docs/TESTING.md).
 
 ## Project documentation
 
@@ -85,10 +91,12 @@ Read the [architecture reference](docs/ARCHITECTURE.md) for the component bounda
 The policy fails closed. It requires Telecom authorization, runtime permissions, a verifiably SIM-backed non-emergency call, a single active call, a configured target present in both Telecom and HFP state, and—when using automatic mode—a verified projection-host state. It makes at most three automatic requests in a four-second startup window, observes route changes, and stops on safety-relevant events, possible user overrides, authorization loss, projection loss, target loss, call hold, a second call, or a routing exception. The explicit manual one-shot bypasses only the automatic toggle and projection gate; it does not bypass authorization, identity, device-presence, or emergency safeguards.
 
 
-The Android compatibility boundary uses the deprecated `Telecom.requestBluetoothAudio(BluetoothDevice)` API because current public `CallEndpoint` APIs do not expose a stable Bluetooth hardware address for deterministic target matching. This is a reference implementation, not a guarantee of acceptance by every Android build, dialer, Bluetooth stack, vehicle, or headset.
+Routing uses API 34+ `requestCallEndpointChange()` with an endpoint object from the latest `onAvailableCallEndpointsChanged()` callback. The deprecated `requestBluetoothAudio(BluetoothDevice)` path has been removed. Because the public endpoint API exposes a name and UUID but no Bluetooth address, the app resolves identity only when the saved device name is unique among live Bluetooth endpoints, or when exactly one HFP device and one Bluetooth endpoint exist. Ambiguity fails closed. Endpoint UUIDs are not persisted.
 
 
 > Configure and test only while parked. Do not rely on this project for emergency, safety-critical, or hands-free compliance use cases.
 
 
 ## Verification
+
+Run `bash tools/test-all.sh` for the deterministic policy and service-callback suites. The pull-request workflow is the authoritative reproducible Android build check: it assembles the APK, runs JVM unit tests, and runs Android lint before publishing the APK artifact. Passing those checks does not establish Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure in [testing guidance](docs/TESTING.md).

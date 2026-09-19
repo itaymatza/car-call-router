@@ -1,6 +1,7 @@
 package android.os
 import java.util.PriorityQueue
 interface IBinder
+interface OutcomeReceiver<R,E:Throwable>{fun onResult(result:R);fun onError(error:E)}
 class Looper { companion object { private val main=Looper(); fun getMainLooper()=main } }
 object SystemClock { fun elapsedRealtime()=TestQueue.now }
 object TestQueue {
