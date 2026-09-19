@@ -12,12 +12,12 @@ class SetupStateTest {
             SetupState(false, false, false, false).phase
         )
         assertEquals(
-            SetupPhase.NEEDS_TELECOM_AUTHORIZATION,
+            SetupPhase.NEEDS_TARGET_DEVICE,
             SetupState(true, false, false, false).phase
         )
         assertEquals(
-            SetupPhase.NEEDS_TARGET_DEVICE,
-            SetupState(true, true, false, false).phase
+            SetupPhase.NEEDS_TELECOM_AUTHORIZATION,
+            SetupState(true, false, true, false).phase
         )
     }
 
