@@ -58,8 +58,9 @@ class RoutingTrace(
         phase: RoutingPolicy.Phase,
         reason: RoutingPolicy.ReasonCode,
         termination: String
-    ) {
-        if (sessionId == null) return
+    ): Confirmation? {
+        if (sessionId == null) return null
+        val result = confirmation
         event(
             "SESSION_FINISHED",
             "phase" to phase,
@@ -68,6 +69,7 @@ class RoutingTrace(
             "best_confirmation" to confirmation
         )
         sessionId = null
+        return result
     }
 
     fun isActive(): Boolean = sessionId != null

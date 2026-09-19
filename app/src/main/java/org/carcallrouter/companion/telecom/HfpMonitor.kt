@@ -20,6 +20,7 @@ class HfpMonitor(private val context: Context, private val changed: () -> Unit) 
     private var headset: BluetoothHeadset? = null
     private var closed = false
     private var registered = false
+    private var lastLoggedState: String? = null
     var known = false; private set
     var connected: Set<String> = emptySet(); private set
     var audioConnected: Set<String> = emptySet(); private set
@@ -87,7 +88,11 @@ class HfpMonitor(private val context: Context, private val changed: () -> Unit) 
             audioConnected = emptySet()
             RouterLog.event("HFP_QUERY_ERROR", e.javaClass.simpleName)
         }
-        RouterLog.event("HFP_STATE", "known=$known; connected=${connected.map(RouterLog::deviceId)}; sco=${audioConnected.map(RouterLog::deviceId)}")
+        val stateKey = "$known|${connected.sorted()}|${audioConnected.sorted()}"
+        if (stateKey != lastLoggedState) {
+            lastLoggedState = stateKey
+            RouterLog.event("HFP_STATE", "known=$known; connected=${connected.map(RouterLog::deviceId)}; sco=${audioConnected.map(RouterLog::deviceId)}")
+        }
         changed()
     }
     override fun close() {

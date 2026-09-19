@@ -89,6 +89,7 @@ python3 "$ROOT/tools/analyze_device_trace.py" "$TEMP_DIR/before.trace" --session
 MANUFACTURER="$("${ADB[@]}" shell getprop ro.product.manufacturer | tr -d '\r\n')"
 MODEL="$("${ADB[@]}" shell getprop ro.product.model | tr -d '\r\n')"
 SDK="$("${ADB[@]}" shell getprop ro.build.version.sdk | tr -d '\r\n')"
+BUILD_FINGERPRINT="$("${ADB[@]}" shell getprop ro.build.fingerprint | tr -d '\r\n')"
 VERSION_NAME="$("${ADB[@]}" shell dumpsys package "$PACKAGE" | awk -F= '/versionName=/{gsub(/\r/,"",$2); print $2; exit}')"
 VERSION_CODE="$("${ADB[@]}" shell dumpsys package "$PACKAGE" | awk '/versionCode=/{for(i=1;i<=NF;i++) if($i ~ /^versionCode=/){sub(/^versionCode=/,"",$i); print $i; exit}}')"
 cat >"$OUTPUT/device.txt" <<EOF
@@ -97,6 +98,7 @@ scenario=$SCENARIO
 manufacturer=$MANUFACTURER
 model=$MODEL
 android_api=$SDK
+build_fingerprint=$BUILD_FINGERPRINT
 package=$PACKAGE
 version_name=$VERSION_NAME
 version_code=$VERSION_CODE

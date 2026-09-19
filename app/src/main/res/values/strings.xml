@@ -17,6 +17,9 @@
     <string name="readiness_active_title">Calls will use your selected device</string>
     <string name="readiness_active_message">The app is ready and will make a bounded routing request when an eligible call starts.</string>
     <string name="setup_progress">%1$d of %2$d required steps complete</string>
+    <string name="last_call_title">Last call result</string>
+    <string name="last_call_none">No completed routing session has been recorded yet.</string>
+    <string name="last_call_summary">%1$s\nResult: %2$s\nReason: %3$s\nBest confirmation: %4$s</string>
     <string name="automation_title">Automatic routing</string>
     <string name="master">Route eligible calls automatically</string>
     <string name="master_help_locked">Complete the required setup steps below to enable automation.</string>
@@ -63,7 +66,7 @@
     <string name="competitor_none">None — do not retry after the initial request</string>
     <string name="competitor_selected">%1$s may trigger a bounded retry</string>
     <string name="competitor_action">Choose competing device</string>
-    <string name="competitor_help">Leave this unset for the safest behavior. When selected, only this device may trigger limited retry attempts during the first four seconds of a call.</string>
+    <string name="competitor_help">Leave this unset for the safest behavior. When selected, only this device may trigger limited, non-overlapping retries during the bounded startup guard.</string>
     <string name="battery_settings">Battery settings (only if calls are missed)</string>
     <string name="battery_dialog_title">Optional battery settings</string>
     <string name="battery_dialog_message">Use this only if real tests show missed calls while the phone is idle. A battery exemption does not guarantee Telecom binding, and the app will not change this setting automatically.</string>

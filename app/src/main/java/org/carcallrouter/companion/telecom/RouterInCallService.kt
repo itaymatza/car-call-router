@@ -9,6 +9,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.telecom.Call
 import android.telecom.CallEndpoint
+import android.telecom.CallEndpointException
 import android.telecom.InCallService
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.ProjectionMonitor
@@ -197,7 +198,10 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         }
         if (records.isEmpty()) {
             handler.removeCallbacks(tick)
-            trace.finish(policy.phase, policy.reasonCode, "call_removed")
+            val confirmation = trace.finish(policy.phase, policy.reasonCode, "call_removed")
+            if (confirmation != null) {
+                settings.recordLastSession(policy.phase.name, policy.reasonCode.name, confirmation.name)
+            }
             router.clearSession()
             policy = RoutingPolicy()
             lastTracePolicy = null
@@ -213,7 +217,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     override fun onCallEndpointChanged(callEndpoint: CallEndpoint) {
         super.onCallEndpointChanged(callEndpoint)
         router.updateCurrent(callEndpoint)
-        policy.observeRoute(currentRoute())
+        policy.observeRoute(currentRoute(), SystemClock.elapsedRealtime())
         // Device names may contain personal data, so log only type + a salted ID.
         RouterLog.event("ENDPOINT", "type=${callEndpoint.endpointType}; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}")
         trace.event(
@@ -355,6 +359,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             projection = projection,
             targetHfpConnected = hfpConnected,
             targetAvailable = endpointAvailable,
+            endpointRevision = router.endpointRevision(),
             route = currentRoute()
         ))
         val policyState = policy.phase to policy.reasonCode
@@ -368,6 +373,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             )
         }
         if (decision.requestTarget && target.endpoint != null) {
+            val attempt = requireNotNull(decision.requestAttempt)
             try {
                 RouterLog.event("ROUTE_REQUEST", "target=${RouterLog.deviceId(address)}; attempt=${policy.requests}; mode=${if (manualSession) "manual" else "auto"}; backend=Telecom.requestCallEndpointChange; basis=${target.basis}")
                 trace.event(
@@ -380,21 +386,28 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
                 router.request(
                     target.endpoint,
                     accepted = {
-                        RouterLog.event("ROUTE_ACCEPTED", "Telecom accepted the request; awaiting endpoint callback verification")
-                        trace.event("REQUEST_ACCEPTED", "attempt" to policy.requests)
+                        policy.requestSucceeded(attempt, SystemClock.elapsedRealtime())
+                        RouterLog.event("ROUTE_ACCEPTED", "attempt=$attempt; Telecom completed the request; awaiting endpoint observation")
+                        trace.event("REQUEST_ACCEPTED", "attempt" to attempt)
                         queueEvaluation()
                     },
                     rejected = { error ->
-                        policy.requestFailed()
-                        RouterLog.event("ROUTE_REJECTED", "code=${error.code}")
-                        trace.event("REQUEST_REJECTED", "code" to error.code)
+                        val mapped = when (error.code) {
+                            CallEndpointException.ERROR_REQUEST_TIME_OUT -> RoutingPolicy.RequestError.TIMEOUT
+                            CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST -> RoutingPolicy.RequestError.ENDPOINT_GONE
+                            CallEndpointException.ERROR_ANOTHER_REQUEST -> RoutingPolicy.RequestError.CANCELLED_BY_OTHER
+                            else -> RoutingPolicy.RequestError.UNSPECIFIED
+                        }
+                        policy.requestFailed(attempt, mapped)
+                        RouterLog.event("ROUTE_REJECTED", "attempt=$attempt; code=${error.code}; class=$mapped")
+                        trace.event("REQUEST_REJECTED", "attempt" to attempt, "code" to error.code, "class" to mapped)
                         queueEvaluation()
                     }
                 )
             } catch (e: RuntimeException) {
-                policy.requestFailed()
-                RouterLog.event("ROUTE_ERROR", e.javaClass.simpleName)
-                trace.event("REQUEST_ERROR", "type" to e.javaClass.simpleName)
+                policy.requestFailed(attempt, RoutingPolicy.RequestError.RUNTIME_EXCEPTION)
+                RouterLog.event("ROUTE_ERROR", "attempt=$attempt; type=${e.javaClass.simpleName}")
+                trace.event("REQUEST_ERROR", "attempt" to attempt, "type" to e.javaClass.simpleName)
             }
         }
         val route = currentRoute()

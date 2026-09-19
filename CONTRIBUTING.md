@@ -29,7 +29,7 @@ git diff --cached --check
 git diff --cached
 ```
 
-Regenerate `SOURCE-SHA256SUMS.txt` after an intentional source change. Do not add the fresh `verification/current/` logs created by local tests; those files are local evidence and are ignored by Git.
+Do not add the fresh `verification/current/` logs created by local tests; those files are local evidence and are ignored by Git. Release integrity is established by the protected signing workflow, published digest, and artifact attestation—not a mutable checksum list in the source tree.
 
 ## Tests and documentation
 

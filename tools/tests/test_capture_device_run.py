@@ -52,9 +52,11 @@ elif args[:3] == ["shell", "getprop", "ro.product.model"]:
     print("TestModel")
 elif args[:3] == ["shell", "getprop", "ro.build.version.sdk"]:
     print("37")
+elif args[:3] == ["shell", "getprop", "ro.build.fingerprint"]:
+    print("samsung/test/test:17/TEST/1:user/release-keys")
 elif args[:3] == ["shell", "dumpsys", "package"]:
-    print("versionCode=4 minSdk=34")
-    print("versionName=0.3.0-beta.2")
+    print("versionCode=5 minSdk=34")
+    print("versionName=0.3.0-beta.3")
 else:
     print("unexpected fake adb arguments: " + repr(args), file=sys.stderr)
     sys.exit(2)
@@ -86,6 +88,8 @@ class CaptureDeviceRunTest(unittest.TestCase):
             self.assertIn("session=new", trace)
             self.assertNotIn("session=old", trace)
             self.assertEqual("verdict=PASS", (output / "verdict.txt").read_text().splitlines()[0])
+            device = (output / "device.txt").read_text(encoding="utf-8")
+            self.assertIn("build_fingerprint=samsung/test/test:17/TEST/1:user/release-keys", device)
 
 
 if __name__ == "__main__":

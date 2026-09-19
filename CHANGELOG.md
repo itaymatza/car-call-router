@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0-beta.3
+
 - Add a privacy-safe parked-device capture harness that records only new structured routing traces,
   minimal device/app metadata, and explicit speaker, microphone, and Android Auto observations.
 - Add a dependency-free trace analyzer with JSON/CSV output, integrity checks, strict dual-
@@ -10,6 +12,15 @@
   required permissions, debuggability, and SHA-256 evidence.
 - Add service regressions for mid-call authorization/runtime-permission revocation and safe process
   recreation during an already-active call.
+- Enforce a single in-flight Telecom request with generation-tokened callbacks and a 2.5-second
+  retry gap that respects AOSP's two-second request timeout.
+- Add error-specific bounded recovery: timeout may retry, endpoint disappearance requires a fresh
+  endpoint snapshot, and external cancellation or unknown failure stops the session.
+- Separate the evidence-gathering and routing-action deadlines, and debounce transient alternative
+  routes only during the first second after the app's own request.
+- Persist a privacy-safe last-call result in the UI and suppress duplicate HFP/projection logs.
+- Add a protected signed-beta workflow with APK identity verification, SHA-256 publication, and
+  GitHub artifact attestation; add Dependabot, Gradle caching, and CodeQL workflows.
 
 ## 0.3.0-beta.2
 
