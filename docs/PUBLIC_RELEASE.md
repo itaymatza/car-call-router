@@ -43,7 +43,7 @@ Use a new application ID that the distributor controls when creating a separatel
 
 ## Repository settings to review
 
-Private vulnerability reporting is enabled so potential vulnerabilities can be reported without creating a public issue. The default workflow token has read-only permissions, and the build workflow does not upload APKs or diagnostics. Repository administrators should periodically review collaborator access, branch protection, fork policy, issue moderation, Actions permissions, secret-scanning alerts, and the visibility of releases or deployment environments.
+Private vulnerability reporting is enabled so potential vulnerabilities can be reported without creating a public issue. The default workflow token has read-only permissions. The build workflow uploads the generated debug APK as an expiring GitHub Actions artifact named `car-call-router-debug-apk`; it does not upload phone diagnostics. Treat workflow artifacts as build outputs, not permanent releases. Repository administrators should periodically review collaborator access, branch protection, fork policy, issue moderation, Actions permissions, secret-scanning alerts, and the visibility of releases or deployment environments.
 
 Automated dependency updates are intentionally not configured in this repository. They can create maintenance pull requests and should be enabled only after the maintainer selects a review cadence and compatibility policy. Until then, review Gradle, Android Gradle Plugin, Kotlin, Gradle wrapper, and GitHub Actions revisions as explicit, separately tested pull requests.
 

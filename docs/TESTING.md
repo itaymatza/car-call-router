@@ -22,6 +22,19 @@ bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktra
 
 The repository workflow runs that command on pushes and pull requests with read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
 
+## Verify device authorization
+
+When more than one ADB target is listed, address the physical phone explicitly:
+
+```sh
+adb devices
+adb -s PHONE_SERIAL shell cmd appops get --uid org.carcallrouter.companion MANAGE_ONGOING_CALLS
+```
+
+The required result includes `MANAGE_ONGOING_CALLS: allow`. Refresh the app's Diagnostics and confirm the current status reports runtime permissions and Telecom authorization as true. Historical `AUTH_MISSING` events may remain after a successful grant and do not override the current status.
+
+`Last Telecom binding: Never observed` is normal before the first eligible call. It becomes a useful failure signal only if it remains unchanged during an authorized normal test call.
+
 ## Exact parked-car test
 
 1. Park safely, switch off the engine if local conditions require it, and do not begin driving during the test.
