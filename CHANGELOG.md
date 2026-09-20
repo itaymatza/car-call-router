@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.3.0-beta.7
+
+- Add privacy-safe process, UI, Telecom-service, and call lifecycle correlation so an exported log
+  proves whether Samsung bound the service before or only after the app was opened.
+- Record process age, foreground importance, screen-interactive state, battery-optimization
+  exemption, app-standby bucket, and the prior process-exit reason at the relevant lifecycle edges.
+- Preserve the existing fail-safe for already-active calls; this diagnostic release does not
+  guess that a late bind is a fresh call or silently override a route chosen mid-call.
+
 ## 0.3.0-beta.6
 
 - Correlate API 37 endpoint-request callbacks with generation-bound, expiring request tickets so

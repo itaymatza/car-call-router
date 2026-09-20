@@ -4,7 +4,7 @@ This pre-release makes the current Car Call Router beta installable as a direct 
 
 ## Install
 
-1. Download **car-call-router-0.3.0-beta.6-debug.apk** below.
+1. Download **car-call-router-0.3.0-beta.7-debug.apk** below.
 2. Open the APK on an Android 14+ phone and allow the browser or file manager to install unknown
    apps when prompted.
 3. Open Car Call Router and complete the guided permissions, target-device selection, and
@@ -23,11 +23,11 @@ This pre-release makes the current Car Call Router beta installable as a direct 
 The attached `.sha256` file verifies the APK bytes. The GitHub artifact attestation links the APK
 to the workflow and source commit that produced it.
 
-## What changed in beta.6
+## What changed in beta.7
 
-- Correlates endpoint callbacks with generation-bound, expiring request tickets and ignores late
-  outcomes from completed calls.
-- Distinguishes Samsung call-start callback replays from genuine external/user requests.
-- Adds richer privacy-safe request, route, endpoint, HFP/SCO, and per-session summary evidence.
-- Detects endpoint oscillation and external interference as unstable qualification results.
+- Correlates app-process, UI, Telecom binding, and call lifecycle events in the exported log.
+- Records whether the service was already bound when the UI opened, plus process age, prior exit
+  reason, foreground importance, battery exemption, screen state, and app-standby bucket.
+- Retains beta.6 request-generation, Samsung callback-replay, route-oscillation, and HFP/SCO
+  diagnostics without weakening the already-active-call safety guard.
 - Remains a debug beta pending parked real-car qualification.

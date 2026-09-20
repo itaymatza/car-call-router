@@ -14,6 +14,7 @@ import android.telecom.CallEndpointException
 import android.telecom.InCallService
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.ProjectionMonitor
+import org.carcallrouter.companion.ProcessDiagnostics
 import org.carcallrouter.companion.RouterLog
 import org.carcallrouter.companion.RouterSettings
 import org.carcallrouter.companion.SessionBridge
@@ -134,7 +135,10 @@ class RouterInCallService :
             }
         settings.prefs.registerOnSharedPreferenceChangeListener(prefListener)
         SessionBridge.controller = WeakReference(this)
-        RouterLog.event("SERVICE_CREATE", "non-UI service; authorized=${Access.ongoingCalls(this)}")
+        RouterLog.event(
+            "SERVICE_CREATE",
+            "non-UI service; authorized=${Access.ongoingCalls(this)}; ${ProcessDiagnostics.snapshot(this)}",
+        )
         hfp.start()
         projectionMonitor.start()
     }
@@ -142,7 +146,7 @@ class RouterInCallService :
     override fun onBind(intent: Intent): IBinder {
         if (disposed) startObservers()
         settings.markBound()
-        RouterLog.event("TELECOM_BOUND", "System bound the service")
+        RouterLog.event("TELECOM_BOUND", "System bound the service; ${ProcessDiagnostics.snapshot(this)}")
         return requireNotNull(super.onBind(intent))
     }
 
@@ -189,7 +193,11 @@ class RouterInCallService :
             )
         }
         call.registerCallback(callback, handler)
-        RouterLog.event("CALL_ADDED", "call=$id; state=${stateName(state)}; preActiveObserved=${record.sawPreActive}")
+        RouterLog.event(
+            "CALL_ADDED",
+            "call=$id; state=${stateName(state)}; preActiveObserved=${record.sawPreActive}; " +
+                ProcessDiagnostics.snapshot(this),
+        )
         if (!sessionStarted && state == Call.STATE_ACTIVE) {
             // No observed transition: may be process recovery or binding to an old call.
             sessionStarted = true
@@ -693,7 +701,7 @@ class RouterInCallService :
     }
 
     override fun onUnbind(intent: Intent): Boolean {
-        RouterLog.event("TELECOM_UNBOUND", "System unbound service")
+        RouterLog.event("TELECOM_UNBOUND", "System unbound service; ${ProcessDiagnostics.snapshot(this)}")
         stopObservers()
         return super.onUnbind(intent)
     }
@@ -714,6 +722,7 @@ class RouterInCallService :
     }
 
     override fun onDestroy() {
+        RouterLog.event("SERVICE_DESTROY", ProcessDiagnostics.snapshot(this))
         stopObservers()
         super.onDestroy()
     }
