@@ -124,7 +124,7 @@ class HfpMonitor(
 
     override fun close() {
         closed = true
-        if (registered) context.unregisterReceiver(receiver)
+        if (registered) runCatching { context.unregisterReceiver(receiver) }
         registered = false
         headset?.let { runCatching { adapter?.closeProfileProxy(BluetoothProfile.HEADSET, it) } }
         headset = null

@@ -7,16 +7,16 @@ The Android Gradle module accepts three optional Gradle properties. They may be 
 | Property | Default | Purpose |
 |---|---|---|
 | `APP_APPLICATION_ID` | `org.carcallrouter.companion` | Installable Android application ID. Choose an ID controlled by the build owner. |
-| `APP_VERSION_CODE` | `11` | Monotonically increasing Android version code. |
-| `APP_VERSION_NAME` | `0.3.0-beta.9` | Human-readable version string. |
+| `APP_VERSION_CODE` | `12` | Monotonically increasing Android version code. |
+| `APP_VERSION_NAME` | `0.3.0-beta.10` | Human-readable version string. |
 
 Example:
 
 ```sh
 bash gradlew \
   -PAPP_APPLICATION_ID=example.callroute \
-  -PAPP_VERSION_CODE=11 \
-  -PAPP_VERSION_NAME=0.3.0-beta.9 \
+  -PAPP_VERSION_CODE=12 \
+  -PAPP_VERSION_NAME=0.3.0-beta.10 \
   :app:assembleDebug
 ```
 
@@ -67,7 +67,7 @@ Older builds created inappropriate companion associations. The current build rem
 
 ## Projection integration
 
-Automatic mode uses the AndroidX car-app host-provider protocol as an optional projection-state gate. The monitor deliberately avoids inferring projection state from Bluetooth names, Wi-Fi networks, package process state, or broadcast extras. A missing or temporarily unknown projection state freezes new automatic route requests until fresh evidence arrives; a confirmed disconnect stops an active guard. The manual one-shot has an explicit projection-gate bypass for parked testing only.
+Automatic mode uses the AndroidX car-app host-provider protocol as an optional projection-state gate. The monitor deliberately avoids inferring projection state from Bluetooth names, Wi-Fi networks, package process state, or broadcast extras. A missing or temporarily unknown projection state freezes new automatic route requests until fresh evidence arrives; a confirmed disconnect stops an active guard and tears down Bluetooth HFP monitoring. A later verified projection connection creates a fresh HFP observer. The manual one-shot has an explicit projection-gate bypass for parked testing only.
 
 ## References
 

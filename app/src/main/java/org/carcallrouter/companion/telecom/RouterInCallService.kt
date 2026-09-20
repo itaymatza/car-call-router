@@ -39,7 +39,10 @@ class RouterInCallService :
     private lateinit var trace: RoutingTrace
     private var projection: Boolean? = null
     private var sequence = 0
-    private var hasObservedCallInInstance = false
+    // Telecom can unbind/rebind the same Call object while it is already ACTIVE. Track object
+    // identity so that replay remains fail-closed without suppressing a genuinely new call that
+    // happens to be first observed at ACTIVE in this long-lived service instance.
+    private var lastObservedCallObject: WeakReference<Call>? = null
     private var disposed = false
     private var policy = RoutingPolicy()
     private var sessionStarted = false
@@ -118,22 +121,12 @@ class RouterInCallService :
         settings = RouterSettings(this)
         router = AddressedTelecomRouter(this)
         classifier = CellularClassifier(this)
-        hfp =
-            HfpMonitor(this) {
-                // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
-                val address = settings.targetAddress?.uppercase()
-                if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
-                    suspendSessionFromEvent(
-                        "target Bluetooth HFP disappeared; this session stays paused",
-                        RoutingPolicy.ReasonCode.TARGET_HFP_DISCONNECTED,
-                    )
-                }
-                queueEvaluation()
-            }
+        hfp = newHfpMonitor()
         projectionMonitor =
             ProjectionMonitor(this) { value ->
                 projection = value
                 if (value == true) ensureHfpMonitoring("projection_active")
+                if (value == false && !manualSession) stopHfpMonitoring("projection_inactive")
                 if (!manualSession && guardHasActed() && value == false) {
                     suspendSessionFromEvent(
                         "Projection disconnected; this session stays paused",
@@ -151,11 +144,32 @@ class RouterInCallService :
         projectionMonitor.start()
     }
 
+    private fun newHfpMonitor(): HfpMonitor =
+        HfpMonitor(this) {
+            // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
+            val address = settings.targetAddress?.uppercase()
+            if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
+                suspendSessionFromEvent(
+                    "target Bluetooth HFP disappeared; this session stays paused",
+                    RoutingPolicy.ReasonCode.TARGET_HFP_DISCONNECTED,
+                )
+            }
+            queueEvaluation()
+        }
+
     private fun ensureHfpMonitoring(reason: String) {
         if (hfpStarted) return
         hfpStarted = true
         RouterLog.event("HFP_MONITOR_START", "reason=$reason")
         hfp.start()
+    }
+
+    private fun stopHfpMonitoring(reason: String) {
+        if (!hfpStarted) return
+        RouterLog.event("HFP_MONITOR_STOP", "reason=$reason")
+        hfp.close()
+        hfp = newHfpMonitor()
+        hfpStarted = false
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -167,8 +181,8 @@ class RouterInCallService :
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
-        val repeatedServiceInstance = hasObservedCallInInstance
-        hasObservedCallInInstance = true
+        val replayedCallObject = lastObservedCallObject?.get() === call
+        lastObservedCallObject = WeakReference(call)
         val id = ++sequence
         val callback =
             object : Call.Callback() {
@@ -223,10 +237,10 @@ class RouterInCallService :
             manualSession = false
             activeTransitionAt = SystemClock.elapsedRealtime()
             initialEndpointId = router.current()?.identifier?.toString()
-            if (repeatedServiceInstance) {
+            if (replayedCallObject) {
                 trace.begin("automatic", "same_instance_active_rebind")
                 policy.suspend(
-                    "Already-active call returned to the same service instance; automatic takeover suppressed",
+                    "Same already-active call object returned to the service; automatic takeover suppressed",
                     RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
                 )
                 trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)

@@ -234,6 +234,20 @@ fun main(args: Array<String>) {
                         check(HfpMonitor.starts == 1)
                     }
                 },
+            "hfp_monitor_stops_off_projection_and_restarts_on_reconnect" to
+                {
+                    Fixture(projected = true).use { f ->
+                        check(HfpMonitor.starts == 1)
+                        ProjectionMonitor.emit(false)
+                        f.flush()
+                        HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                        f.flush()
+                        check(HfpMonitor.starts == 1)
+                        ProjectionMonitor.emit(true)
+                        f.flush()
+                        check(HfpMonitor.starts == 2)
+                    }
+                },
             "default_toggle_off_is_passive" to {
                 Fixture(enabled = false).use { f ->
                     f.active()
@@ -627,6 +641,18 @@ fun main(args: Array<String>) {
                         f.service.onCallAdded(next)
                         f.flush()
                         next.deliverState(Call.STATE_ACTIVE)
+                        f.flush()
+                        countEquals(f, 2)
+                    }
+                },
+            "new_call_first_seen_active_can_recover_in_same_service_instance" to
+                {
+                    Fixture(initialState = Call.STATE_ACTIVE).use { f ->
+                        countEquals(f, 1)
+                        f.service.onCallRemoved(f.call)
+                        f.route(competing)
+                        val next = Call(Call.Details(Call.STATE_ACTIVE))
+                        f.service.onCallAdded(next)
                         f.flush()
                         countEquals(f, 2)
                     }
