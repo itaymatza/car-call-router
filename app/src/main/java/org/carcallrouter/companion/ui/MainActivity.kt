@@ -20,6 +20,7 @@ import android.widget.Toast
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.BuildConfig
 import org.carcallrouter.companion.LegacyAssociationCleanup
+import org.carcallrouter.companion.ProcessDiagnostics
 import org.carcallrouter.companion.ProjectionMonitor
 import org.carcallrouter.companion.R
 import org.carcallrouter.companion.RouterLog
@@ -65,6 +66,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        logUiState("CREATED")
         setContentView(R.layout.activity_main)
         findViewById<View>(R.id.root).setOnApplyWindowInsetsListener { view, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
@@ -159,6 +161,7 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        logUiState("STARTED")
         SessionBridge.observe(statusListener)
         RouterLog.observe(logListener)
         monitor =
@@ -171,15 +174,21 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        logUiState("RESUMED")
         refresh()
     }
 
     override fun onStop() {
+        logUiState("STOPPED")
         SessionBridge.remove(statusListener)
         RouterLog.remove(logListener)
         monitor?.close()
         monitor = null
         super.onStop()
+    }
+
+    private fun logUiState(state: String) {
+        ProcessDiagnostics.markUi(state, SessionBridge.controller?.get() != null)
     }
 
     private fun currentSetupState() =

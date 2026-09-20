@@ -25,6 +25,10 @@ object RouterLog {
     fun recentText() = events.joinToString("\n")
 }
 
+object ProcessDiagnostics {
+    fun snapshot(c: Context) = "processAgeMs=0; uiState=NEVER_OPENED"
+}
+
 class ProjectionMonitor(
     c: Context,
     private val changed: (Boolean?) -> Unit,

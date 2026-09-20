@@ -1,0 +1,5 @@
+Version 0.3.0-beta.7
+
+- Correlates process, UI, Telecom binding, and call lifecycle events.
+- Records privacy-safe background restrictions and prior process-exit evidence.
+- Preserves the already-active-call safety guard while diagnosing late binding.
