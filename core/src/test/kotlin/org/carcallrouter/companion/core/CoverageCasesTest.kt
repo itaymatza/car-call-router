@@ -97,17 +97,30 @@ class CoverageCasesTest {
         assertTrue(trace.isActive())
         now = 90
         trace.event("odd event", "nullable field" to null)
+        trace.event("REQUEST_SUBMITTED")
+        trace.event("ENDPOINT_CHANGED")
+        trace.event("ENDPOINT_REQUEST_OBSERVED", "classification" to "SELF")
+        trace.event("ENDPOINT_REQUEST_OBSERVED", "classification" to "STARTUP_REPLAY")
+        trace.event("ENDPOINT_REQUEST_OBSERVED", "classification" to "EXTERNAL")
+        trace.event("ENDPOINT_REQUEST_OBSERVED", "classification" to null)
+        trace.event("SESSION_SUSPENDED")
         trace.confirmTargetHfpAudio()
         trace.confirmTelecom()
         trace.confirmTargetHfpAudio()
         assertEquals(
             RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
-            trace.finish(Phase.RELEASED, ReasonCode.STARTUP_COMPLETE, "done"),
+            trace.finish(Phase.RELEASED, ReasonCode.STARTUP_COMPLETE, "done", "final_route" to Route.TARGET),
         )
         assertTrue(lines.first().contains("session=empty"))
         assertTrue(lines.any { "elapsed_ms=0" in it && "nullable_field=null" in it })
         assertEquals(1, lines.count { "TELECOM_ENDPOINT_CONFIRMED" in it })
         assertEquals(1, lines.count { "TARGET_HFP_AUDIO_CONFIRMED" in it })
+        assertTrue(
+            lines.last().contains(
+                "requests=1 route_changes=1 endpoint_callbacks=4 self_callbacks=1 " +
+                    "startup_replays=1 external_callbacks=1 suspensions=1 final_route=TARGET",
+            ),
+        )
 
         session = "second"
         trace.begin("manual", "again")
