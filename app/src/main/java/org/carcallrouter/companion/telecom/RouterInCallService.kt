@@ -39,6 +39,7 @@ class RouterInCallService :
     private lateinit var trace: RoutingTrace
     private var projection: Boolean? = null
     private var sequence = 0
+
     // Telecom can unbind/rebind the same Call object while it is already ACTIVE. Track object
     // identity so that replay remains fail-closed without suppressing a genuinely new call that
     // happens to be first observed at ACTIVE in this long-lived service instance.
