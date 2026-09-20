@@ -38,8 +38,9 @@ object ProcessDiagnostics {
 
     fun previousExit(context: Context): String {
         val manager = context.getSystemService(ActivityManager::class.java) ?: return "unavailable"
-        val exit = runCatching { manager.getHistoricalProcessExitReasons(null, 0, 1).firstOrNull() }.getOrNull()
-            ?: return "none"
+        val exit =
+            runCatching { manager.getHistoricalProcessExitReasons(null, 0, 1).firstOrNull() }.getOrNull()
+                ?: return "none"
         val ageMs = (System.currentTimeMillis() - exit.timestamp).coerceAtLeast(0)
         return "reason=${exitReasonName(exit.reason)}; status=${exit.status}; ageMs=$ageMs"
     }

@@ -20,8 +20,8 @@ import android.widget.Toast
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.BuildConfig
 import org.carcallrouter.companion.LegacyAssociationCleanup
-import org.carcallrouter.companion.ProjectionMonitor
 import org.carcallrouter.companion.ProcessDiagnostics
+import org.carcallrouter.companion.ProjectionMonitor
 import org.carcallrouter.companion.R
 import org.carcallrouter.companion.RouterLog
 import org.carcallrouter.companion.RouterSettings
