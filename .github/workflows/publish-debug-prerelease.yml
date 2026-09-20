@@ -17,10 +17,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VERSION_CODE: '5'
-  VERSION_NAME: 0.3.0-beta.3
-  RELEASE_TAG: v0.3.0-beta.3-debug
-  APK_NAME: car-call-router-0.3.0-beta.3-debug.apk
+  VERSION_CODE: '6'
+  VERSION_NAME: 0.3.0-beta.4
+  RELEASE_TAG: v0.3.0-beta.4-debug
+  APK_NAME: car-call-router-0.3.0-beta.4-debug.apk
 
 jobs:
   publish:
