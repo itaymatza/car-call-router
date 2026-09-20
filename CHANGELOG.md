@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make GitHub Releases the prominent version and download hub, with latest-version and download
+  badges plus direct APK, checksum, verification-report, and full-history links.
 - Publish a durable GitHub debug pre-release with a direct APK download, checksum, verification
   report, provenance attestation, and clear signing/qualification limitations.
 - Improve repository discoverability with problem-oriented Android Auto, Bluetooth HFP, call-audio,
