@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.3.0-beta.5
+
+- Fix automatic routing on Android 17/Samsung when Telecom replays its call-start endpoint request
+  around the transition to an active call.
+- Preserve the safety behavior that suspends routing for genuine external endpoint requests after
+  Car Call Router has acted.
+- Add a deterministic production-service regression for the exact callback ordering observed in
+  the field and publish the fix as a direct-download debug beta.
+
 ## 0.3.0-beta.4
 
 - Align the installed app with the Car Call Router product identity, add Android application
