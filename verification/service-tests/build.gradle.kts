@@ -18,6 +18,9 @@ ktlint {
     baseline.set(file("ktlint-baseline.xml"))
     outputToConsole.set(true)
     ignoreFailures.set(false)
+    filter {
+        exclude { element -> element.file.path.contains("/app/src/") }
+    }
 }
 
 dependencies {
@@ -27,7 +30,7 @@ dependencies {
 sourceSets {
     main {
         kotlin {
-            srcDir(projectDir)
+            srcDir("src/main/kotlin")
             srcDir(rootProject.file("app/src/main/java"))
             include("ServiceTests.kt")
             include("stubs/**/*.kt")
