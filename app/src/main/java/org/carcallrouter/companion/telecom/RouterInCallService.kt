@@ -71,7 +71,10 @@ class RouterInCallService :
     private val evaluateEvent = Runnable { evaluate() }
     private val prefListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key != "last_bound" && sessionStarted) {
+            // Diagnostic writes (last_bound / last_session_*) share this preference file but do
+            // not alter routing. Treating them as configuration changes can start an orphan trace
+            // while onCallRemoved() is persisting the result of the trace that just finished.
+            if (key in RouterSettings.ROUTING_CONFIGURATION_KEYS && sessionStarted) {
                 policy.suspend(
                     "Settings changed during a call; automatic routing paused for this session",
                     RoutingPolicy.ReasonCode.SETTINGS_CHANGED,
@@ -327,7 +330,19 @@ class RouterInCallService :
         router.updateCurrent(callEndpoint)
         lastEndpointId = callEndpoint.identifier.toString()
         val route = currentRoute()
-        policy.observeRoute(route, SystemClock.elapsedRealtime())
+        val protectedLateBindRoute =
+            lateBindRecoveryDeadlineAt != null &&
+                policy.phase == RoutingPolicy.Phase.IDLE &&
+                isProtectedLateBindRoute(route)
+        if (protectedLateBindRoute) {
+            lateBindRecoveryDeadlineAt = null
+            suspendSessionFromEvent(
+                "Protected route observed during late-bind recovery; respecting possible user choice",
+                RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
+            )
+        } else {
+            policy.observeRoute(route, SystemClock.elapsedRealtime())
+        }
         // Device names may contain personal data, so log only type + a salted ID.
         RouterLog.event("ENDPOINT", "type=${callEndpoint.endpointType}; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}")
         trace.event(
@@ -387,10 +402,14 @@ class RouterInCallService :
                     (priorPreGuardAt != null && now - priorPreGuardAt <= STARTUP_REPLAY_WINDOW_MS) ||
                         (matchesInitial && transitionAge != null && transitionAge <= INITIAL_ROUTE_REPLAY_WINDOW_MS)
                 )
+        val protectedLateBindRequest =
+            lateBindRecoveryDeadlineAt != null &&
+                callEndpoint.endpointType in PROTECTED_ENDPOINT_TYPES
         val classification =
             when {
                 observation.origin == AddressedTelecomRouter.RequestOrigin.SELF -> "SELF"
                 startupReplay -> "STARTUP_REPLAY"
+                protectedLateBindRequest -> "EXTERNAL"
                 guardActed -> "EXTERNAL"
                 else -> "PRE_GUARD"
             }
@@ -554,13 +573,7 @@ class RouterInCallService :
                         RoutingPolicy.Route.STREAMING,
                     )
             val userOwnedRoute =
-                route in
-                    setOf(
-                        RoutingPolicy.Route.HANDSET,
-                        RoutingPolicy.Route.SPEAKER,
-                        RoutingPolicy.Route.WIRED,
-                        RoutingPolicy.Route.OTHER_BLUETOOTH,
-                    )
+                isProtectedLateBindRoute(route)
             val immediatelyIneligible =
                 !settings.enabled ||
                     !Access.ongoingCalls(this) ||
@@ -803,6 +816,13 @@ class RouterInCallService :
         evaluate()
     }
 
+    private fun isProtectedLateBindRoute(route: RoutingPolicy.Route): Boolean =
+        route in DEFINITE_USER_OWNED_ROUTES ||
+            // Before the target endpoint snapshot arrives, a configured car Bluetooth endpoint
+            // is indistinguishable from OTHER_BLUETOOTH. Protect it only once the exact target is
+            // resolvable; until then the bounded evidence window remains passive.
+            (route == RoutingPolicy.Route.OTHER_BLUETOOTH && targetEndpoint().endpoint != null)
+
     override fun pauseSession() {
         sessionStarted = true
         trace.begin("manual", "pause")
@@ -854,6 +874,18 @@ class RouterInCallService :
         private const val STARTUP_REPLAY_WINDOW_MS = 2_500L
         private const val INITIAL_ROUTE_REPLAY_WINDOW_MS = 750L
         private const val LATE_BIND_EVIDENCE_WINDOW_MS = 5_000L
+        private val DEFINITE_USER_OWNED_ROUTES =
+            setOf(
+                RoutingPolicy.Route.HANDSET,
+                RoutingPolicy.Route.SPEAKER,
+                RoutingPolicy.Route.WIRED,
+            )
+        private val PROTECTED_ENDPOINT_TYPES =
+            setOf(
+                CallEndpoint.TYPE_EARPIECE,
+                CallEndpoint.TYPE_SPEAKER,
+                CallEndpoint.TYPE_WIRED_HEADSET,
+            )
 
         private fun isPreActive(state: Int) =
             state in setOf(Call.STATE_NEW, Call.STATE_RINGING, Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_SELECT_PHONE_ACCOUNT)

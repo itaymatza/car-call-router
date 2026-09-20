@@ -2,7 +2,7 @@
 
 ## Current classification
 
-`0.3.0-beta.8` is a production-hardening beta. The real-device proof of concept validates the core Telecom endpoint approach, but intermittent behavior means the project must not yet be described as production-ready.
+`0.3.0-beta.9` is a production-hardening beta. The real-device proof of concept validates the core Telecom endpoint approach, but intermittent behavior means the project must not yet be described as production-ready.
 
 ## Completed engineering gates
 
@@ -27,6 +27,10 @@
   and unexpected debuggability; its artifact includes the exact APK and certificate SHA-256 values.
 - Service regressions cover authorization and runtime-permission revocation during a pending route,
   plus process recreation without taking over an already-active call.
+- Late-bind recovery is tested across every ordering of projection, HFP, endpoint-snapshot, and
+  current-route evidence plus 1,000 seeded callback storms. Protected handset/speaker/wired edges
+  are latched even when callbacks coalesce, while a pre-snapshot car Bluetooth route remains
+  unresolved instead of being misclassified as a user override.
 - Requests are single-flight and generation-tokened. AOSP's two-second timeout is respected, new
   requests are separated by 2.5 seconds, timeout/stale-endpoint errors have bounded typed recovery,
   and an endpoint-gone retry requires a newer endpoint snapshot.

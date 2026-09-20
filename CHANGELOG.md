@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.3.0-beta.9
+
+- Fix late-bind recovery when Telecom reports the configured car's current Bluetooth endpoint
+  before its available-endpoints snapshot; the transient identity gap is no longer mistaken for
+  an unconfigured-device override.
+- Latch handset, speaker, and wired route edges during late-bind recovery so a later car callback
+  in the same main-loop batch cannot erase a protected user/system choice.
+- Restrict settings-change cancellation to routing configuration keys. Persisting last-session
+  diagnostics no longer starts an orphan routing trace after the real session has finished.
+- Make the framework-double HFP boundary accurately remain unknown until monitoring starts, and
+  verify that monitoring starts only for verified Android Auto projection or explicit Route now.
+- Add 1,312 adversarial late-bind interleavings covering all evidence orders, protected-route
+  insertion boundaries, transient unknown evidence, duplicate callbacks, and seeded callback
+  storms, in addition to the existing policy and service suites.
+
 ## 0.3.0-beta.8
 
 - Recover automatic routing when Samsung first binds the non-UI Telecom service to an already

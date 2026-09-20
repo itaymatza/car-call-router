@@ -80,4 +80,16 @@ class RouterSettings(
             prefs.getString("last_session_confirmation", "NONE") ?: "NONE",
         )
     }
+
+    companion object {
+        /** Preferences which can change an in-flight routing decision. */
+        internal val ROUTING_CONFIGURATION_KEYS =
+            setOf(
+                "enabled",
+                "target",
+                "target_name",
+                "competitor",
+                "competitor_name",
+            )
+    }
 }

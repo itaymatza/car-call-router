@@ -13,6 +13,7 @@ import org.carcallrouter.companion.SessionBridge
 import org.carcallrouter.companion.telecom.HfpMonitor
 import org.carcallrouter.companion.telecom.RouterInCallService
 import java.io.File
+import kotlin.random.Random
 
 // Real production service + routing policy; substituted Android/framework boundaries.
 // This is NOT Android emulation, an APK installation, real Telecom, or Bluetooth testing.
@@ -27,6 +28,10 @@ private val target = CallEndpoint("Target test device", CallEndpoint.TYPE_BLUETO
 private val competing = CallEndpoint("Competing test device", CallEndpoint.TYPE_BLUETOOTH, COMPETING_ID)
 private val other = CallEndpoint("Other test device", CallEndpoint.TYPE_BLUETOOTH, OTHER_ID)
 private val speaker = CallEndpoint("Speaker", CallEndpoint.TYPE_SPEAKER, java.util.UUID.fromString("00000000-0000-0000-0000-000000000004"))
+private val handset = CallEndpoint("Handset", CallEndpoint.TYPE_EARPIECE, java.util.UUID.fromString("00000000-0000-0000-0000-000000000005"))
+private val wired =
+    CallEndpoint("Wired", CallEndpoint.TYPE_WIRED_HEADSET, java.util.UUID.fromString("00000000-0000-0000-0000-000000000006"))
+private var adversarialInterleavings = 0
 
 private fun reset() {
     TestQueue.reset()
@@ -40,6 +45,7 @@ private fun reset() {
     HfpMonitor.isKnown = true
     HfpMonitor.devices = setOf(TARGET, COMPETING, OTHER)
     HfpMonitor.audioDevices = emptySet()
+    HfpMonitor.starts = 0
     SessionBridge.controller = null
 }
 
@@ -110,6 +116,15 @@ private fun countEquals(
     check(f.count() == expected) { "Expected $expected requests, observed ${f.service.issuedRequests}; status=${SessionBridge.status}" }
 }
 
+private fun <T> permutations(values: List<T>): List<List<T>> =
+    if (values.isEmpty()) {
+        listOf(emptyList())
+    } else {
+        values.flatMapIndexed { index, value ->
+            permutations(values.filterIndexed { candidate, _ -> candidate != index }).map { listOf(value) + it }
+        }
+    }
+
 fun main(args: Array<String>) {
     val tests =
         listOf<Pair<String, () -> Unit>>(
@@ -164,6 +179,22 @@ fun main(args: Array<String>) {
                         TestQueue.advanceTo(5000)
                         countEquals(f, 0)
                         check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    }
+                },
+            "hfp_monitor_starts_only_for_projection_or_manual_request" to
+                {
+                    Fixture(projected = false).use { f ->
+                        check(HfpMonitor.starts == 0)
+                        f.active()
+                        check(HfpMonitor.starts == 0)
+                        f.service.routeNow()
+                        check(HfpMonitor.starts == 1)
+                    }
+                    Fixture(projected = null).use {
+                        check(HfpMonitor.starts == 0)
+                        ProjectionMonitor.emit(true)
+                        it.flush()
+                        check(HfpMonitor.starts == 1)
                     }
                 },
             "default_toggle_off_is_passive" to {
@@ -852,7 +883,110 @@ fun main(args: Array<String>) {
                         )
                         check(last.reason == "TARGET_ENDPOINT_STABILIZING")
                         check(last.confirmation == "TARGET_HFP_AUDIO")
+                        val traces = RouterLog.events.filter { it.first == "ROUTING_TRACE" }.map { it.second }
+                        check(traces.last().contains("event=SESSION_FINISHED")) {
+                            "Persisting diagnostics started an orphan trace: ${traces.takeLast(3)}"
+                        }
                     }
+                },
+            "diagnostic_preference_writes_do_not_pause_an_active_session" to
+                {
+                    Fixture().use { f ->
+                        f.established()
+                        RouterSettings(f.service).recordLastSession("TEST", "TEST", "TEST")
+                        f.flush()
+                        check(!SessionBridge.status.contains("SETTINGS_CHANGED"))
+                    }
+                },
+            "late_bind_evidence_permutations_route_once_and_latch_protected_edges" to
+                {
+                    val actions = listOf("projection", "hfp", "endpoints", "route")
+                    val protectedRoutes = listOf(speaker, handset, wired)
+                    for (order in permutations(actions)) {
+                        fun run(
+                            protectedEdge: String?,
+                            protectedRoute: CallEndpoint? = null,
+                        ) {
+                            Fixture(
+                                projected = null,
+                                initialState = Call.STATE_ACTIVE,
+                                available = emptyList(),
+                            ).use { f ->
+                                HfpMonitor.emit(emptySet(), known = false)
+                                for (action in order) {
+                                    when (action) {
+                                        "projection" -> ProjectionMonitor.emit(true)
+                                        "hfp" -> HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                                        "endpoints" -> f.endpoints(listOf(target, competing, other))
+                                        "route" -> f.route(competing)
+                                    }
+                                    if (protectedEdge == action) f.route(requireNotNull(protectedRoute))
+                                }
+                                // A later car callback in the same main-loop batch must not erase
+                                // the protected route edge that was already observed.
+                                if (protectedEdge != null) f.route(competing)
+                                f.flush()
+                                countEquals(f, if (protectedEdge == null) 1 else 0)
+                                adversarialInterleavings++
+                            }
+                        }
+                        run(null)
+                        order.forEach { edge -> protectedRoutes.forEach { route -> run(edge, route) } }
+                    }
+                    check(adversarialInterleavings == 312)
+                },
+            "late_bind_protected_endpoint_request_is_never_overridden" to
+                {
+                    Fixture(
+                        projected = null,
+                        initialState = Call.STATE_ACTIVE,
+                        available = emptyList(),
+                    ).use { f ->
+                        f.service.onCallEndpointRequested(speaker)
+                        ProjectionMonitor.emit(true)
+                        HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                        f.endpoints(listOf(target, competing, other))
+                        f.route(competing)
+                        f.flush()
+                        countEquals(f, 0)
+                        check(SessionBridge.status.contains("EXTERNAL_ENDPOINT_REQUEST"))
+                    }
+                },
+            "seeded_late_bind_callback_storms_preserve_override_safety" to
+                {
+                    val random = Random(20260920)
+                    repeat(1_000) {
+                        val protected = random.nextBoolean()
+                        Fixture(
+                            projected = null,
+                            initialState = Call.STATE_ACTIVE,
+                            available = emptyList(),
+                        ).use { f ->
+                            HfpMonitor.emit(emptySet(), known = false)
+                            val actions =
+                                mutableListOf<() -> Unit>(
+                                    { ProjectionMonitor.emit(true) },
+                                    { HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER)) },
+                                    { f.endpoints(listOf(target, competing, other)) },
+                                    { f.route(competing) },
+                                    { ProjectionMonitor.emit(null) },
+                                    { HfpMonitor.emit(emptySet(), known = false) },
+                                )
+                            if (protected) actions.add { f.route(listOf(speaker, handset, wired).random(random)) }
+                            actions.shuffle(random)
+                            actions.forEach { it() }
+                            // End with complete positive evidence. A protected edge must remain
+                            // sticky even when all callbacks coalesce before evaluation.
+                            ProjectionMonitor.emit(true)
+                            HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                            f.endpoints(listOf(target, competing, other))
+                            f.route(competing)
+                            f.flush()
+                            countEquals(f, if (protected) 0 else 1)
+                            adversarialInterleavings++
+                        }
+                    }
+                    check(adversarialInterleavings == 1_312)
                 },
         )
     val allTests = tests + extraTests
@@ -869,7 +1003,10 @@ fun main(args: Array<String>) {
             out.add("FAIL $name: ${t.message}")
         }
     }
-    out.add("RESULT ${allTests.size - failed.size}/${allTests.size} passed; failures=${failed.size}")
+    out.add(
+        "RESULT ${allTests.size - failed.size}/${allTests.size} passed; failures=${failed.size}; " +
+            "adversarial_interleavings=$adversarialInterleavings",
+    )
     out.add(
         "SCOPE: production Kotlin service/adapter/policy on a deterministic JVM double; " +
             "NOT Android installation, platform admission, Bluetooth or audio validation.",
