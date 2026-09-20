@@ -4,7 +4,7 @@ This pre-release makes the current Car Call Router beta installable as a direct 
 
 ## Install
 
-1. Download **car-call-router-0.3.0-beta.9-debug.apk** below.
+1. Download **car-call-router-0.3.0-beta.10-debug.apk** below.
 2. Open the APK on an Android 14+ phone and allow the browser or file manager to install unknown
    apps when prompted.
 3. Open Car Call Router and complete the guided permissions, target-device selection, and
@@ -23,13 +23,12 @@ This pre-release makes the current Car Call Router beta installable as a direct 
 The attached `.sha256` file verifies the APK bytes. The GitHub artifact attestation links the APK
 to the workflow and source commit that produced it.
 
-## What changed in beta.8
+## What changed in beta.10
 
-- Safely recovers automatic routing when Samsung first exposes a call as already active, provided
-  Android Auto, the configured car route, the exact BMW HFP target, and every call-safety gate are
-  verified.
-- Never performs this recovery from handset, speaker, wired, unknown, or unconfigured Bluetooth
-  routes, preserving explicit user route choices.
-- Starts HFP observation only after Android Auto projection is verified or the manual one-shot is
-  explicitly requested; no permanent foreground service or idle polling is added.
+- Allows a genuinely new consecutive call first observed as active to enter strict late-bind
+  recovery, while an exact replay of the same Android call object remains suppressed.
+- Stops HFP observation on confirmed Android Auto loss and recreates it only after projection is
+  verified again. The explicit parked manual one-shot retains its projection bypass.
+- Keeps all existing authorization, call-safety, target-identity, request-budget, user-override,
+  endpoint-confirmation, and HFP/SCO diagnostic controls.
 - Remains a debug beta pending parked real-car qualification.

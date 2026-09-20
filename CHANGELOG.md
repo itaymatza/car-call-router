@@ -7,10 +7,21 @@
   `SessionBridge`; the pure routing core enforces independent 95% line and 90% branch floors.
 - Upload HTML/XML coverage and JUnit reports from every CI run and publish exact core/service
   coverage totals in the GitHub job summary.
-- Expand the deterministic suite to 104 core JUnit tests and 73 production-service scenarios,
+- Expand the deterministic suite to 104 core JUnit tests and 75 production-service scenarios,
   including 750,000 callback/evidence transitions, 7,776 exhaustive eligibility combinations,
   late-bind endpoint-before-snapshot ordering, protected-route variants, expiring request markers,
   generation isolation, runtime failures, and cached-endpoint invalidation.
+
+## 0.3.0-beta.10
+
+- Distinguish a replay of the exact same Android `Call` object from a genuinely new call in a
+  long-lived `InCallService`, allowing strict late-bind recovery on consecutive calls without
+  weakening rebind safety.
+- Tear down Bluetooth HFP monitoring on confirmed Android Auto disconnection and create a fresh
+  observer only after projection reconnects; the parked manual one-shot retains its explicit
+  projection bypass.
+- Add deterministic regressions for consecutive calls first observed as active and projection-
+  scoped HFP resource use.
 
 ## 0.3.0-beta.9
 

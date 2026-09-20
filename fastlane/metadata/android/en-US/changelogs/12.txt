@@ -1,0 +1,5 @@
+Version 0.3.0-beta.10
+
+- Recover consecutive calls first observed as active without weakening same-call replay safety.
+- Stop HFP monitoring when Android Auto disconnects and restart it only after verified reconnect.
+- Add deterministic lifecycle and projection resource-gating regressions.

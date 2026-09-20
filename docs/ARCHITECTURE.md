@@ -18,7 +18,7 @@ compiled implementation, preventing either harness from maintaining a private co
 | `RouterSettings` | Persists the enabled state plus the locally chosen target and optional competing Bluetooth devices in app-private preferences. | No device identifiers are compiled into the source tree or sent over the network. |
 | `Access` | Checks runtime permissions and the protected ongoing-call authorization. | Missing or revoked access stops routing eligibility. The displayed AppOps command derives from the installed application ID. |
 | `ProjectionMonitor` | Reads the AndroidX host-provider state for optional projection gating. | Missing or unknown evidence freezes requests; confirmed loss stops an active guard. It does not infer state from names, Wi-Fi, or process activity. |
-| `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | Broadcast extras are not trusted; state is re-queried from the profile service. |
+| `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | It starts only for verified projection or an explicit manual test, stops on confirmed projection loss, and re-queries profile state rather than trusting broadcast extras. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
 | `RoutingPolicy` (`:core`) | Pure Kotlin state machine that decides whether a routing request is permitted, delayed, released, or stopped. | Uses separate evidence and action deadlines, permits one request in flight, enforces a 2.5-second request gap and a three-request maximum, and classifies platform outcomes. |
 | `RoutingTrace` | Emits versioned, redacted, session-sequenced evidence with stable reason codes and elapsed timings. | Separates a Telecom endpoint observation from exact target HFP audio/SCO evidence; it does not claim physical microphone quality. |
@@ -27,7 +27,7 @@ compiled implementation, preventing either harness from maintaining a private co
 
 ## Decision flow
 
-1. Telecom binds `RouterInCallService` and the service starts its projection and HFP observers. The service remains passive until it sees a fresh pre-active-to-active call transition.
+1. Telecom binds `RouterInCallService` and the service starts its lightweight projection observer. HFP observation starts only after projection is verified or a parked manual test is requested. The service normally waits for a fresh pre-active-to-active call transition; a new call first observed as active can use the stricter late-bind evidence path.
 2. The service gathers a current snapshot: authorization, runtime permissions, call safety, number of live calls, projection state, target availability, and observed route.
 3. `RoutingPolicy` rejects the snapshot unless all automatic-mode prerequisites hold. A manual one-shot bypasses only the master-toggle and projection checks.
 4. When eligible, the policy allows at most one outstanding request. `AddressedTelecomRouter` submits the exact current callback object to `requestCallEndpointChange`.
