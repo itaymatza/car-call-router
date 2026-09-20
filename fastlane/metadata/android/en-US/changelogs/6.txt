@@ -1,0 +1,6 @@
+Version 0.3.0-beta.4
+
+• Uses the Car Call Router identity consistently across Android and GitHub.
+• Adds adaptive, round, and themed launcher icons.
+• Adds in-app links to versions, downloads, source code, and issue reporting.
+• Aligns secure manifest and reusable store-listing metadata.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0-beta.4
+
 - Align the installed app with the Car Call Router product identity, add Android application
   metadata and an adaptive themed icon, expose releases/source/support inside the app, and add
   reusable Android store-listing metadata with automated drift checks.
