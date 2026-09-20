@@ -69,8 +69,9 @@ class CoverageCasesTest {
 
     @Test
     fun manualAndUnknownRoutesNeverReceiveBlindRetries() {
-        val manual = RoutingPolicy(platformRequestTimeoutMs = 100, actionWindowMs = 1_000)
-            .also { it.begin(0, Route.COMPETING_DEVICE, manualOneShot = true) }
+        val manual =
+            RoutingPolicy(platformRequestTimeoutMs = 100, actionWindowMs = 1_000)
+                .also { it.begin(0, Route.COMPETING_DEVICE, manualOneShot = true) }
         manual.evaluate(snapshot(0))
         manual.evaluate(snapshot(100))
         assertEquals(ReasonCode.REQUEST_NOT_VERIFIED, manual.reasonCode)
@@ -99,8 +100,10 @@ class CoverageCasesTest {
         trace.confirmTargetHfpAudio()
         trace.confirmTelecom()
         trace.confirmTargetHfpAudio()
-        assertEquals(RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
-            trace.finish(Phase.RELEASED, ReasonCode.STARTUP_COMPLETE, "done"))
+        assertEquals(
+            RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
+            trace.finish(Phase.RELEASED, ReasonCode.STARTUP_COMPLETE, "done"),
+        )
         assertTrue(lines.first().contains("session=empty"))
         assertTrue(lines.any { "elapsed_ms=0" in it && "nullable_field=null" in it })
         assertEquals(1, lines.count { "TELECOM_ENDPOINT_CONFIRMED" in it })
@@ -108,21 +111,38 @@ class CoverageCasesTest {
 
         session = "second"
         trace.begin("manual", "again")
-        assertEquals(RoutingTrace.Confirmation.NONE,
-            trace.finish(Phase.FAILED, ReasonCode.REQUEST_FAILED, "done"))
+        assertEquals(
+            RoutingTrace.Confirmation.NONE,
+            trace.finish(Phase.FAILED, ReasonCode.REQUEST_FAILED, "done"),
+        )
     }
 
     @Test
     fun emptySavedLabelUsesOnlyUnambiguousHfpTopology() {
         val one = Candidate("one", "Car")
         assertTrue(EndpointIdentity.resolve("   ", listOf(one), true, 1) is Resolution.Matched)
-        assertTrue(EndpointIdentity.resolve("", listOf(one, Candidate("two", "Other")), true, 2)
-            is Resolution.Unavailable)
+        assertTrue(
+            EndpointIdentity.resolve("", listOf(one, Candidate("two", "Other")), true, 2)
+                is Resolution.Unavailable,
+        )
     }
 
     private fun policy() = RoutingPolicy().also { it.begin(0, Route.COMPETING_DEVICE) }
 
-    private fun snapshot(now: Long, route: Route = Route.COMPETING_DEVICE) = Snapshot(
-        now, true, true, true, true, true, true, true, true, 1, route
+    private fun snapshot(
+        now: Long,
+        route: Route = Route.COMPETING_DEVICE,
+    ) = Snapshot(
+        now,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        1,
+        route,
     )
 }

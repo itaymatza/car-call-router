@@ -8,7 +8,8 @@ Install a JDK 17 or newer and a Kotlin compiler, then run:
 bash tools/test-all.sh
 ```
 
-The script runs the pure-JVM `:core` JUnit suite and its enforced 90% branch-coverage gate,
+The script runs ktlint for every Kotlin module, the pure-JVM `:core` JUnit suite and its enforced
+90% branch-coverage gate,
 production-service scenarios against local Android-framework doubles, and the Python
 trace/APK-tooling tests. The core suite includes named policy rules, 5,000 seeded traces (250,000
 transitions), connection-order and timing scenarios, and JSONL regression-trace replay. It writes
@@ -26,6 +27,12 @@ bash gradlew :core:check :app:assembleDebug :app:testDebugUnitTest :app:lintDebu
 ```
 
 The repository workflow runs that command on pushes and pull requests with read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
+
+Kotlin formatting is enforced with ktlint's official style and a 140-character maximum. Run
+`bash gradlew :app:ktlintFormat :core:ktlintFormat :verification:service-tests:ktlintFormat` before
+committing broad mechanical changes. Kotlin compiler warnings and Android lint warnings are treated
+as errors. Plugin and library versions are centralized in `gradle/libs.versions.toml` and updated
+through Dependabot.
 
 The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so
 callback-order and lifecycle regressions are exercised against the same compiled `:core` module.

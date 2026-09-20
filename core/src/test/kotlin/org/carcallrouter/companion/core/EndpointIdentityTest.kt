@@ -20,12 +20,13 @@ class EndpointIdentityTest {
     }
 
     @Test fun duplicateNamesFailClosed() {
-        val result = EndpointIdentity.resolve(
-            "Car Hands-Free",
-            listOf(target, Candidate("endpoint-c", "car hands-free")),
-            true,
-            2
-        )
+        val result =
+            EndpointIdentity.resolve(
+                "Car Hands-Free",
+                listOf(target, Candidate("endpoint-c", "car hands-free")),
+                true,
+                2,
+            )
         assertTrue(result is Resolution.Unavailable)
     }
 
@@ -41,7 +42,7 @@ class EndpointIdentityTest {
 
     @Test fun unknownNameWithMultipleEndpointsFailsClosed() {
         assertTrue(
-            EndpointIdentity.resolve("Unknown", listOf(target, other), true, 2) is Resolution.Unavailable
+            EndpointIdentity.resolve("Unknown", listOf(target, other), true, 2) is Resolution.Unavailable,
         )
     }
 

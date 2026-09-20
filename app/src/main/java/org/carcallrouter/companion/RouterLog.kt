@@ -19,6 +19,7 @@ object RouterLog {
     private val recent = java.util.ArrayDeque<String>()
     private lateinit var file: File
     private lateinit var salt: String
+
     @Synchronized fun initialize(context: Context) {
         file = File(context.filesDir, "router.log")
         val prefs = context.getSharedPreferences("log_identity", Context.MODE_PRIVATE)
@@ -26,12 +27,17 @@ object RouterLog {
             prefs.edit().putString("salt", it).apply()
         }
     }
+
     fun deviceId(address: String?): String {
         if (address == null) return "none"
         val bytes = MessageDigest.getInstance("SHA-256").digest((salt + address.uppercase()).toByteArray())
         return bytes.take(5).joinToString("") { "%02x".format(it.toInt() and 255) }
     }
-    fun event(event: String, detail: String) {
+
+    fun event(
+        event: String,
+        detail: String,
+    ) {
         val line = "${Instant.now()} +${SystemClock.elapsedRealtime()}ms $event $detail"
         Log.i("CallRouteCompanion", line)
         synchronized(this) {
@@ -46,25 +52,44 @@ object RouterLog {
                     file.renameTo(previous)
                 }
                 file.appendText(line + "\n")
-            } catch (_: Exception) { Log.w("CallRouteCompanion", "Diagnostic file write failed") }
+            } catch (_: Exception) {
+                Log.w("CallRouteCompanion", "Diagnostic file write failed")
+            }
         }
         main.post { listeners.toList().forEach { it() } }
     }
+
     @Synchronized fun recentText(): String = recent.joinToString("\n")
-    fun observe(listener: () -> Unit) { listeners.add(listener) }
-    fun remove(listener: () -> Unit) { listeners.remove(listener) }
+
+    fun observe(listener: () -> Unit) {
+        listeners.add(listener)
+    }
+
+    fun remove(listener: () -> Unit) {
+        listeners.remove(listener)
+    }
+
     /** Serialized after pending writes, so exported logs include the latest events. */
-    fun export(context: Context, uri: android.net.Uri, done: (Boolean) -> Unit) {
+    fun export(
+        context: Context,
+        uri: android.net.Uri,
+        done: (Boolean) -> Unit,
+    ) {
         io.execute {
-            val ok = try {
-                context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { writer ->
-                    writer.appendLine("Call Route Companion ${BuildConfig.VERSION_NAME}; Android SDK ${android.os.Build.VERSION.SDK_INT}")
-                    writer.appendLine("Device addresses are salted aliases. No phone numbers are recorded.")
-                    val previous = File(file.parentFile, "router.previous.log")
-                    if (previous.exists()) writer.append(previous.readText())
-                    if (file.exists()) writer.append(file.readText())
-                } != null
-            } catch (_: Exception) { false }
+            val ok =
+                try {
+                    context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { writer ->
+                        writer.appendLine(
+                            "Call Route Companion ${BuildConfig.VERSION_NAME}; Android SDK ${android.os.Build.VERSION.SDK_INT}",
+                        )
+                        writer.appendLine("Device addresses are salted aliases. No phone numbers are recorded.")
+                        val previous = File(file.parentFile, "router.previous.log")
+                        if (previous.exists()) writer.append(previous.readText())
+                        if (file.exists()) writer.append(file.readText())
+                    } != null
+                } catch (_: Exception) {
+                    false
+                }
             main.post { done(ok) }
         }
     }

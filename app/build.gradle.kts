@@ -6,16 +6,24 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
-    .orElse("org.carcallrouter.companion")
-val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
-    .map { it.toInt() }
-    .getOrElse(5)
-val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
-    .orElse("0.3.0-beta.3")
-val enableBetaSigning = providers.gradleProperty("ENABLE_BETA_SIGNING")
-    .map { it.toBoolean() }
-    .getOrElse(false)
+val configuredApplicationId =
+    providers
+        .gradleProperty("APP_APPLICATION_ID")
+        .orElse("org.carcallrouter.companion")
+val configuredVersionCode =
+    providers
+        .gradleProperty("APP_VERSION_CODE")
+        .map { it.toInt() }
+        .getOrElse(5)
+val configuredVersionName =
+    providers
+        .gradleProperty("APP_VERSION_NAME")
+        .orElse("0.3.0-beta.3")
+val enableBetaSigning =
+    providers
+        .gradleProperty("ENABLE_BETA_SIGNING")
+        .map { it.toBoolean() }
+        .getOrElse(false)
 
 android {
     namespace = "org.carcallrouter.companion"
@@ -70,7 +78,6 @@ kotlin {
 }
 
 ktlint {
-    baseline.set(file("ktlint-baseline.xml"))
     outputToConsole.set(true)
     ignoreFailures.set(false)
 }

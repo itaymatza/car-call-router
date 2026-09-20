@@ -15,7 +15,6 @@ kotlin {
 }
 
 ktlint {
-    baseline.set(file("ktlint-baseline.xml"))
     outputToConsole.set(true)
     ignoreFailures.set(false)
     filter {

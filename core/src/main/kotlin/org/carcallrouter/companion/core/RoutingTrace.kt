@@ -9,7 +9,7 @@ package org.carcallrouter.companion.core
 class RoutingTrace(
     private val now: () -> Long,
     private val newSessionId: () -> String,
-    private val emit: (String) -> Unit
+    private val emit: (String) -> Unit,
 ) {
     enum class Confirmation { NONE, TELECOM_ENDPOINT, TARGET_HFP_AUDIO }
 
@@ -18,7 +18,10 @@ class RoutingTrace(
     private var sequence = 0
     private var confirmation = Confirmation.NONE
 
-    fun begin(mode: String, trigger: String) {
+    fun begin(
+        mode: String,
+        trigger: String,
+    ) {
         if (sessionId != null) return
         sessionId = token(newSessionId())
         startedAt = now()
@@ -27,17 +30,21 @@ class RoutingTrace(
         event("SESSION_STARTED", "mode" to mode, "trigger" to trigger)
     }
 
-    fun event(name: String, vararg fields: Pair<String, Any?>) {
+    fun event(
+        name: String,
+        vararg fields: Pair<String, Any?>,
+    ) {
         val id = sessionId ?: return
         val elapsed = (now() - startedAt).coerceAtLeast(0)
-        val body = buildList {
-            add("schema=1")
-            add("session=$id")
-            add("seq=${++sequence}")
-            add("elapsed_ms=$elapsed")
-            add("event=${token(name)}")
-            fields.forEach { (key, value) -> add("${token(key)}=${token(value?.toString() ?: "null")}") }
-        }.joinToString(" ")
+        val body =
+            buildList {
+                add("schema=1")
+                add("session=$id")
+                add("seq=${++sequence}")
+                add("elapsed_ms=$elapsed")
+                add("event=${token(name)}")
+                fields.forEach { (key, value) -> add("${token(key)}=${token(value?.toString() ?: "null")}") }
+            }.joinToString(" ")
         emit(body)
     }
 
@@ -57,7 +64,7 @@ class RoutingTrace(
     fun finish(
         phase: RoutingPolicy.Phase,
         reason: RoutingPolicy.ReasonCode,
-        termination: String
+        termination: String,
     ): Confirmation? {
         if (sessionId == null) return null
         val result = confirmation
@@ -66,7 +73,7 @@ class RoutingTrace(
             "phase" to phase,
             "reason" to reason,
             "termination" to termination,
-            "best_confirmation" to confirmation
+            "best_confirmation" to confirmation,
         )
         sessionId = null
         return result
@@ -74,9 +81,10 @@ class RoutingTrace(
 
     fun isActive(): Boolean = sessionId != null
 
-    private fun token(value: String): String = value
-        .trim()
-        .replace(Regex("[^A-Za-z0-9_.:-]"), "_")
-        .take(96)
-        .ifEmpty { "empty" }
+    private fun token(value: String): String =
+        value
+            .trim()
+            .replace(Regex("[^A-Za-z0-9_.:-]"), "_")
+            .take(96)
+            .ifEmpty { "empty" }
 }
