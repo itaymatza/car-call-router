@@ -1,0 +1,6 @@
+Version 0.3.0-beta.9
+
+- Fix late-bind callback ordering when the current car endpoint arrives before its endpoint list.
+- Preserve handset, speaker, and wired choices across coalesced callbacks.
+- Keep HFP monitoring gated by Android Auto or explicit Route now.
+- Add 1,312 deterministic and seeded late-bind interleavings.

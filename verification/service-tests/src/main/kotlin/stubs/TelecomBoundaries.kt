@@ -12,15 +12,19 @@ class HfpMonitor(
     c: Context,
     private val changed: () -> Unit,
 ) : AutoCloseable {
-    val known get() = isKnown
-    val connected get() = devices
-    val audioConnected get() = audioDevices
+    private var started = false
+    val known get() = started && isKnown
+    val connected get() = if (started) devices else emptySet()
+    val audioConnected get() = if (started) audioDevices else emptySet()
 
     init {
         instances.add(this)
     }
 
     fun start() {
+        if (started) return
+        started = true
+        starts++
         changed()
     }
 
@@ -32,6 +36,7 @@ class HfpMonitor(
         var isKnown = true
         var devices = setOf<String>()
         var audioDevices = setOf<String>()
+        var starts = 0
         val instances = mutableListOf<HfpMonitor>()
 
         fun emit(
@@ -40,7 +45,7 @@ class HfpMonitor(
         ) {
             devices = value
             isKnown = known
-            instances.toList().forEach { it.changed() }
+            instances.filter { it.started }.forEach { it.changed() }
         }
     }
 }

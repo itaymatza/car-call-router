@@ -16,6 +16,10 @@ transitions), connection-order and timing scenarios, and JSONL regression-trace 
 fresh local logs under `verification/current/`, which is intentionally ignored by Git. The
 standalone Kotlin compiler is needed only by the lightweight framework-double service runner.
 
+The production-service harness also executes 1,312 adversarial late-bind interleavings: every
+ordering of projection, HFP, endpoint-snapshot, and current-route evidence with protected-route
+handset, speaker, and wired edge inserted at each boundary, plus 1,000 reproducible callback storms.
+
 These checks exercise decision rules and lifecycle behavior. They do not install an APK, emulate Android Telecom, validate protected-permission admission, or test a real Bluetooth stack, microphone, projection host, headset, or vehicle.
 
 ## Android build and static checks
