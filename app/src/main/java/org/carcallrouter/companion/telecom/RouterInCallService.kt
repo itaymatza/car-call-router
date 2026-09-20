@@ -39,15 +39,18 @@ class RouterInCallService :
     private lateinit var trace: RoutingTrace
     private var projection: Boolean? = null
     private var sequence = 0
+    private var hasObservedCallInInstance = false
     private var disposed = false
     private var policy = RoutingPolicy()
     private var sessionStarted = false
     private var lastPublished = ""
     private var manualSession = false
+    private var hfpStarted = false
     private var lastTracePolicy: Pair<RoutingPolicy.Phase, RoutingPolicy.ReasonCode>? = null
     private var lastSafety = "No calls"
     private var manualCooldownUntil = 0L
     private var activeTransitionAt: Long? = null
+    private var lateBindRecoveryDeadlineAt: Long? = null
     private var initialEndpointId: String? = null
     private var lastEndpointId: String? = null
     private val preGuardEndpointRequests = mutableMapOf<String, Long>()
@@ -88,10 +91,12 @@ class RouterInCallService :
         policy = RoutingPolicy()
         sessionStarted = false
         manualSession = false
+        hfpStarted = false
         lastTracePolicy = null
         projection = null
         lastPublished = ""
         activeTransitionAt = null
+        lateBindRecoveryDeadlineAt = null
         initialEndpointId = null
         lastEndpointId = null
         preGuardEndpointRequests.clear()
@@ -125,6 +130,7 @@ class RouterInCallService :
         projectionMonitor =
             ProjectionMonitor(this) { value ->
                 projection = value
+                if (value == true) ensureHfpMonitoring("projection_active")
                 if (!manualSession && guardHasActed() && value == false) {
                     suspendSessionFromEvent(
                         "Projection disconnected; this session stays paused",
@@ -139,8 +145,14 @@ class RouterInCallService :
             "SERVICE_CREATE",
             "non-UI service; authorized=${Access.ongoingCalls(this)}; ${ProcessDiagnostics.snapshot(this)}",
         )
-        hfp.start()
         projectionMonitor.start()
+    }
+
+    private fun ensureHfpMonitoring(reason: String) {
+        if (hfpStarted) return
+        hfpStarted = true
+        RouterLog.event("HFP_MONITOR_START", "reason=$reason")
+        hfp.start()
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -152,6 +164,8 @@ class RouterInCallService :
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        val repeatedServiceInstance = hasObservedCallInInstance
+        hasObservedCallInInstance = true
         val id = ++sequence
         val callback =
             object : Call.Callback() {
@@ -199,14 +213,29 @@ class RouterInCallService :
                 ProcessDiagnostics.snapshot(this),
         )
         if (!sessionStarted && state == Call.STATE_ACTIVE) {
-            // No observed transition: may be process recovery or binding to an old call.
+            // Samsung can bind this non-UI service after its first observable call state is
+            // already ACTIVE. Defer the decision until fresh projection/HFP/endpoint evidence is
+            // available; recovery is permitted only from a verified car-owned route.
             sessionStarted = true
-            trace.begin("automatic", "already_active_bind")
-            policy.suspend(
-                "Already-active call on service bind; automatic takeover suppressed",
-                RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
-            )
-            trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
+            manualSession = false
+            activeTransitionAt = SystemClock.elapsedRealtime()
+            initialEndpointId = router.current()?.identifier?.toString()
+            if (repeatedServiceInstance) {
+                trace.begin("automatic", "same_instance_active_rebind")
+                policy.suspend(
+                    "Already-active call returned to the same service instance; automatic takeover suppressed",
+                    RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
+                )
+                trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
+            } else {
+                lateBindRecoveryDeadlineAt = activeTransitionAt?.plus(LATE_BIND_EVIDENCE_WINDOW_MS)
+                trace.begin("automatic", "already_active_bind_pending")
+                trace.event("LATE_BIND_RECOVERY_PENDING", "initial_route" to currentRoute())
+                RouterLog.event(
+                    "LATE_BIND_RECOVERY_PENDING",
+                    "Awaiting verified Android Auto, BMW HFP and endpoint evidence",
+                )
+            }
         }
         queueEvaluation()
     }
@@ -231,6 +260,7 @@ class RouterInCallService :
             sessionStarted = true
             manualSession = false
             activeTransitionAt = SystemClock.elapsedRealtime()
+            lateBindRecoveryDeadlineAt = null
             initialEndpointId = router.current()?.identifier?.toString()
             if (record.sawPreActive && previous != Call.STATE_HOLDING) {
                 trace.begin("automatic", "fresh_active_transition")
@@ -280,6 +310,7 @@ class RouterInCallService :
             manualSession = false
             manualCooldownUntil = 0L
             activeTransitionAt = null
+            lateBindRecoveryDeadlineAt = null
             initialEndpointId = null
             lastEndpointId = null
             preGuardEndpointRequests.clear()
@@ -502,6 +533,88 @@ class RouterInCallService :
         val target = targetEndpoint()
         val endpointAvailable = if (router.hasAvailableSnapshot()) target.endpoint != null else null
         val now = SystemClock.elapsedRealtime()
+        val route = currentRoute()
+        val lateBindDeadline = lateBindRecoveryDeadlineAt
+        if (lateBindDeadline != null && policy.phase == RoutingPolicy.Phase.IDLE) {
+            val prerequisitesReady =
+                settings.enabled &&
+                    Access.ongoingCalls(this) &&
+                    active &&
+                    live.size == 1 &&
+                    records.size == 1 &&
+                    safe &&
+                    projection == true &&
+                    hfpConnected == true &&
+                    endpointAvailable == true
+            val carOwnedRoute =
+                route in
+                    setOf(
+                        RoutingPolicy.Route.TARGET,
+                        RoutingPolicy.Route.COMPETING_DEVICE,
+                        RoutingPolicy.Route.STREAMING,
+                    )
+            val userOwnedRoute =
+                route in
+                    setOf(
+                        RoutingPolicy.Route.HANDSET,
+                        RoutingPolicy.Route.SPEAKER,
+                        RoutingPolicy.Route.WIRED,
+                        RoutingPolicy.Route.OTHER_BLUETOOTH,
+                    )
+            val immediatelyIneligible =
+                !settings.enabled ||
+                    !Access.ongoingCalls(this) ||
+                    !active ||
+                    live.size != 1 ||
+                    records.size != 1 ||
+                    !safe
+            when {
+                immediatelyIneligible -> {
+                    lateBindRecoveryDeadlineAt = null
+                    policy.begin(now, route)
+                }
+                userOwnedRoute || projection == false -> {
+                    lateBindRecoveryDeadlineAt = null
+                    policy.suspend(
+                        "Already-active call is not on a verified Android Auto/car route; automatic takeover suppressed",
+                        RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
+                    )
+                    trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode, "route" to route)
+                }
+                prerequisitesReady && carOwnedRoute -> {
+                    lateBindRecoveryDeadlineAt = null
+                    policy.begin(now, route)
+                    trace.event("LATE_BIND_RECOVERY_STARTED", "initial_route" to route)
+                    RouterLog.event("LATE_BIND_RECOVERY_STARTED", "Verified Android Auto/car route; automatic startup guard enabled")
+                }
+                now >= lateBindDeadline -> {
+                    lateBindRecoveryDeadlineAt = null
+                    policy.suspend(
+                        "Already-active call lacked complete safe recovery evidence",
+                        RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
+                    )
+                    trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode, "route" to route)
+                }
+                else -> {
+                    val state =
+                        "Service: bound\n" +
+                            "Projection: ${projection ?: "unknown"}\n" +
+                            "Call: ACTIVE; live=${live.size}\n" +
+                            "Safety: $lastSafety\n" +
+                            "Selected device: endpoint resolved=${target.endpoint != null}; " +
+                            "HFP connected=${hfpConnected ?: "unknown"}\n" +
+                            "Route: $route\n" +
+                            "Controller: WAITING; reason=LATE_BIND_RECOVERY_EVIDENCE"
+                    if (state != lastPublished) {
+                        lastPublished = state
+                        RouterLog.event("STATUS", state.replace("\n", " | "))
+                        SessionBridge.publish(state)
+                    }
+                    handler.postDelayed(tick, (lateBindDeadline - now).coerceAtLeast(1))
+                    return
+                }
+            }
+        }
         val decision =
             policy.evaluate(
                 RoutingPolicy.Snapshot(
@@ -515,7 +628,7 @@ class RouterInCallService :
                     targetHfpConnected = hfpConnected,
                     targetAvailable = endpointAvailable,
                     endpointRevision = router.endpointRevision(),
-                    route = currentRoute(),
+                    route = route,
                 ),
             )
         val policyState = policy.phase to policy.reasonCode
@@ -640,7 +753,6 @@ class RouterInCallService :
                 trace.event("REQUEST_ERROR", "attempt" to attempt, "type" to e.javaClass.simpleName)
             }
         }
-        val route = currentRoute()
         val sco =
             when {
                 address == null -> false
@@ -680,6 +792,7 @@ class RouterInCallService :
             RouterLog.event("MANUAL_TEST", "A request is already within its verification window")
             return
         }
+        ensureHfpMonitoring("manual_route_now")
         // This explicit one-shot bypasses only auto toggle/projection, NOT safety/identity checks.
         sessionStarted = true
         manualSession = true
@@ -740,6 +853,7 @@ class RouterInCallService :
     companion object {
         private const val STARTUP_REPLAY_WINDOW_MS = 2_500L
         private const val INITIAL_ROUTE_REPLAY_WINDOW_MS = 750L
+        private const val LATE_BIND_EVIDENCE_WINDOW_MS = 5_000L
 
         private fun isPreActive(state: Int) =
             state in setOf(Call.STATE_NEW, Call.STATE_RINGING, Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_SELECT_PHONE_ACCOUNT)

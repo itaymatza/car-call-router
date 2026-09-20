@@ -1,0 +1,5 @@
+Version 0.3.0-beta.8
+
+- Recovers automatic routing from Samsung's verified already-active car route.
+- Preserves handset, speaker, wired, unknown, and other-device route choices.
+- Activates Bluetooth HFP observation only for Android Auto or manual testing.
