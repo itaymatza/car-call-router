@@ -10,17 +10,20 @@ import org.carcallrouter.companion.core.EndpointIdentity
  * API 34+ Telecom endpoint boundary. Requests use only live CallEndpoint instances supplied by
  * Telecom. Endpoint identifiers are session-scoped and are never persisted as device identity.
  */
-class AddressedTelecomRouter(private val service: InCallService) {
+class AddressedTelecomRouter(
+    private val service: InCallService,
+) {
     data class Target(
         val endpoint: CallEndpoint?,
         val reason: String,
-        val basis: EndpointIdentity.Basis? = null
+        val basis: EndpointIdentity.Basis? = null,
     )
 
     private var available: List<CallEndpoint> = emptyList()
     private var availableSnapshotReceived = false
     private var availableRevision = 0L
     private var current: CallEndpoint? = null
+
     // API 37 may report the request before or after the resulting endpoint change. Counts are
     // consumed only by onCallEndpointRequested, never by onCallEndpointChanged.
     private val ownRequestCounts = mutableMapOf<String, Int>()
@@ -40,41 +43,51 @@ class AddressedTelecomRouter(private val service: InCallService) {
     fun current(): CallEndpoint? {
         current?.let { return it }
         return try {
-            service.currentCallEndpoint.takeIf { endpoint ->
-                !availableSnapshotReceived || available.any { it.identifier == endpoint.identifier }
-            }?.also { current = it }
-        } catch (_: RuntimeException) { null }
+            service.currentCallEndpoint
+                .takeIf { endpoint ->
+                    !availableSnapshotReceived || available.any { it.identifier == endpoint.identifier }
+                }?.also { current = it }
+        } catch (_: RuntimeException) {
+            null
+        }
     }
 
     fun hasAvailableSnapshot(): Boolean = availableSnapshotReceived
+
     fun endpointRevision(): Long = availableRevision
 
     fun target(
         savedLabel: String,
         targetHfpConnected: Boolean,
-        connectedHfpCount: Int
+        connectedHfpCount: Int,
     ): Target {
         val endpoints = available.filter { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
-        val candidates = endpoints.map {
-            EndpointIdentity.Candidate(it.identifier.toString(), it.endpointName.toString())
-        }
-        return when (val resolution = EndpointIdentity.resolve(
-            savedLabel,
-            candidates,
-            targetHfpConnected,
-            connectedHfpCount
-        )) {
-            is EndpointIdentity.Resolution.Matched -> Target(
-                endpoint = endpoints.single { it.identifier.toString() == resolution.candidate.id },
-                reason = "Matched current Telecom endpoint",
-                basis = resolution.basis
-            )
+        val candidates =
+            endpoints.map {
+                EndpointIdentity.Candidate(it.identifier.toString(), it.endpointName.toString())
+            }
+        return when (
+            val resolution =
+                EndpointIdentity.resolve(
+                    savedLabel,
+                    candidates,
+                    targetHfpConnected,
+                    connectedHfpCount,
+                )
+        ) {
+            is EndpointIdentity.Resolution.Matched ->
+                Target(
+                    endpoint = endpoints.single { it.identifier.toString() == resolution.candidate.id },
+                    reason = "Matched current Telecom endpoint",
+                    basis = resolution.basis,
+                )
             is EndpointIdentity.Resolution.Unavailable -> Target(null, resolution.reason)
         }
     }
 
-    fun isCurrent(endpoint: CallEndpoint?): Boolean = endpoint != null &&
-        current()?.identifier == endpoint.identifier
+    fun isCurrent(endpoint: CallEndpoint?): Boolean =
+        endpoint != null &&
+            current()?.identifier == endpoint.identifier
 
     fun consumeOwnRequest(endpoint: CallEndpoint): Boolean {
         val id = endpoint.identifier.toString()
@@ -90,7 +103,7 @@ class AddressedTelecomRouter(private val service: InCallService) {
     fun request(
         endpoint: CallEndpoint,
         accepted: () -> Unit,
-        rejected: (CallEndpointException) -> Unit
+        rejected: (CallEndpointException) -> Unit,
     ) {
         check(available.any { it.identifier == endpoint.identifier }) {
             "Endpoint is no longer in Telecom's current callback set"
@@ -103,10 +116,11 @@ class AddressedTelecomRouter(private val service: InCallService) {
                 service.mainExecutor,
                 object : OutcomeReceiver<Void?, CallEndpointException> {
                     override fun onResult(result: Void?) = accepted()
+
                     // Keep the marker until the API 37 request callback is consumed. That callback
                     // can be delivered after this result callback.
                     override fun onError(error: CallEndpointException) = rejected(error)
-                }
+                },
             )
         } catch (error: RuntimeException) {
             val count = ownRequestCounts[id] ?: 0

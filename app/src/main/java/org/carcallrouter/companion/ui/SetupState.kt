@@ -5,30 +5,32 @@ enum class SetupPhase {
     NEEDS_TELECOM_AUTHORIZATION,
     NEEDS_TARGET_DEVICE,
     READY,
-    ACTIVE
+    ACTIVE,
 }
 
 data class SetupState(
     val runtimePermissionsGranted: Boolean,
     val telecomAuthorized: Boolean,
     val targetSelected: Boolean,
-    val automationEnabled: Boolean
+    val automationEnabled: Boolean,
 ) {
-    val completedSteps: Int = listOf(
-        runtimePermissionsGranted,
-        telecomAuthorized,
-        targetSelected
-    ).count { it }
+    val completedSteps: Int =
+        listOf(
+            runtimePermissionsGranted,
+            telecomAuthorized,
+            targetSelected,
+        ).count { it }
 
     val ready: Boolean = completedSteps == REQUIRED_STEPS
 
-    val phase: SetupPhase = when {
-        !runtimePermissionsGranted -> SetupPhase.NEEDS_RUNTIME_PERMISSIONS
-        !targetSelected -> SetupPhase.NEEDS_TARGET_DEVICE
-        !telecomAuthorized -> SetupPhase.NEEDS_TELECOM_AUTHORIZATION
-        automationEnabled -> SetupPhase.ACTIVE
-        else -> SetupPhase.READY
-    }
+    val phase: SetupPhase =
+        when {
+            !runtimePermissionsGranted -> SetupPhase.NEEDS_RUNTIME_PERMISSIONS
+            !targetSelected -> SetupPhase.NEEDS_TARGET_DEVICE
+            !telecomAuthorized -> SetupPhase.NEEDS_TELECOM_AUTHORIZATION
+            automationEnabled -> SetupPhase.ACTIVE
+            else -> SetupPhase.READY
+        }
 
     companion object {
         const val REQUIRED_STEPS = 3

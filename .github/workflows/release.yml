@@ -52,7 +52,9 @@ jobs:
           bash gradlew
           -PENABLE_BETA_SIGNING=true
           :core:check
+          :app:ktlintCheck
           :app:testDebugUnitTest
+          :verification:service-tests:ktlintCheck
           :verification:service-tests:run
           :app:lintRelease
           :app:assembleRelease

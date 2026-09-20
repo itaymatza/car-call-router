@@ -18,8 +18,10 @@ class RoutingScenarioTest {
         trace.confirmTelecom()
         now = 3_000
         trace.confirmTargetHfpAudio()
-        assertEquals(RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
-            trace.finish(Phase.RELEASED, RoutingPolicy.ReasonCode.STARTUP_COMPLETE, "complete"))
+        assertEquals(
+            RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
+            trace.finish(Phase.RELEASED, RoutingPolicy.ReasonCode.STARTUP_COMPLETE, "complete"),
+        )
         assertEquals(1, lines.count { "TARGET_HFP_AUDIO_CONFIRMED" in it })
     }
 
@@ -65,17 +67,26 @@ class RoutingScenarioTest {
     fun jsonlRegressionTraceReplaysDeterministically() {
         val resource = requireNotNull(javaClass.getResource("/traces/head-unit-reclaim.jsonl"))
         val policy = policy()
-        val attempts = resource.readText().lineSequence().filter { it.isNotBlank() }.map { line ->
-            val fields = parseFlatJson(line)
-            policy.evaluate(snapshot(
-                now = requireNotNull(fields["now"]).toLong(),
-                projection = fields["projection"].toNullableBoolean(),
-                targetHfpConnected = fields["targetHfpConnected"].toNullableBoolean(),
-                targetAvailable = fields["targetAvailable"].toNullableBoolean(),
-                endpointRevision = requireNotNull(fields["endpointRevision"]).toLong(),
-                route = Route.valueOf(requireNotNull(fields["route"]))
-            )).requestAttempt
-        }.filterNotNull().toList()
+        val attempts =
+            resource
+                .readText()
+                .lineSequence()
+                .filter { it.isNotBlank() }
+                .map { line ->
+                    val fields = parseFlatJson(line)
+                    policy
+                        .evaluate(
+                            snapshot(
+                                now = requireNotNull(fields["now"]).toLong(),
+                                projection = fields["projection"].toNullableBoolean(),
+                                targetHfpConnected = fields["targetHfpConnected"].toNullableBoolean(),
+                                targetAvailable = fields["targetAvailable"].toNullableBoolean(),
+                                endpointRevision = requireNotNull(fields["endpointRevision"]).toLong(),
+                                route = Route.valueOf(requireNotNull(fields["route"])),
+                            ),
+                        ).requestAttempt
+                }.filterNotNull()
+                .toList()
         assertEquals(listOf(1, 2), attempts)
         assertTrue(policy.verified)
     }
@@ -88,16 +99,28 @@ class RoutingScenarioTest {
         targetHfpConnected: Boolean? = true,
         targetAvailable: Boolean? = true,
         endpointRevision: Long = 1,
-        route: Route = Route.COMPETING_DEVICE
-    ) = Snapshot(now, true, true, true, true, true, projection, targetHfpConnected,
-        targetAvailable, endpointRevision, route)
+        route: Route = Route.COMPETING_DEVICE,
+    ) = Snapshot(
+        now,
+        true,
+        true,
+        true,
+        true,
+        true,
+        projection,
+        targetHfpConnected,
+        targetAvailable,
+        endpointRevision,
+        route,
+    )
 
-    private fun String?.toNullableBoolean(): Boolean? = when (this) {
-        "true" -> true
-        "false" -> false
-        "null" -> null
-        else -> error("Invalid nullable boolean: $this")
-    }
+    private fun String?.toNullableBoolean(): Boolean? =
+        when (this) {
+            "true" -> true
+            "false" -> false
+            "null" -> null
+            else -> error("Invalid nullable boolean: $this")
+        }
 
     private fun parseFlatJson(line: String): Map<String, String> =
         Regex("\\\"([^\\\"]+)\\\"\\s*:\\s*(\\\"([^\\\"]*)\\\"|true|false|null|-?\\d+)")

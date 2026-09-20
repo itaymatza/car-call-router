@@ -150,10 +150,11 @@ class MainActivity : Activity() {
         super.onStart()
         SessionBridge.observe(statusListener)
         RouterLog.observe(logListener)
-        monitor = ProjectionMonitor(this) {
-            projection = it
-            refresh()
-        }.also { it.start() }
+        monitor =
+            ProjectionMonitor(this) {
+                projection = it
+                refresh()
+            }.also { it.start() }
         logs.text = RouterLog.recentText()
     }
 
@@ -170,12 +171,13 @@ class MainActivity : Activity() {
         super.onStop()
     }
 
-    private fun currentSetupState() = SetupState(
-        runtimePermissionsGranted = Access.runtimeGranted(this),
-        telecomAuthorized = Access.ongoingCalls(this),
-        targetSelected = settings.targetAddress != null,
-        automationEnabled = settings.enabled
-    )
+    private fun currentSetupState() =
+        SetupState(
+            runtimePermissionsGranted = Access.runtimeGranted(this),
+            telecomAuthorized = Access.ongoingCalls(this),
+            targetSelected = settings.targetAddress != null,
+            automationEnabled = settings.enabled,
+        )
 
     @SuppressLint("SetTextI18n")
     private fun refresh() {
@@ -187,72 +189,79 @@ class MainActivity : Activity() {
         master.isEnabled = setup.ready || settings.enabled
         syncing = false
 
-        setupProgress.text = getString(
-            R.string.setup_progress,
-            setup.completedSteps,
-            SetupState.REQUIRED_STEPS
-        )
+        setupProgress.text =
+            getString(
+                R.string.setup_progress,
+                setup.completedSteps,
+                SetupState.REQUIRED_STEPS,
+            )
         updateReadiness(setup)
 
         val lastSession = settings.lastSession
-        lastCallResult.text = if (lastSession == null) {
-            getString(R.string.last_call_none)
-        } else {
-            getString(
-                R.string.last_call_summary,
-                DateFormat.getDateTimeInstance().format(Date(lastSession.completedAt)),
-                lastSession.phase,
-                lastSession.reason,
-                lastSession.confirmation
-            )
-        }
+        lastCallResult.text =
+            if (lastSession == null) {
+                getString(R.string.last_call_none)
+            } else {
+                getString(
+                    R.string.last_call_summary,
+                    DateFormat.getDateTimeInstance().format(Date(lastSession.completedAt)),
+                    lastSession.phase,
+                    lastSession.reason,
+                    lastSession.confirmation,
+                )
+            }
 
         masterHelp.setText(
             when {
                 !setup.ready -> R.string.master_help_locked
                 settings.enabled -> R.string.master_help_active
                 else -> R.string.master_help_ready
-            }
+            },
         )
         projectionValue.setText(
             when (projection) {
                 true -> R.string.projection_connected
                 false -> R.string.projection_not_connected
                 null -> R.string.projection_unknown
-            }
+            },
         )
 
         permissionsState.setText(if (setup.runtimePermissionsGranted) R.string.permissions_complete else R.string.permissions_missing)
-        permissionsButton.setText(if (setup.runtimePermissionsGranted) R.string.permissions_action_complete else R.string.permissions_action)
+        permissionsButton.setText(
+            if (setup.runtimePermissionsGranted) R.string.permissions_action_complete else R.string.permissions_action,
+        )
         permissionsButton.isEnabled = !setup.runtimePermissionsGranted
 
         authorizationState.setText(
-            if (setup.telecomAuthorized) R.string.authorization_complete else R.string.authorization_missing
+            if (setup.telecomAuthorized) R.string.authorization_complete else R.string.authorization_missing,
         )
         authorizationButton.setText(if (setup.telecomAuthorized) R.string.authorization_action_complete else R.string.authorization_action)
         authorizationButton.isEnabled = !setup.telecomAuthorized && setup.targetSelected
 
-        targetValue.text = if (setup.targetSelected) {
-            getString(R.string.target_selected, settings.targetName)
-        } else {
-            getString(R.string.target_missing)
-        }
+        targetValue.text =
+            if (setup.targetSelected) {
+                getString(R.string.target_selected, settings.targetName)
+            } else {
+                getString(R.string.target_missing)
+            }
         targetButton.setText(if (setup.targetSelected) R.string.target_action_change else R.string.target_action)
 
-        competitorValue.text = if (settings.competitorAddress == null) {
-            getString(R.string.competitor_none)
-        } else {
-            getString(R.string.competitor_selected, settings.competitorName)
-        }
+        competitorValue.text =
+            if (settings.competitorAddress == null) {
+                getString(R.string.competitor_none)
+            } else {
+                getString(R.string.competitor_selected, settings.competitorName)
+            }
 
         routeNowButton.isEnabled = setup.ready
         pauseButton.isEnabled = SessionBridge.controller?.get() != null
 
-        val bound = if (settings.lastBound == 0L) {
-            "Never observed"
-        } else {
-            DateFormat.getDateTimeInstance().format(Date(settings.lastBound))
-        }
+        val bound =
+            if (settings.lastBound == 0L) {
+                "Never observed"
+            } else {
+                DateFormat.getDateTimeInstance().format(Date(settings.lastBound))
+            }
         status.text = "Version: ${BuildConfig.VERSION_NAME}\n" +
             "Android SDK: ${android.os.Build.VERSION.SDK_INT}\n" +
             "Runtime permissions: ${setup.runtimePermissionsGranted}\n" +
@@ -264,41 +273,46 @@ class MainActivity : Activity() {
 
     private fun updateReadiness(setup: SetupState) {
         when (setup.phase) {
-            SetupPhase.NEEDS_RUNTIME_PERMISSIONS -> setReadiness(
-                R.drawable.bg_status_warning,
-                R.color.warning,
-                R.string.setup_required,
-                R.string.readiness_permissions_title,
-                R.string.readiness_permissions_message
-            )
-            SetupPhase.NEEDS_TELECOM_AUTHORIZATION -> setReadiness(
-                R.drawable.bg_status_warning,
-                R.color.warning,
-                R.string.setup_required,
-                R.string.readiness_authorization_title,
-                R.string.readiness_authorization_message
-            )
-            SetupPhase.NEEDS_TARGET_DEVICE -> setReadiness(
-                R.drawable.bg_status_warning,
-                R.color.warning,
-                R.string.setup_required,
-                R.string.readiness_target_title,
-                R.string.readiness_target_message
-            )
-            SetupPhase.READY -> setReadiness(
-                R.drawable.bg_status_ready,
-                R.color.success,
-                R.string.ready_label,
-                R.string.readiness_ready_title,
-                R.string.readiness_ready_message
-            )
-            SetupPhase.ACTIVE -> setReadiness(
-                R.drawable.bg_status_active,
-                R.color.primary,
-                R.string.active_label,
-                R.string.readiness_active_title,
-                R.string.readiness_active_message
-            )
+            SetupPhase.NEEDS_RUNTIME_PERMISSIONS ->
+                setReadiness(
+                    R.drawable.bg_status_warning,
+                    R.color.warning,
+                    R.string.setup_required,
+                    R.string.readiness_permissions_title,
+                    R.string.readiness_permissions_message,
+                )
+            SetupPhase.NEEDS_TELECOM_AUTHORIZATION ->
+                setReadiness(
+                    R.drawable.bg_status_warning,
+                    R.color.warning,
+                    R.string.setup_required,
+                    R.string.readiness_authorization_title,
+                    R.string.readiness_authorization_message,
+                )
+            SetupPhase.NEEDS_TARGET_DEVICE ->
+                setReadiness(
+                    R.drawable.bg_status_warning,
+                    R.color.warning,
+                    R.string.setup_required,
+                    R.string.readiness_target_title,
+                    R.string.readiness_target_message,
+                )
+            SetupPhase.READY ->
+                setReadiness(
+                    R.drawable.bg_status_ready,
+                    R.color.success,
+                    R.string.ready_label,
+                    R.string.readiness_ready_title,
+                    R.string.readiness_ready_message,
+                )
+            SetupPhase.ACTIVE ->
+                setReadiness(
+                    R.drawable.bg_status_active,
+                    R.color.primary,
+                    R.string.active_label,
+                    R.string.readiness_active_title,
+                    R.string.readiness_active_message,
+                )
         }
     }
 
@@ -307,7 +321,7 @@ class MainActivity : Activity() {
         accent: Int,
         eyebrow: Int,
         title: Int,
-        message: Int
+        message: Int,
     ) {
         readinessCard.setBackgroundResource(background)
         readinessEyebrow.setText(eyebrow)
@@ -321,13 +335,13 @@ class MainActivity : Activity() {
             toast(getString(R.string.permissions_action_complete))
             return
         }
-        AlertDialog.Builder(this)
+        AlertDialog
+            .Builder(this)
             .setTitle(R.string.permissions_dialog_title)
             .setMessage(R.string.permissions_dialog_message)
             .setPositiveButton(R.string.continue_action) { _, _ ->
                 requestPermissions(Access.runtimePermissions, REQUEST_PERMISSIONS)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
+            }.setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
@@ -359,22 +373,23 @@ class MainActivity : Activity() {
 
     private fun showAuthorizationGuide() {
         val command = Access.authorizationAdb()
-        AlertDialog.Builder(this)
+        AlertDialog
+            .Builder(this)
             .setTitle(R.string.authorization_dialog_title)
             .setMessage(getString(R.string.authorization_dialog_message, command))
             .setPositiveButton(R.string.copy_command) { _, _ ->
                 getSystemService(ClipboardManager::class.java)?.setPrimaryClip(
-                    ClipData.newPlainText("Call-routing authorization", command)
+                    ClipData.newPlainText("Call-routing authorization", command),
                 )
                 toast(getString(R.string.command_copied))
-            }
-            .setNeutralButton(R.string.verify_authorization) { _, _ -> verifyCallAuthorization() }
+            }.setNeutralButton(R.string.verify_authorization) { _, _ -> verifyCallAuthorization() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun showBatterySettingsGuide() {
-        AlertDialog.Builder(this)
+        AlertDialog
+            .Builder(this)
             .setTitle(R.string.battery_dialog_title)
             .setMessage(R.string.battery_dialog_message)
             .setPositiveButton(R.string.open_settings) { _, _ ->
@@ -383,17 +398,17 @@ class MainActivity : Activity() {
                 } catch (_: RuntimeException) {
                     toast("Battery settings are unavailable on this Android build.")
                 }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
+            }.setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun exportLog() {
-        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TITLE, "car-call-router-${System.currentTimeMillis()}.txt")
-        }
+        val intent =
+            Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TITLE, "car-call-router-${System.currentTimeMillis()}.txt")
+            }
         @Suppress("DEPRECATION")
         startActivityForResult(intent, REQUEST_EXPORT)
     }
@@ -405,20 +420,26 @@ class MainActivity : Activity() {
             return
         }
         try {
-            val devices = getSystemService(BluetoothManager::class.java)?.adapter?.bondedDevices
-                ?.filter { !competing || !it.address.equals(settings.targetAddress, true) }
-                ?.sortedWith(compareBy({ it.name ?: "" }, { it.address }))
-                ?: emptyList()
-            val labels = devices.map {
-                val suffix = it.address.takeLast(5)
-                "${it.alias ?: it.name ?: "Unnamed Bluetooth device"} • $suffix"
-            }.toMutableList()
+            val devices =
+                getSystemService(BluetoothManager::class.java)
+                    ?.adapter
+                    ?.bondedDevices
+                    ?.filter { !competing || !it.address.equals(settings.targetAddress, true) }
+                    ?.sortedWith(compareBy({ it.name ?: "" }, { it.address }))
+                    ?: emptyList()
+            val labels =
+                devices
+                    .map {
+                        val suffix = it.address.takeLast(5)
+                        "${it.alias ?: it.name ?: "Unnamed Bluetooth device"} • $suffix"
+                    }.toMutableList()
             if (competing) labels.add(0, getString(R.string.competitor_none))
             if (labels.isEmpty()) {
                 toast("No paired Bluetooth devices found. Pair the car or headset in Android settings first.")
                 return
             }
-            AlertDialog.Builder(this)
+            AlertDialog
+                .Builder(this)
                 .setTitle(if (competing) R.string.competitor_title else R.string.target_step_title)
                 .setItems(labels.toTypedArray()) { _, index ->
                     if (competing && index == 0) {
@@ -432,12 +453,11 @@ class MainActivity : Activity() {
                         }
                         RouterLog.event(
                             "DEVICE_SELECTED",
-                            "role=${if (competing) "competitor" else "target"}; id=${RouterLog.deviceId(device.address)}"
+                            "role=${if (competing) "competitor" else "target"}; id=${RouterLog.deviceId(device.address)}",
                         )
                     }
                     refresh()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
+                }.setNegativeButton(android.R.string.cancel, null)
                 .show()
         } catch (e: RuntimeException) {
             RouterLog.event("DEVICE_SELECTION_ERROR", e.javaClass.simpleName)
@@ -445,7 +465,10 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun button(id: Int, action: () -> Unit) {
+    private fun button(
+        id: Int,
+        action: () -> Unit,
+    ) {
         findViewById<Button>(id).setOnClickListener { action() }
     }
 
@@ -456,14 +479,18 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray
+        grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         refresh()
     }
 
     @Deprecated("Framework Activity compatibility callback")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+    ) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK) {
             data?.data?.let { uri ->

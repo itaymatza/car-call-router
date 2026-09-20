@@ -9,15 +9,15 @@ class SetupStateTest {
     @Test fun reportsFirstIncompleteStep() {
         assertEquals(
             SetupPhase.NEEDS_RUNTIME_PERMISSIONS,
-            SetupState(false, false, false, false).phase
+            SetupState(false, false, false, false).phase,
         )
         assertEquals(
             SetupPhase.NEEDS_TARGET_DEVICE,
-            SetupState(true, false, false, false).phase
+            SetupState(true, false, false, false).phase,
         )
         assertEquals(
             SetupPhase.NEEDS_TELECOM_AUTHORIZATION,
-            SetupState(true, false, true, false).phase
+            SetupState(true, false, true, false).phase,
         )
     }
 

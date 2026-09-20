@@ -1,4 +1,5 @@
 @file:Suppress("DEPRECATION")
+
 package org.carcallrouter.companion.telecom
 
 import android.content.Intent
@@ -25,7 +26,9 @@ import java.util.IdentityHashMap
 import java.util.UUID
 
 /** Telecom-bound non-UI companion; never claims the dialer role or manipulates media profiles. */
-class RouterInCallService : InCallService(), SessionBridge.Control {
+class RouterInCallService :
+    InCallService(),
+    SessionBridge.Control {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var settings: RouterSettings
     private lateinit var router: AddressedTelecomRouter
@@ -43,23 +46,32 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     private var lastTracePolicy: Pair<RoutingPolicy.Phase, RoutingPolicy.ReasonCode>? = null
     private var lastSafety = "No calls"
     private var manualCooldownUntil = 0L
-    private data class Record(val id: Int, val callback: Call.Callback, var sawPreActive: Boolean, var lastState: Int)
+
+    private data class Record(
+        val id: Int,
+        val callback: Call.Callback,
+        var sawPreActive: Boolean,
+        var lastState: Int,
+    )
+
     private val records = IdentityHashMap<Call, Record>()
-    private val tick = Runnable {
-        // One-shot deadline verification, not continuous polling.
-        evaluate()
-    }
-    private val evaluateEvent = Runnable { evaluate() }
-    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key != "last_bound" && sessionStarted) {
-            policy.suspend(
-                "Settings changed during a call; automatic routing paused for this session",
-                RoutingPolicy.ReasonCode.SETTINGS_CHANGED
-            )
-            trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
-            queueEvaluation()
+    private val tick =
+        Runnable {
+            // One-shot deadline verification, not continuous polling.
+            evaluate()
         }
-    }
+    private val evaluateEvent = Runnable { evaluate() }
+    private val prefListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key != "last_bound" && sessionStarted) {
+                policy.suspend(
+                    "Settings changed during a call; automatic routing paused for this session",
+                    RoutingPolicy.ReasonCode.SETTINGS_CHANGED,
+                )
+                trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
+                queueEvaluation()
+            }
+        }
 
     override fun onCreate() {
         super.onCreate()
@@ -74,35 +86,44 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         lastTracePolicy = null
         projection = null
         lastPublished = ""
-        trace = RoutingTrace(
-            now = SystemClock::elapsedRealtime,
-            newSessionId = { UUID.randomUUID().toString().replace("-", "").take(12) },
-            emit = { RouterLog.event("ROUTING_TRACE", it) }
-        )
+        trace =
+            RoutingTrace(
+                now = SystemClock::elapsedRealtime,
+                newSessionId = {
+                    UUID
+                        .randomUUID()
+                        .toString()
+                        .replace("-", "")
+                        .take(12)
+                },
+                emit = { RouterLog.event("ROUTING_TRACE", it) },
+            )
         settings = RouterSettings(this)
         router = AddressedTelecomRouter(this)
         classifier = CellularClassifier(this)
-        hfp = HfpMonitor(this) {
-            // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
-            val address = settings.targetAddress?.uppercase()
-            if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
-                suspendSessionFromEvent(
-                    "target Bluetooth HFP disappeared; this session stays paused",
-                    RoutingPolicy.ReasonCode.TARGET_HFP_DISCONNECTED
-                )
+        hfp =
+            HfpMonitor(this) {
+                // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
+                val address = settings.targetAddress?.uppercase()
+                if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
+                    suspendSessionFromEvent(
+                        "target Bluetooth HFP disappeared; this session stays paused",
+                        RoutingPolicy.ReasonCode.TARGET_HFP_DISCONNECTED,
+                    )
+                }
+                queueEvaluation()
             }
-            queueEvaluation()
-        }
-        projectionMonitor = ProjectionMonitor(this) { value ->
-            projection = value
-            if (!manualSession && guardHasActed() && value == false) {
-                suspendSessionFromEvent(
-                    "Projection disconnected; this session stays paused",
-                    RoutingPolicy.ReasonCode.PROJECTION_DISCONNECTED
-                )
+        projectionMonitor =
+            ProjectionMonitor(this) { value ->
+                projection = value
+                if (!manualSession && guardHasActed() && value == false) {
+                    suspendSessionFromEvent(
+                        "Projection disconnected; this session stays paused",
+                        RoutingPolicy.ReasonCode.PROJECTION_DISCONNECTED,
+                    )
+                }
+                queueEvaluation()
             }
-            queueEvaluation()
-        }
         settings.prefs.registerOnSharedPreferenceChangeListener(prefListener)
         SessionBridge.controller = WeakReference(this)
         RouterLog.event("SERVICE_CREATE", "non-UI service; authorized=${Access.ongoingCalls(this)}")
@@ -120,19 +141,35 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
         val id = ++sequence
-        val callback = object : Call.Callback() {
-            override fun onStateChanged(call: Call, state: Int) { handleState(call, state) }
-            override fun onDetailsChanged(call: Call, details: Call.Details) { handleState(call, details.state) }
-            override fun onChildrenChanged(call: Call, children: MutableList<Call>) {
-                if (children.isNotEmpty()) {
-                    suspendSessionFromEvent(
-                        "Conference children observed; system retains routing",
-                        RoutingPolicy.ReasonCode.CONFERENCE_OBSERVED
-                    )
+        val callback =
+            object : Call.Callback() {
+                override fun onStateChanged(
+                    call: Call,
+                    state: Int,
+                ) {
+                    handleState(call, state)
                 }
-                queueEvaluation()
+
+                override fun onDetailsChanged(
+                    call: Call,
+                    details: Call.Details,
+                ) {
+                    handleState(call, details.state)
+                }
+
+                override fun onChildrenChanged(
+                    call: Call,
+                    children: MutableList<Call>,
+                ) {
+                    if (children.isNotEmpty()) {
+                        suspendSessionFromEvent(
+                            "Conference children observed; system retains routing",
+                            RoutingPolicy.ReasonCode.CONFERENCE_OBSERVED,
+                        )
+                    }
+                    queueEvaluation()
+                }
             }
-        }
         val state = call.details.state
         val record = Record(id, callback, isPreActive(state), state)
         records[call] = record
@@ -140,7 +177,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             // Do not let rapid call removal erase the fact that the session was ambiguous.
             suspendSessionFromEvent(
                 "Another call observed; system retains routing for this session",
-                RoutingPolicy.ReasonCode.MULTIPLE_CALLS
+                RoutingPolicy.ReasonCode.MULTIPLE_CALLS,
             )
         }
         call.registerCallback(callback, handler)
@@ -151,14 +188,17 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             trace.begin("automatic", "already_active_bind")
             policy.suspend(
                 "Already-active call on service bind; automatic takeover suppressed",
-                RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND
+                RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
             )
             trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
         }
         queueEvaluation()
     }
 
-    private fun handleState(call: Call, state: Int) {
+    private fun handleState(
+        call: Call,
+        state: Int,
+    ) {
         val record = records[call] ?: return
         val previous = record.lastState
         record.lastState = state
@@ -166,7 +206,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             // Use the callback state, not call.details which can already contain a later state.
             suspendSessionFromEvent(
                 "Observed ${stateName(state)}; no reassertion on resume",
-                RoutingPolicy.ReasonCode.CALL_NOT_ACTIVE
+                RoutingPolicy.ReasonCode.CALL_NOT_ACTIVE,
             )
         }
         if (isPreActive(state)) record.sawPreActive = true
@@ -178,12 +218,15 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
                 trace.begin("automatic", "fresh_active_transition")
                 policy.begin(SystemClock.elapsedRealtime(), currentRoute())
                 trace.event("ACTIVE_TRANSITION", "call" to record.id, "initial_route" to currentRoute())
-                RouterLog.event("SESSION_START", "call=${record.id}; detected ACTIVE transition; target=${RouterLog.deviceId(settings.targetAddress)}")
+                RouterLog.event(
+                    "SESSION_START",
+                    "call=${record.id}; detected ACTIVE transition; target=${RouterLog.deviceId(settings.targetAddress)}",
+                )
             } else {
                 trace.begin("automatic", "active_without_fresh_transition")
                 policy.suspend(
                     "No fresh answered/connected transition observed",
-                    RoutingPolicy.ReasonCode.NO_FRESH_ACTIVE_TRANSITION
+                    RoutingPolicy.ReasonCode.NO_FRESH_ACTIVE_TRANSITION,
                 )
                 trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
             }
@@ -224,7 +267,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             "ENDPOINT_CHANGED",
             "type" to callEndpoint.endpointType,
             "id" to RouterLog.deviceId(callEndpoint.identifier.toString()),
-            "route" to currentRoute()
+            "route" to currentRoute(),
         )
         queueEvaluation()
     }
@@ -232,11 +275,16 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
     override fun onAvailableCallEndpointsChanged(availableEndpoints: MutableList<CallEndpoint>) {
         super.onAvailableCallEndpointsChanged(availableEndpoints)
         router.updateAvailable(availableEndpoints)
-        RouterLog.event("AVAILABLE_ENDPOINTS", availableEndpoints.joinToString { "type=${it.endpointType},id=${RouterLog.deviceId(it.identifier.toString())}" })
+        RouterLog.event(
+            "AVAILABLE_ENDPOINTS",
+            availableEndpoints.joinToString {
+                "type=${it.endpointType},id=${RouterLog.deviceId(it.identifier.toString())}"
+            },
+        )
         trace.event(
             "ENDPOINT_SNAPSHOT",
             "count" to availableEndpoints.size,
-            "bluetooth_count" to availableEndpoints.count { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+            "bluetooth_count" to availableEndpoints.count { it.endpointType == CallEndpoint.TYPE_BLUETOOTH },
         )
         queueEvaluation()
     }
@@ -250,29 +298,38 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         val own = router.consumeOwnRequest(callEndpoint)
         RouterLog.event(
             "ENDPOINT_REQUEST_OBSERVED",
-            "type=${callEndpoint.endpointType}; ownPending=$own; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}"
+            "type=${callEndpoint.endpointType}; ownPending=$own; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}",
         )
         trace.event(
             "ENDPOINT_REQUEST_OBSERVED",
             "type" to callEndpoint.endpointType,
             "id" to RouterLog.deviceId(callEndpoint.identifier.toString()),
-            "origin" to if (own) "self" else "external"
+            "origin" to if (own) "self" else "external",
         )
         if (sessionStarted && !own) {
             suspendSessionFromEvent(
                 "Another in-call UI requested an endpoint; respecting possible user override",
-                RoutingPolicy.ReasonCode.EXTERNAL_ENDPOINT_REQUEST
+                RoutingPolicy.ReasonCode.EXTERNAL_ENDPOINT_REQUEST,
             )
         }
         queueEvaluation()
     }
 
-    private fun guardHasActed(): Boolean = sessionStarted &&
-        policy.phase in setOf(RoutingPolicy.Phase.WAITING, RoutingPolicy.Phase.VERIFYING,
-            RoutingPolicy.Phase.STABILIZING) && (policy.requests > 0 || policy.verified)
+    private fun guardHasActed(): Boolean =
+        sessionStarted &&
+            policy.phase in
+            setOf(
+                RoutingPolicy.Phase.WAITING,
+                RoutingPolicy.Phase.VERIFYING,
+                RoutingPolicy.Phase.STABILIZING,
+            ) &&
+            (policy.requests > 0 || policy.verified)
 
     /** Latch safety-relevant events before later callbacks can replace their state. */
-    private fun suspendSessionFromEvent(reason: String, code: RoutingPolicy.ReasonCode) {
+    private fun suspendSessionFromEvent(
+        reason: String,
+        code: RoutingPolicy.ReasonCode,
+    ) {
         if (disposed) return
         sessionStarted = true
         trace.begin("automatic", "safety_event")
@@ -295,12 +352,13 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             CallEndpoint.TYPE_EARPIECE -> RoutingPolicy.Route.HANDSET
             CallEndpoint.TYPE_WIRED_HEADSET -> RoutingPolicy.Route.WIRED
             CallEndpoint.TYPE_STREAMING -> RoutingPolicy.Route.STREAMING
-            CallEndpoint.TYPE_BLUETOOTH -> when {
-                !hfp.known -> RoutingPolicy.Route.UNKNOWN
-                router.isCurrent(targetEndpoint().endpoint) -> RoutingPolicy.Route.TARGET
-                router.isCurrent(competitorEndpoint().endpoint) -> RoutingPolicy.Route.COMPETING_DEVICE
-                else -> RoutingPolicy.Route.OTHER_BLUETOOTH
-            }
+            CallEndpoint.TYPE_BLUETOOTH ->
+                when {
+                    !hfp.known -> RoutingPolicy.Route.UNKNOWN
+                    router.isCurrent(targetEndpoint().endpoint) -> RoutingPolicy.Route.TARGET
+                    router.isCurrent(competitorEndpoint().endpoint) -> RoutingPolicy.Route.COMPETING_DEVICE
+                    else -> RoutingPolicy.Route.OTHER_BLUETOOTH
+                }
             else -> RoutingPolicy.Route.UNKNOWN
         }
     }
@@ -310,7 +368,7 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         return router.target(
             savedLabel = settings.targetName,
             targetHfpConnected = address != null && hfp.known && address in hfp.connected,
-            connectedHfpCount = if (hfp.known) hfp.connected.size else 0
+            connectedHfpCount = if (hfp.known) hfp.connected.size else 0,
         )
     }
 
@@ -319,13 +377,14 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         return router.target(
             savedLabel = settings.competitorName,
             targetHfpConnected = address != null && hfp.known && address in hfp.connected,
-            connectedHfpCount = if (hfp.known) hfp.connected.size else 0
+            connectedHfpCount = if (hfp.known) hfp.connected.size else 0,
         )
     }
 
-    private fun liveCalls(): List<Call> = records.keys.filter {
-        it.details.state != Call.STATE_DISCONNECTED && it.details.state != Call.STATE_DISCONNECTING
-    }
+    private fun liveCalls(): List<Call> =
+        records.keys.filter {
+            it.details.state != Call.STATE_DISCONNECTED && it.details.state != Call.STATE_DISCONNECTING
+        }
 
     private fun evaluate() {
         if (disposed) return
@@ -334,34 +393,39 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         val active = live.any { it.details.state == Call.STATE_ACTIVE }
         val rejections = live.mapNotNull(classifier::rejection)
         val safe = Access.runtimeGranted(this) && live.isNotEmpty() && rejections.isEmpty()
-        lastSafety = when {
-            !Access.runtimeGranted(this) -> "Required runtime permissions not granted"
-            rejections.isNotEmpty() -> rejections.joinToString("; ")
-            live.isEmpty() -> "No live calls"
-            else -> "SIM-backed call and emergency-number checks passed"
-        }
+        lastSafety =
+            when {
+                !Access.runtimeGranted(this) -> "Required runtime permissions not granted"
+                rejections.isNotEmpty() -> rejections.joinToString("; ")
+                live.isEmpty() -> "No live calls"
+                else -> "SIM-backed call and emergency-number checks passed"
+            }
         val address = settings.targetAddress?.uppercase()
-        val hfpConnected = when {
-            address == null -> false
-            !hfp.known -> null
-            else -> address in hfp.connected
-        }
+        val hfpConnected =
+            when {
+                address == null -> false
+                !hfp.known -> null
+                else -> address in hfp.connected
+            }
         val target = targetEndpoint()
         val endpointAvailable = if (router.hasAvailableSnapshot()) target.endpoint != null else null
         val now = SystemClock.elapsedRealtime()
-        val decision = policy.evaluate(RoutingPolicy.Snapshot(
-            now = now,
-            enabled = settings.enabled,
-            authorized = Access.ongoingCalls(this),
-            active = active,
-            singleCall = live.size == 1 && records.size == 1,
-            safeCellularCall = safe,
-            projection = projection,
-            targetHfpConnected = hfpConnected,
-            targetAvailable = endpointAvailable,
-            endpointRevision = router.endpointRevision(),
-            route = currentRoute()
-        ))
+        val decision =
+            policy.evaluate(
+                RoutingPolicy.Snapshot(
+                    now = now,
+                    enabled = settings.enabled,
+                    authorized = Access.ongoingCalls(this),
+                    active = active,
+                    singleCall = live.size == 1 && records.size == 1,
+                    safeCellularCall = safe,
+                    projection = projection,
+                    targetHfpConnected = hfpConnected,
+                    targetAvailable = endpointAvailable,
+                    endpointRevision = router.endpointRevision(),
+                    route = currentRoute(),
+                ),
+            )
         val policyState = policy.phase to policy.reasonCode
         if (policyState != lastTracePolicy) {
             lastTracePolicy = policyState
@@ -369,19 +433,25 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
                 "POLICY_STATE",
                 "phase" to policy.phase,
                 "reason" to policy.reasonCode,
-                "attempts" to policy.requests
+                "attempts" to policy.requests,
             )
         }
         if (decision.requestTarget && target.endpoint != null) {
             val attempt = requireNotNull(decision.requestAttempt)
+            val targetId = RouterLog.deviceId(address)
+            val requestMode = if (manualSession) "manual" else "auto"
             try {
-                RouterLog.event("ROUTE_REQUEST", "target=${RouterLog.deviceId(address)}; attempt=${policy.requests}; mode=${if (manualSession) "manual" else "auto"}; backend=Telecom.requestCallEndpointChange; basis=${target.basis}")
+                RouterLog.event(
+                    "ROUTE_REQUEST",
+                    "target=$targetId; attempt=${policy.requests}; mode=$requestMode; " +
+                        "backend=Telecom.requestCallEndpointChange; basis=${target.basis}",
+                )
                 trace.event(
                     "REQUEST_SUBMITTED",
                     "attempt" to policy.requests,
                     "mode" to if (manualSession) "manual" else "automatic",
                     "basis" to target.basis,
-                    "target" to RouterLog.deviceId(address)
+                    "target" to RouterLog.deviceId(address),
                 )
                 router.request(
                     target.endpoint,
@@ -392,17 +462,18 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
                         queueEvaluation()
                     },
                     rejected = { error ->
-                        val mapped = when (error.code) {
-                            CallEndpointException.ERROR_REQUEST_TIME_OUT -> RoutingPolicy.RequestError.TIMEOUT
-                            CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST -> RoutingPolicy.RequestError.ENDPOINT_GONE
-                            CallEndpointException.ERROR_ANOTHER_REQUEST -> RoutingPolicy.RequestError.CANCELLED_BY_OTHER
-                            else -> RoutingPolicy.RequestError.UNSPECIFIED
-                        }
+                        val mapped =
+                            when (error.code) {
+                                CallEndpointException.ERROR_REQUEST_TIME_OUT -> RoutingPolicy.RequestError.TIMEOUT
+                                CallEndpointException.ERROR_ENDPOINT_DOES_NOT_EXIST -> RoutingPolicy.RequestError.ENDPOINT_GONE
+                                CallEndpointException.ERROR_ANOTHER_REQUEST -> RoutingPolicy.RequestError.CANCELLED_BY_OTHER
+                                else -> RoutingPolicy.RequestError.UNSPECIFIED
+                            }
                         policy.requestFailed(attempt, mapped)
                         RouterLog.event("ROUTE_REJECTED", "attempt=$attempt; code=${error.code}; class=$mapped")
                         trace.event("REQUEST_REJECTED", "attempt" to attempt, "code" to error.code, "class" to mapped)
                         queueEvaluation()
-                    }
+                    },
                 )
             } catch (e: RuntimeException) {
                 policy.requestFailed(attempt, RoutingPolicy.RequestError.RUNTIME_EXCEPTION)
@@ -411,16 +482,29 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
             }
         }
         val route = currentRoute()
-        val sco = when {
-            address == null -> false
-            !hfp.known -> null
-            else -> address in hfp.audioConnected
-        }
+        val sco =
+            when {
+                address == null -> false
+                !hfp.known -> null
+                else -> address in hfp.audioConnected
+            }
         if (route == RoutingPolicy.Route.TARGET) {
             trace.confirmTelecom()
             if (sco == true) trace.confirmTargetHfpAudio()
         }
-        val state = "Service: bound\nProjection: ${projection ?: "unknown"}\nCall: ${if (active) "ACTIVE" else "not active"}; live=${live.size}\nSafety: $lastSafety\nSelected device: endpoint resolved=${target.endpoint != null}; HFP connected=${hfpConnected ?: "unknown"}; SCO=${sco ?: "unknown"}\nEndpoint resolution: ${target.reason}\nRoute: $route\nController: ${policy.phase}; attempts=${policy.requests}; reason=${policy.reasonCode}\n${policy.reason}"
+        val state =
+            listOf(
+                "Service: bound",
+                "Projection: ${projection ?: "unknown"}",
+                "Call: ${if (active) "ACTIVE" else "not active"}; live=${live.size}",
+                "Safety: $lastSafety",
+                "Selected device: endpoint resolved=${target.endpoint != null}; " +
+                    "HFP connected=${hfpConnected ?: "unknown"}; SCO=${sco ?: "unknown"}",
+                "Endpoint resolution: ${target.reason}",
+                "Route: $route",
+                "Controller: ${policy.phase}; attempts=${policy.requests}; reason=${policy.reasonCode}",
+                policy.reason,
+            ).joinToString("\n")
         if (state != lastPublished) {
             lastPublished = state
             RouterLog.event("STATUS", state.replace("\n", " | "))
@@ -478,27 +562,37 @@ class RouterInCallService : InCallService(), SessionBridge.Control {
         SessionBridge.publish("No Telecom service bound. This is normal between calls.")
     }
 
-    override fun onDestroy() { stopObservers(); super.onDestroy() }
+    override fun onDestroy() {
+        stopObservers()
+        super.onDestroy()
+    }
 
-    override fun dump(fd: FileDescriptor, writer: PrintWriter, args: Array<out String>) {
+    override fun dump(
+        fd: FileDescriptor,
+        writer: PrintWriter,
+        args: Array<out String>,
+    ) {
         writer.println("Call Route Companion (redacted)")
         writer.println(SessionBridge.status)
         writer.println(RouterLog.recentText())
     }
 
     companion object {
-        private fun isPreActive(state: Int) = state in setOf(Call.STATE_NEW, Call.STATE_RINGING, Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_SELECT_PHONE_ACCOUNT)
-        private fun stateName(state: Int) = when (state) {
-            Call.STATE_NEW -> "NEW"
-            Call.STATE_RINGING -> "RINGING"
-            Call.STATE_DIALING -> "DIALING"
-            Call.STATE_CONNECTING -> "CONNECTING"
-            Call.STATE_ACTIVE -> "ACTIVE"
-            Call.STATE_HOLDING -> "HOLDING"
-            Call.STATE_DISCONNECTED -> "DISCONNECTED"
-            Call.STATE_DISCONNECTING -> "DISCONNECTING"
-            Call.STATE_SELECT_PHONE_ACCOUNT -> "SELECT_PHONE_ACCOUNT"
-            else -> "STATE_$state"
-        }
+        private fun isPreActive(state: Int) =
+            state in setOf(Call.STATE_NEW, Call.STATE_RINGING, Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_SELECT_PHONE_ACCOUNT)
+
+        private fun stateName(state: Int) =
+            when (state) {
+                Call.STATE_NEW -> "NEW"
+                Call.STATE_RINGING -> "RINGING"
+                Call.STATE_DIALING -> "DIALING"
+                Call.STATE_CONNECTING -> "CONNECTING"
+                Call.STATE_ACTIVE -> "ACTIVE"
+                Call.STATE_HOLDING -> "HOLDING"
+                Call.STATE_DISCONNECTED -> "DISCONNECTED"
+                Call.STATE_DISCONNECTING -> "DISCONNECTING"
+                Call.STATE_SELECT_PHONE_ACCOUNT -> "SELECT_PHONE_ACCOUNT"
+                else -> "STATE_$state"
+            }
     }
 }

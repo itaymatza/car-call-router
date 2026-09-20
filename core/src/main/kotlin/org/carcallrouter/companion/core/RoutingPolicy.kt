@@ -8,25 +8,56 @@ class RoutingPolicy(
     private val minRequestGapMs: Long = 2_500,
     private val resultCallbackGraceMs: Long = 500,
     private val routeDebounceMs: Long = 1_000,
-    private val maxRequests: Int = 3
+    private val maxRequests: Int = 3,
 ) {
     enum class Phase { IDLE, WAITING, VERIFYING, STABILIZING, RELEASED, SUSPENDED, FAILED }
+
     enum class Route { TARGET, COMPETING_DEVICE, OTHER_BLUETOOTH, SPEAKER, HANDSET, WIRED, STREAMING, UNKNOWN }
+
     enum class RequestError { TIMEOUT, ENDPOINT_GONE, CANCELLED_BY_OTHER, UNSPECIFIED, RUNTIME_EXCEPTION }
+
     enum class ReasonCode {
-        NO_SESSION, WAITING_PREREQUISITES, EXTERNAL_SUSPEND, SETTINGS_CHANGED,
-        ALREADY_ACTIVE_BIND, CONFERENCE_OBSERVED, NO_FRESH_ACTIVE_TRANSITION,
-        EXTERNAL_ENDPOINT_REQUEST, USER_PAUSED, AUTHORIZATION_MISSING, UNSAFE_CALL,
-        MULTIPLE_CALLS, CALL_NOT_ACTIVE, DISABLED, USER_OVERRIDE, STARTUP_COMPLETE,
-        EVIDENCE_DEADLINE_EXPIRED, ACTION_DEADLINE_EXPIRED, WAITING_PROJECTION,
-        PROJECTION_UNKNOWN, PROJECTION_DISCONNECTED, WAITING_TARGET_HFP,
-        TARGET_HFP_UNKNOWN, TARGET_HFP_DISCONNECTED, WAITING_ENDPOINT_SNAPSHOT,
-        WAITING_TARGET_ENDPOINT, WAITING_FRESH_ENDPOINT_SNAPSHOT, TARGET_ENDPOINT_CONFIRMED,
-        TARGET_ENDPOINT_STABILIZING, ROUTE_MOVED_AFTER_CONFIRMATION,
-        ALTERNATIVE_ROUTE_DURING_REQUEST, ALTERNATIVE_ROUTE_DEBOUNCE,
-        REQUEST_NOT_VERIFIED, REQUEST_ACCEPTED, REQUEST_ACCEPTED_NOT_OBSERVED,
-        REQUEST_TIMED_OUT, REQUEST_ENDPOINT_GONE, REQUEST_CANCELLED_BY_OTHER,
-        REQUEST_BUDGET_EXHAUSTED, REQUEST_SUBMITTED, REQUEST_FAILED
+        NO_SESSION,
+        WAITING_PREREQUISITES,
+        EXTERNAL_SUSPEND,
+        SETTINGS_CHANGED,
+        ALREADY_ACTIVE_BIND,
+        CONFERENCE_OBSERVED,
+        NO_FRESH_ACTIVE_TRANSITION,
+        EXTERNAL_ENDPOINT_REQUEST,
+        USER_PAUSED,
+        AUTHORIZATION_MISSING,
+        UNSAFE_CALL,
+        MULTIPLE_CALLS,
+        CALL_NOT_ACTIVE,
+        DISABLED,
+        USER_OVERRIDE,
+        STARTUP_COMPLETE,
+        EVIDENCE_DEADLINE_EXPIRED,
+        ACTION_DEADLINE_EXPIRED,
+        WAITING_PROJECTION,
+        PROJECTION_UNKNOWN,
+        PROJECTION_DISCONNECTED,
+        WAITING_TARGET_HFP,
+        TARGET_HFP_UNKNOWN,
+        TARGET_HFP_DISCONNECTED,
+        WAITING_ENDPOINT_SNAPSHOT,
+        WAITING_TARGET_ENDPOINT,
+        WAITING_FRESH_ENDPOINT_SNAPSHOT,
+        TARGET_ENDPOINT_CONFIRMED,
+        TARGET_ENDPOINT_STABILIZING,
+        ROUTE_MOVED_AFTER_CONFIRMATION,
+        ALTERNATIVE_ROUTE_DURING_REQUEST,
+        ALTERNATIVE_ROUTE_DEBOUNCE,
+        REQUEST_NOT_VERIFIED,
+        REQUEST_ACCEPTED,
+        REQUEST_ACCEPTED_NOT_OBSERVED,
+        REQUEST_TIMED_OUT,
+        REQUEST_ENDPOINT_GONE,
+        REQUEST_CANCELLED_BY_OTHER,
+        REQUEST_BUDGET_EXHAUSTED,
+        REQUEST_SUBMITTED,
+        REQUEST_FAILED,
     }
 
     data class Snapshot(
@@ -43,20 +74,25 @@ class RoutingPolicy(
         val targetAvailable: Boolean?,
         /** Monotonically increases for every available-endpoint callback in this call session. */
         val endpointRevision: Long,
-        val route: Route
+        val route: Route,
     )
 
     data class Decision(
         val requestTarget: Boolean = false,
         val requestAttempt: Int? = null,
-        val wakeAt: Long? = null
+        val wakeAt: Long? = null,
     )
 
-    var phase = Phase.IDLE; private set
-    var reason = "No call session"; private set
-    var reasonCode = ReasonCode.NO_SESSION; private set
-    var requests = 0; private set
-    var verified = false; private set
+    var phase = Phase.IDLE
+        private set
+    var reason = "No call session"
+        private set
+    var reasonCode = ReasonCode.NO_SESSION
+        private set
+    var requests = 0
+        private set
+    var verified = false
+        private set
 
     private var manual = false
     private var evidenceDeadline = 0L
@@ -70,7 +106,11 @@ class RoutingPolicy(
     private var pendingAlternative: Route? = null
     private var initialRoute = Route.UNKNOWN
 
-    fun begin(now: Long, initial: Route, manualOneShot: Boolean = false) {
+    fun begin(
+        now: Long,
+        initial: Route,
+        manualOneShot: Boolean = false,
+    ) {
         manual = manualOneShot
         evidenceDeadline = now + evidenceWindowMs
         actionDeadline = null
@@ -88,7 +128,10 @@ class RoutingPolicy(
         reasonCode = ReasonCode.WAITING_PREREQUISITES
     }
 
-    fun suspend(reason: String, code: ReasonCode = ReasonCode.EXTERNAL_SUSPEND) {
+    fun suspend(
+        reason: String,
+        code: ReasonCode = ReasonCode.EXTERNAL_SUSPEND,
+    ) {
         phase = Phase.SUSPENDED
         this.reason = reason
         reasonCode = code
@@ -97,12 +140,20 @@ class RoutingPolicy(
     }
 
     /** Latch route edges before queued evaluations can coalesce them. */
-    fun observeRoute(route: Route, now: Long) {
+    fun observeRoute(
+        route: Route,
+        now: Long,
+    ) {
         if (phase in terminalPhases) return
         val alternative = route in alternativeRoutes
         val changedKnownBaseline = initialRoute != Route.UNKNOWN && route != initialRoute
-        val shouldRespect = alternative && (verified || changedKnownBaseline ||
-            (requests > 0 && route != initialRoute))
+        val shouldRespect =
+            alternative &&
+                (
+                    verified ||
+                        changedKnownBaseline ||
+                        (requests > 0 && route != initialRoute)
+                )
         if (!shouldRespect) {
             if (!alternative) pendingAlternative = null
             return
@@ -117,7 +168,10 @@ class RoutingPolicy(
         suspend("Alternative route observed; respecting possible user override", ReasonCode.USER_OVERRIDE)
     }
 
-    fun requestSucceeded(attempt: Int, now: Long) {
+    fun requestSucceeded(
+        attempt: Int,
+        now: Long,
+    ) {
         if (inFlightAttempt != attempt || phase in terminalPhases) return
         clearPendingRequest()
         acceptedUntil = now + resultCallbackGraceMs
@@ -126,7 +180,10 @@ class RoutingPolicy(
         reasonCode = ReasonCode.REQUEST_ACCEPTED
     }
 
-    fun requestFailed(attempt: Int, error: RequestError) {
+    fun requestFailed(
+        attempt: Int,
+        error: RequestError,
+    ) {
         if (inFlightAttempt != attempt || phase in terminalPhases) return
         val failedRevision = inFlightRevision
         clearPendingRequest()
@@ -142,14 +199,16 @@ class RoutingPolicy(
                 reason = "Requested endpoint disappeared; awaiting a fresh endpoint snapshot"
                 reasonCode = ReasonCode.REQUEST_ENDPOINT_GONE
             }
-            RequestError.CANCELLED_BY_OTHER -> suspend(
-                "Another endpoint request cancelled this request; respecting external routing",
-                ReasonCode.REQUEST_CANCELLED_BY_OTHER
-            )
-            RequestError.UNSPECIFIED, RequestError.RUNTIME_EXCEPTION -> fail(
-                "Telecom routing request failed; no blind retry",
-                ReasonCode.REQUEST_FAILED
-            )
+            RequestError.CANCELLED_BY_OTHER ->
+                suspend(
+                    "Another endpoint request cancelled this request; respecting external routing",
+                    ReasonCode.REQUEST_CANCELLED_BY_OTHER,
+                )
+            RequestError.UNSPECIFIED, RequestError.RUNTIME_EXCEPTION ->
+                fail(
+                    "Telecom routing request failed; no blind retry",
+                    ReasonCode.REQUEST_FAILED,
+                )
         }
     }
 
@@ -176,16 +235,18 @@ class RoutingPolicy(
         if (s.now >= deadline) {
             phase = if (s.route == Route.TARGET) Phase.RELEASED else Phase.FAILED
             val evidenceExpired = actionDeadline == null
-            reason = when {
-                phase == Phase.RELEASED -> "Startup window complete; user owns routing"
-                evidenceExpired -> "Evidence deadline expired before routing could start"
-                else -> "Routing action deadline expired without target verification"
-            }
-            reasonCode = when {
-                phase == Phase.RELEASED -> ReasonCode.STARTUP_COMPLETE
-                evidenceExpired -> ReasonCode.EVIDENCE_DEADLINE_EXPIRED
-                else -> ReasonCode.ACTION_DEADLINE_EXPIRED
-            }
+            reason =
+                when {
+                    phase == Phase.RELEASED -> "Startup window complete; user owns routing"
+                    evidenceExpired -> "Evidence deadline expired before routing could start"
+                    else -> "Routing action deadline expired without target verification"
+                }
+            reasonCode =
+                when {
+                    phase == Phase.RELEASED -> ReasonCode.STARTUP_COMPLETE
+                    evidenceExpired -> ReasonCode.EVIDENCE_DEADLINE_EXPIRED
+                    else -> ReasonCode.ACTION_DEADLINE_EXPIRED
+                }
             clearPendingRequest()
             return Decision()
         }
@@ -202,7 +263,11 @@ class RoutingPolicy(
             return Decision(wakeAt = deadline)
         }
         if (s.targetHfpConnected == false) {
-            if (requests > 0 || verified) return stop("Configured target disconnected from Bluetooth HFP", ReasonCode.TARGET_HFP_DISCONNECTED)
+            if (requests > 0 ||
+                verified
+            ) {
+                return stop("Configured target disconnected from Bluetooth HFP", ReasonCode.TARGET_HFP_DISCONNECTED)
+            }
             reason = "Waiting for configured target Bluetooth HFP connection"
             reasonCode = ReasonCode.WAITING_TARGET_HFP
             return Decision(wakeAt = deadline)
@@ -213,8 +278,12 @@ class RoutingPolicy(
             return Decision(wakeAt = deadline)
         }
         if (s.targetAvailable != true) {
-            reason = if (s.targetAvailable == null) "Waiting for Telecom's first call-endpoint snapshot"
-            else "Waiting for configured target in Telecom's current call endpoints"
+            reason =
+                if (s.targetAvailable == null) {
+                    "Waiting for Telecom's first call-endpoint snapshot"
+                } else {
+                    "Waiting for configured target in Telecom's current call endpoints"
+                }
             reasonCode = if (s.targetAvailable == null) ReasonCode.WAITING_ENDPOINT_SNAPSHOT else ReasonCode.WAITING_TARGET_ENDPOINT
             return Decision(wakeAt = deadline)
         }
@@ -234,7 +303,12 @@ class RoutingPolicy(
             acceptedUntil = null
             if (actionDeadline == null) actionDeadline = s.now + actionWindowMs
             phase = if (manual) Phase.RELEASED else Phase.STABILIZING
-            reason = if (manual) "target Bluetooth device verified; one-shot complete" else "target Bluetooth device verified; bounded startup guard"
+            reason =
+                if (manual) {
+                    "target Bluetooth device verified; one-shot complete"
+                } else {
+                    "target Bluetooth device verified; bounded startup guard"
+                }
             reasonCode = if (manual) ReasonCode.TARGET_ENDPOINT_CONFIRMED else ReasonCode.TARGET_ENDPOINT_STABILIZING
             return Decision(wakeAt = if (manual) null else currentDeadline())
         }
@@ -253,10 +327,16 @@ class RoutingPolicy(
         }
 
         if (verified && s.route != Route.COMPETING_DEVICE) {
-            return stop("Route moved away from target device; respecting user/unknown route change", ReasonCode.ROUTE_MOVED_AFTER_CONFIRMATION)
+            return stop(
+                "Route moved away from target device; respecting user/unknown route change",
+                ReasonCode.ROUTE_MOVED_AFTER_CONFIRMATION,
+            )
         }
         if (requests > 0 && !verified && s.route != initialRoute && s.route != Route.COMPETING_DEVICE) {
-            return stop("New alternative route during request; respecting possible user override", ReasonCode.ALTERNATIVE_ROUTE_DURING_REQUEST)
+            return stop(
+                "New alternative route during request; respecting possible user override",
+                ReasonCode.ALTERNATIVE_ROUTE_DURING_REQUEST,
+            )
         }
         if (requests > 0 && (manual || s.route != Route.COMPETING_DEVICE)) {
             return fail("target device not verified; no retry against an unconfigured route", ReasonCode.REQUEST_NOT_VERIFIED)
@@ -283,9 +363,24 @@ class RoutingPolicy(
     }
 
     private fun currentDeadline(): Long = actionDeadline ?: evidenceDeadline
-    private fun clearPendingRequest() { inFlightAttempt = null; inFlightUntil = null }
-    private fun stop(message: String, code: ReasonCode): Decision { suspend(message, code); return Decision() }
-    private fun fail(message: String, code: ReasonCode): Decision {
+
+    private fun clearPendingRequest() {
+        inFlightAttempt = null
+        inFlightUntil = null
+    }
+
+    private fun stop(
+        message: String,
+        code: ReasonCode,
+    ): Decision {
+        suspend(message, code)
+        return Decision()
+    }
+
+    private fun fail(
+        message: String,
+        code: ReasonCode,
+    ): Decision {
         phase = Phase.FAILED
         reason = message
         reasonCode = code

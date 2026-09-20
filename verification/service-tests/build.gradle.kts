@@ -1,10 +1,25 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("org.jetbrains.kotlin.jvm")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ktlint)
     application
 }
 
 kotlin {
     jvmToolchain(17)
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        allWarningsAsErrors.set(true)
+    }
+}
+
+ktlint {
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
+    filter {
+        exclude { element -> element.file.path.contains("/app/src/") }
+    }
 }
 
 dependencies {
@@ -14,7 +29,7 @@ dependencies {
 sourceSets {
     main {
         kotlin {
-            srcDir(projectDir)
+            srcDir("src/main/kotlin")
             srcDir(rootProject.file("app/src/main/java"))
             include("ServiceTests.kt")
             include("stubs/**/*.kt")

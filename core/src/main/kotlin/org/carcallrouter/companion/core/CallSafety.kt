@@ -9,17 +9,19 @@ object CallSafety {
         val externalOrSelfManaged: Boolean,
         val conference: Boolean,
         val telephoneHandlePresent: Boolean,
-        val numberIsEmergency: Boolean?
+        val numberIsEmergency: Boolean?,
     )
-    fun rejection(e: Evidence): String? = when {
-        e.emergencyFlag -> "Network-identified emergency call"
-        e.emergencyCallbackMode -> "Emergency callback mode"
-        e.externalOrSelfManaged -> "External or self-managed call"
-        e.conference -> "Conference call"
-        e.simAccount != true -> "SIM-backed phone account not verified"
-        !e.telephoneHandlePresent -> "Telephone handle hidden or unavailable; emergency status unknown"
-        e.numberIsEmergency == null -> "Emergency-number classification unavailable"
-        e.numberIsEmergency -> "Emergency number"
-        else -> null
-    }
+
+    fun rejection(e: Evidence): String? =
+        when {
+            e.emergencyFlag -> "Network-identified emergency call"
+            e.emergencyCallbackMode -> "Emergency callback mode"
+            e.externalOrSelfManaged -> "External or self-managed call"
+            e.conference -> "Conference call"
+            e.simAccount != true -> "SIM-backed phone account not verified"
+            !e.telephoneHandlePresent -> "Telephone handle hidden or unavailable; emergency status unknown"
+            e.numberIsEmergency == null -> "Emergency-number classification unavailable"
+            e.numberIsEmergency -> "Emergency number"
+            else -> null
+        }
 }

@@ -1,18 +1,29 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ktlint)
 }
 
-val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
-    .orElse("org.carcallrouter.companion")
-val configuredVersionCode = providers.gradleProperty("APP_VERSION_CODE")
-    .map { it.toInt() }
-    .getOrElse(5)
-val configuredVersionName = providers.gradleProperty("APP_VERSION_NAME")
-    .orElse("0.3.0-beta.3")
-val enableBetaSigning = providers.gradleProperty("ENABLE_BETA_SIGNING")
-    .map { it.toBoolean() }
-    .getOrElse(false)
+val configuredApplicationId =
+    providers
+        .gradleProperty("APP_APPLICATION_ID")
+        .orElse("org.carcallrouter.companion")
+val configuredVersionCode =
+    providers
+        .gradleProperty("APP_VERSION_CODE")
+        .map { it.toInt() }
+        .getOrElse(5)
+val configuredVersionName =
+    providers
+        .gradleProperty("APP_VERSION_NAME")
+        .orElse("0.3.0-beta.3")
+val enableBetaSigning =
+    providers
+        .gradleProperty("ENABLE_BETA_SIGNING")
+        .map { it.toBoolean() }
+        .getOrElse(false)
 
 android {
     namespace = "org.carcallrouter.companion"
@@ -53,11 +64,26 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
-    lint { abortOnError = true }
+    lint {
+        abortOnError = true
+        baseline = file("lint-baseline.xml")
+        warningsAsErrors = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        allWarningsAsErrors.set(true)
+    }
+}
+
+ktlint {
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
 }
 
 dependencies {
     implementation(project(":core"))
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit4)
 }
