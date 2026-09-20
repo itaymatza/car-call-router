@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.0-beta.8
+
+- Recover automatic routing when Samsung first binds the non-UI Telecom service to an already
+  active call, but only from a verified Android Auto/configured-car route with all safety,
+  authorization, exact BMW HFP, and endpoint evidence present.
+- Continue suppressing late-bind takeover from handset, speaker, wired, unknown, or unconfigured
+  Bluetooth routes so process recovery cannot override an explicit user choice.
+- Start Bluetooth HFP observation only after Android Auto projection is verified, or after the
+  user explicitly presses the manual one-shot button; no permanent foreground service is added.
+
 ## 0.3.0-beta.7
 
 - Add privacy-safe process, UI, Telecom-service, and call lifecycle correlation so an exported log

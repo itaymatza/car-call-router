@@ -136,13 +136,34 @@ fun main(args: Array<String>) {
                         countEquals(f, 1)
                     }
                 },
-            "late_bind_to_active_call_remains_passive" to
+            "late_bind_to_active_call_recovers_from_configured_car_route" to
                 {
                     Fixture(initialState = Call.STATE_ACTIVE).use { f ->
+                        countEquals(f, 1)
+                    }
+                },
+            "late_bind_to_active_call_never_takes_over_speaker" to
+                {
+                    Fixture(initialState = Call.STATE_ACTIVE, initialEndpoint = speaker).use { f ->
                         countEquals(f, 0)
-                        f.call.deliverDetails()
-                        f.flush()
+                        check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    }
+                },
+            "late_bind_to_active_call_requires_android_auto" to
+                {
+                    Fixture(initialState = Call.STATE_ACTIVE, projected = false).use { f ->
                         countEquals(f, 0)
+                        check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    }
+                },
+            "late_bind_unknown_projection_expires_without_routing" to
+                {
+                    Fixture(initialState = Call.STATE_ACTIVE, projected = null).use { f ->
+                        countEquals(f, 0)
+                        check(SessionBridge.status.contains("LATE_BIND_RECOVERY_EVIDENCE"))
+                        TestQueue.advanceTo(5000)
+                        countEquals(f, 0)
+                        check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
                     }
                 },
             "default_toggle_off_is_passive" to {
@@ -728,7 +749,7 @@ fun main(args: Array<String>) {
                         countEquals(f, 1)
                     }
                 },
-            "process_recreation_preserves_settings_but_does_not_retake_active_call" to
+            "process_recreation_recovers_active_call_from_configured_car_route" to
                 {
                     Fixture().use { f ->
                         f.established()
@@ -750,8 +771,8 @@ fun main(args: Array<String>) {
                         check(
                             restored.targetAddress == TARGET,
                         )
-                        check(recovered.issuedRequests.isEmpty())
-                        check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                        check(recovered.issuedRequests.size == 1)
+                        check(SessionBridge.status.contains("VERIFYING"))
                         recovered.onDestroy()
                     }
                 },
