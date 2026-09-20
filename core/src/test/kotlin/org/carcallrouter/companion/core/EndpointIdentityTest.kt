@@ -49,4 +49,27 @@ class EndpointIdentityTest {
     @Test fun noTelecomEndpointFailsClosed() {
         assertTrue(EndpointIdentity.resolve(target.label, emptyList(), true, 1) is Resolution.Unavailable)
     }
+
+    @Test fun whitespaceAndCaseNormalizationDoesNotMatchSubstrings() {
+        val exact = Candidate("exact", "  CAR\tHANDS-FREE  ")
+        val prefix = Candidate("prefix", "Car Hands-Free Extra")
+        val result = EndpointIdentity.resolve("car hands-free", listOf(exact, prefix), true, 2)
+        assertEquals(exact, (result as Resolution.Matched).candidate)
+    }
+
+    @Test fun fallbackRequiresExactlyOneConnectedHfpDevice() {
+        for (count in listOf(-1, 0, 2, Int.MAX_VALUE)) {
+            assertTrue(
+                EndpointIdentity.resolve("Renamed", listOf(target), true, count) is Resolution.Unavailable,
+            )
+        }
+    }
+
+    @Test fun matchingLabelStillRequiresTargetHfpConnection() {
+        val result = EndpointIdentity.resolve(target.label, listOf(target), false, 1)
+        assertEquals(
+            "Selected device is not connected for calls",
+            (result as Resolution.Unavailable).reason,
+        )
+    }
 }

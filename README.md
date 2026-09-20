@@ -186,7 +186,7 @@ Neither replaces a parked physical microphone and speaker test.
 
 ## Verification
 
-Run `bash tools/test-all.sh` for the pure-JVM core, deterministic property, JSONL replay, and service-callback suites. The `:core` module enforces at least 90% branch coverage. The pull-request workflow also executes the production-service callback harness through Gradle, assembles the APK, runs JVM unit tests and Android lint, then verifies the APK signature and manifest identity before publishing the APK with its SHA-256 verification record. Passing those checks does not establish stable Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure and stability matrix in [testing guidance](docs/TESTING.md).
+Run `bash tools/test-all.sh` for the pure-JVM core, deterministic property, exhaustive eligibility, JSONL replay, and service-callback suites. CI enforces at least 90% branch coverage for `:core` and 80% line / 70% branch coverage for the production Telecom-service boundary, excluding framework stubs and test drivers. The pull-request workflow uploads HTML/XML coverage and JUnit reports, assembles the APK, runs Android lint, and verifies APK signature and manifest identity. Passing those checks does not establish stable Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure and stability matrix in [testing guidance](docs/TESTING.md).
 
 For repeatable real-device evidence, run
 `bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing` while parked. The
