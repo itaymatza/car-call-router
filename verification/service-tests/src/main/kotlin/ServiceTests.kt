@@ -601,6 +601,19 @@ fun main(args: Array<String>) {
                         countEquals(f, 2)
                     }
                 },
+            "api37_call_start_request_does_not_block_initial_routing" to
+                {
+                    Fixture().use { f ->
+                        // Reproduce Samsung's ordering from the field log: ACTIVE begins the
+                        // automatic session, then Telecom replays its existing route before the
+                        // queued policy evaluation can submit our first request.
+                        f.call.deliverState(Call.STATE_ACTIVE)
+                        f.service.onCallEndpointRequested(competing)
+                        f.flush()
+                        countEquals(f, 1)
+                        check(!SessionBridge.status.contains("SUSPENDED"))
+                    }
+                },
             "api37_external_endpoint_request_suspends_the_session" to
                 {
                     Fixture().use { f ->
