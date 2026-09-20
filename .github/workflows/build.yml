@@ -35,7 +35,27 @@ jobs:
           bash -n tools/*.sh verification/service-tests/run.sh
           pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "tools/install.ps1"), [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
       - name: Compile, unit-test, service-test and lint
-        run: bash gradlew :core:check :app:ktlintCheck :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:ktlintCheck :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
+        run: bash gradlew :core:check :app:ktlintCheck :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:check :app:lintDebug --stacktrace --console=plain
+      - name: Publish coverage summary
+        run: >-
+          python3 tools/summarize_coverage.py
+          --report core=core/build/reports/jacoco/test/jacocoTestReport.xml
+          --report service=verification/service-tests/build/reports/jacoco/test/jacocoTestReport.xml
+          --output "$GITHUB_STEP_SUMMARY"
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: test-and-coverage-reports
+          path: |
+            core/build/reports/jacoco/test/
+            core/build/test-results/test/
+            verification/service-tests/build/reports/jacoco/test/
+            verification/service-tests/build/test-results/test/
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify APK signature and manifest identity
         env:
           REPORT_FILE: verification/current/apk-verification.txt

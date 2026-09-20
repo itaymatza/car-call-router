@@ -13,6 +13,9 @@
 - User alternatives, emergency/unclassified calls, multiple calls, hold, conferences, authorization loss, confirmed observer loss, and lifecycle teardown stop automation.
 - Temporary unknown projection/HFP evidence and transient endpoint-list gaps pause safely and can recover without a false disconnect or false user override.
 - Deterministic policy, randomized transition, and production-service callback suites run locally; the service suite is also wired into Gradle CI.
+- CI enforces independent coverage floors: at least 95% line and 90% branch coverage for the pure
+  routing core, plus at least 90% line and 75% branch coverage for the production Telecom-service boundary.
+  Test-driver and Android-framework stub classes are excluded from the service measurement.
 - Diagnostics redact phone numbers, device names, and raw Bluetooth addresses.
 - The API 37 endpoint-request signature and both callback orders are regression-tested; final
   dispatch validation remains a real Android 17 device gate until hosted API 37 SDK builds exist.

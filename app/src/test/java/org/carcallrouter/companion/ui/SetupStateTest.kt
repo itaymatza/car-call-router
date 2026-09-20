@@ -39,4 +39,30 @@ class SetupStateTest {
         assertEquals(2, state.completedSteps)
         assertEquals(SetupPhase.NEEDS_TELECOM_AUTHORIZATION, state.phase)
     }
+
+    @Test fun allSixteenInputCombinationsPreserveSetupPrecedence() {
+        var combinations = 0
+        for (runtime in listOf(false, true)) {
+            for (telecom in listOf(false, true)) {
+                for (target in listOf(false, true)) {
+                    for (enabled in listOf(false, true)) {
+                        val state = SetupState(runtime, telecom, target, enabled)
+                        assertEquals(listOf(runtime, telecom, target).count { it }, state.completedSteps)
+                        assertEquals(runtime && telecom && target, state.ready)
+                        val expected =
+                            when {
+                                !runtime -> SetupPhase.NEEDS_RUNTIME_PERMISSIONS
+                                !target -> SetupPhase.NEEDS_TARGET_DEVICE
+                                !telecom -> SetupPhase.NEEDS_TELECOM_AUTHORIZATION
+                                enabled -> SetupPhase.ACTIVE
+                                else -> SetupPhase.READY
+                            }
+                        assertEquals(expected, state.phase)
+                        combinations++
+                    }
+                }
+            }
+        }
+        assertEquals(16, combinations)
+    }
 }

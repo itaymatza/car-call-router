@@ -57,8 +57,7 @@ jobs:
           :core:check
           :app:ktlintCheck
           :app:testDebugUnitTest
-          :verification:service-tests:ktlintCheck
-          :verification:service-tests:run
+          :verification:service-tests:check
           :app:lintRelease
           :app:assembleRelease
           --stacktrace --console=plain

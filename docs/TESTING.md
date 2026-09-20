@@ -8,13 +8,17 @@ Install a JDK 17 or newer and a Kotlin compiler, then run:
 bash tools/test-all.sh
 ```
 
-The script runs ktlint for every Kotlin module, the pure-JVM `:core` JUnit suite and its enforced
-90% branch-coverage gate,
-production-service scenarios against local Android-framework doubles, and the Python
-trace/APK-tooling tests. The core suite includes named policy rules, 5,000 seeded traces (250,000
-transitions), connection-order and timing scenarios, and JSONL regression-trace replay. It writes
+The script runs ktlint for every Kotlin module, the pure-JVM `:core` JUnit suite with its enforced
+95% line / 90% branch-coverage gates, the production-service JUnit harness with enforced 90% line
+and 75% branch floors, and the Python trace/APK-tooling tests. The service coverage scope contains only
+`RouterInCallService`, `AddressedTelecomRouter`, `RouterSettings`, and `SessionBridge`; framework
+stubs and test-driver code are excluded. The core suite includes named policy rules, 5,000 seeded
+traces (250,000 transitions), another 750,000 seeded callback/evidence transitions, 7,776
+exhaustive automatic/manual eligibility combinations, connection-order and timing scenarios, and
+JSONL regression-trace replay. It writes
 fresh local logs under `verification/current/`, which is intentionally ignored by Git. The
-standalone Kotlin compiler is needed only by the lightweight framework-double service runner.
+framework-double service runner remains available for focused debugging, but normal verification
+runs it through Gradle/JUnit so JaCoCo can measure the production boundary.
 
 The production-service harness also executes 1,312 adversarial late-bind interleavings: every
 ordering of projection, HFP, endpoint-snapshot, and current-route evidence with protected-route
@@ -39,8 +43,10 @@ as errors; the deferred target-SDK finding is recorded in `app/lint-baseline.xml
 findings fail the build. Dependency availability is handled by weekly Dependabot pull requests,
 not Android lint. Plugin and library versions are centralized in `gradle/libs.versions.toml`.
 
-The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so
-callback-order and lifecycle regressions are exercised against the same compiled `:core` module.
+The Gradle workflow and both installation scripts run `:verification:service-tests:check`, so
+callback-order and lifecycle regressions plus their coverage floors are exercised against the same
+compiled `:core` module. CI publishes the JaCoCo HTML/XML and JUnit XML as a retained artifact and
+adds the exact module totals to the run summary.
 CI also runs the standard-library-only device trace analyzer and
 APK-verifier tests. After building, CI verifies the generated APK's signature,
 package/version identity, SDK bounds, required permissions, and debuggable state, then publishes

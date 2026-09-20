@@ -5,11 +5,13 @@ import android.os.TestQueue
 import android.telecom.Call
 import android.telecom.CallEndpoint
 import android.telecom.CallEndpointException
+import android.telecom.InCallService
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.ProjectionMonitor
 import org.carcallrouter.companion.RouterLog
 import org.carcallrouter.companion.RouterSettings
 import org.carcallrouter.companion.SessionBridge
+import org.carcallrouter.companion.telecom.AddressedTelecomRouter
 import org.carcallrouter.companion.telecom.HfpMonitor
 import org.carcallrouter.companion.telecom.RouterInCallService
 import java.io.File
@@ -179,6 +181,41 @@ fun main(args: Array<String>) {
                         TestQueue.advanceTo(5000)
                         countEquals(f, 0)
                         check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    }
+                },
+            "late_bind_current_endpoint_before_snapshot_waits_then_routes" to
+                {
+                    Fixture(
+                        projected = true,
+                        initialState = Call.STATE_ACTIVE,
+                        initialEndpoint = competing,
+                        available = emptyList(),
+                    ).use { f ->
+                        countEquals(f, 0)
+                        check(SessionBridge.status.contains("LATE_BIND_RECOVERY_EVIDENCE"))
+                        f.endpoints(listOf(target, competing, other))
+                        f.flush()
+                        countEquals(f, 1)
+                    }
+                },
+            "late_bind_verified_other_bluetooth_never_routes" to
+                {
+                    Fixture(
+                        initialState = Call.STATE_ACTIVE,
+                        initialEndpoint = other,
+                    ).use { f ->
+                        countEquals(f, 0)
+                        check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    }
+                },
+            "late_bind_target_route_requires_no_request" to
+                {
+                    Fixture(
+                        initialState = Call.STATE_ACTIVE,
+                        initialEndpoint = target,
+                    ).use { f ->
+                        countEquals(f, 0)
+                        check(SessionBridge.status.contains("STABILIZING"))
                     }
                 },
             "hfp_monitor_starts_only_for_projection_or_manual_request" to
@@ -937,19 +974,21 @@ fun main(args: Array<String>) {
                 },
             "late_bind_protected_endpoint_request_is_never_overridden" to
                 {
-                    Fixture(
-                        projected = null,
-                        initialState = Call.STATE_ACTIVE,
-                        available = emptyList(),
-                    ).use { f ->
-                        f.service.onCallEndpointRequested(speaker)
-                        ProjectionMonitor.emit(true)
-                        HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
-                        f.endpoints(listOf(target, competing, other))
-                        f.route(competing)
-                        f.flush()
-                        countEquals(f, 0)
-                        check(SessionBridge.status.contains("EXTERNAL_ENDPOINT_REQUEST"))
+                    for (protected in listOf(speaker, handset, wired)) {
+                        Fixture(
+                            projected = null,
+                            initialState = Call.STATE_ACTIVE,
+                            available = emptyList(),
+                        ).use { f ->
+                            f.service.onCallEndpointRequested(protected)
+                            ProjectionMonitor.emit(true)
+                            HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                            f.endpoints(listOf(target, competing, other))
+                            f.route(competing)
+                            f.flush()
+                            countEquals(f, 0)
+                            check(SessionBridge.status.contains("EXTERNAL_ENDPOINT_REQUEST"))
+                        }
                     }
                 },
             "seeded_late_bind_callback_storms_preserve_override_safety" to
@@ -987,6 +1026,62 @@ fun main(args: Array<String>) {
                         }
                     }
                     check(adversarialInterleavings == 1_312)
+                },
+            "request_markers_expire_and_cannot_claim_future_callbacks" to
+                {
+                    reset()
+                    var now = 0L
+                    val service = InCallService()
+                    val adapter = AddressedTelecomRouter(service) { now }
+                    adapter.updateAvailable(listOf(target))
+                    adapter.request(target, {}, {}, { _, _ -> error("unexpected rejection") })
+                    now = AddressedTelecomRouter.REQUEST_MARKER_TTL_MS + 1
+                    val observation = adapter.observeRequest(target)
+                    check(observation.origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL)
+                    check(observation.expiredCount == 1)
+                    check(observation.pendingCount == 0)
+                },
+            "request_markers_are_generation_bound" to
+                {
+                    reset()
+                    val service = InCallService()
+                    val adapter = AddressedTelecomRouter(service) { 0L }
+                    adapter.updateAvailable(listOf(target))
+                    val oldGeneration = adapter.generation()
+                    adapter.request(target, {}, {}, { _, _ -> error("unexpected rejection") })
+                    adapter.clearSession()
+                    check(adapter.generation() == oldGeneration + 1)
+                    val observation = adapter.observeRequest(target)
+                    check(observation.origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL)
+                    check(observation.pendingCount == 0)
+                },
+            "runtime_request_failure_removes_own_marker" to
+                {
+                    reset()
+                    val service = InCallService().also { it.requestException = SecurityException("test") }
+                    val adapter = AddressedTelecomRouter(service) { 0L }
+                    adapter.updateAvailable(listOf(target))
+                    var threw = false
+                    try {
+                        adapter.request(target, {}, {}, { _, _ -> error("unexpected rejection") })
+                    } catch (_: SecurityException) {
+                        threw = true
+                    }
+                    check(threw)
+                    val observation = adapter.observeRequest(target)
+                    check(observation.origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL)
+                    check(observation.pendingCount == 0)
+                },
+            "removed_endpoint_invalidates_cached_and_platform_current_route" to
+                {
+                    reset()
+                    val service = InCallService().also { it.currentCallEndpoint = target }
+                    val adapter = AddressedTelecomRouter(service)
+                    adapter.updateAvailable(listOf(target, competing))
+                    adapter.updateCurrent(target)
+                    check(adapter.current()?.identifier == TARGET_ID)
+                    adapter.updateAvailable(listOf(competing))
+                    check(adapter.current() == null)
                 },
         )
     val allTests = tests + extraTests
