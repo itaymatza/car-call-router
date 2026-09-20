@@ -34,6 +34,12 @@ class SessionSummary:
     mode: str
     trigger: str
     requests: int
+    endpoint_callbacks: int
+    self_callbacks: int
+    startup_replays: int
+    external_callbacks: int
+    route_changes: int
+    route_oscillations: int
     endpoint_confirmed: bool
     endpoint_latency_ms: int | None
     hfp_audio_confirmed: bool
@@ -42,6 +48,7 @@ class SessionSummary:
     final_reason: str
     termination: str
     best_confirmation: str
+    final_route: str
     events: int
     anomalies: list[str]
 
@@ -125,6 +132,17 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
         finish = finishes[-1] if finishes else None
         endpoint = _first(session_events, "TELECOM_ENDPOINT_CONFIRMED")
         hfp = _first(session_events, "TARGET_HFP_AUDIO_CONFIRMED")
+        request_callbacks = [event for event in session_events if event.event == "ENDPOINT_REQUEST_OBSERVED"]
+        classifications = [
+            event.fields.get("classification", event.fields.get("origin", "unknown").upper())
+            for event in request_callbacks
+        ]
+        route_events = [event for event in session_events if event.event == "ENDPOINT_CHANGED"]
+        routes = [event.fields.get("route", "UNKNOWN") for event in route_events]
+        route_oscillations = sum(
+            routes[index] == routes[index - 2] and routes[index] != routes[index - 1]
+            for index in range(2, len(routes))
+        )
         if hfp and not endpoint:
             anomalies.append("HFP audio confirmation appeared without endpoint confirmation")
 
@@ -132,6 +150,8 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             status = "INVALID"
         elif finish is None:
             status = "OPEN"
+        elif hfp is not None and (classifications.count("EXTERNAL") > 0 or route_oscillations > 0):
+            status = "UNSTABLE"
         elif hfp is not None:
             status = "PASS"
         elif endpoint is not None:
@@ -148,6 +168,12 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             mode=start.fields.get("mode", "unknown") if start else "unknown",
             trigger=start.fields.get("trigger", "unknown") if start else "unknown",
             requests=sum(event.event == "REQUEST_SUBMITTED" for event in session_events),
+            endpoint_callbacks=len(request_callbacks),
+            self_callbacks=classifications.count("SELF"),
+            startup_replays=classifications.count("STARTUP_REPLAY"),
+            external_callbacks=classifications.count("EXTERNAL"),
+            route_changes=len(route_events),
+            route_oscillations=route_oscillations,
             endpoint_confirmed=endpoint is not None,
             endpoint_latency_ms=endpoint.elapsed_ms if endpoint else None,
             hfp_audio_confirmed=hfp is not None,
@@ -156,6 +182,7 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             final_reason=finish.fields.get("reason", "unknown") if finish else "unknown",
             termination=finish.fields.get("termination", "open") if finish else "open",
             best_confirmation=finish.fields.get("best_confirmation", derived_confirmation) if finish else derived_confirmation,
+            final_route=finish.fields.get("final_route", routes[-1] if routes else "unknown") if finish else (routes[-1] if routes else "unknown"),
             events=len(session_events),
             anomalies=anomalies,
         ))
@@ -169,11 +196,21 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
         print(f"Session {item.session}: {item.status}", file=out)
         print(f"  mode/trigger: {item.mode}/{item.trigger}", file=out)
         print(f"  requests: {item.requests}", file=out)
+        print(
+            f"  endpoint callbacks: {item.endpoint_callbacks} "
+            f"(self={item.self_callbacks}, startup_replay={item.startup_replays}, external={item.external_callbacks})",
+            file=out,
+        )
+        print(f"  route changes/oscillations: {item.route_changes}/{item.route_oscillations}", file=out)
         print(f"  Telecom endpoint: {'confirmed' if item.endpoint_confirmed else 'not confirmed'}"
               + (f" at {item.endpoint_latency_ms} ms" if item.endpoint_latency_ms is not None else ""), file=out)
         print(f"  target HFP audio: {'confirmed' if item.hfp_audio_confirmed else 'not confirmed'}"
               + (f" at {item.hfp_latency_ms} ms" if item.hfp_latency_ms is not None else ""), file=out)
-        print(f"  finish: {item.final_phase}/{item.final_reason}; {item.termination}; best={item.best_confirmation}", file=out)
+        print(
+            f"  finish: {item.final_phase}/{item.final_reason}; {item.termination}; "
+            f"best={item.best_confirmation}; final_route={item.final_route}",
+            file=out,
+        )
         for anomaly in item.anomalies:
             print(f"  anomaly: {anomaly}", file=out)
     for warning in warnings:
@@ -181,8 +218,9 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
 
 
 def render_csv(summaries: list[SessionSummary], out: TextIO) -> None:
-    fieldnames = list(asdict(SessionSummary("", "", "", "", 0, False, None, False, None,
-                                            "", "", "", "", 0, [])).keys())
+    fieldnames = list(asdict(SessionSummary("", "", "", "", 0, 0, 0, 0, 0, 0, 0,
+                                            False, None, False, None, "", "", "", "", "",
+                                            0, [])).keys())
     writer = csv.DictWriter(out, fieldnames=fieldnames)
     writer.writeheader()
     for item in summaries:

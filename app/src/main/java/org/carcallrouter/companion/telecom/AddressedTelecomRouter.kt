@@ -1,6 +1,7 @@
 package org.carcallrouter.companion.telecom
 
 import android.os.OutcomeReceiver
+import android.os.SystemClock
 import android.telecom.CallEndpoint
 import android.telecom.CallEndpointException
 import android.telecom.InCallService
@@ -12,6 +13,7 @@ import org.carcallrouter.companion.core.EndpointIdentity
  */
 class AddressedTelecomRouter(
     private val service: InCallService,
+    private val now: () -> Long = SystemClock::elapsedRealtime,
 ) {
     data class Target(
         val endpoint: CallEndpoint?,
@@ -19,14 +21,39 @@ class AddressedTelecomRouter(
         val basis: EndpointIdentity.Basis? = null,
     )
 
+    enum class RequestOrigin { SELF, EXTERNAL }
+
+    data class RequestTicket(
+        val generation: Long,
+        val id: Long,
+        val createdAt: Long,
+        val expiresAt: Long,
+    )
+
+    data class RequestObservation(
+        val origin: RequestOrigin,
+        val generation: Long,
+        val requestId: Long?,
+        val ageMs: Long?,
+        val pendingCount: Int,
+        val expiredCount: Int,
+    )
+
+    private data class RequestMarker(
+        val ticket: RequestTicket,
+        val endpointId: String,
+    )
+
     private var available: List<CallEndpoint> = emptyList()
     private var availableSnapshotReceived = false
     private var availableRevision = 0L
     private var current: CallEndpoint? = null
 
-    // API 37 may report the request before or after the resulting endpoint change. Counts are
-    // consumed only by onCallEndpointRequested, never by onCallEndpointChanged.
-    private val ownRequestCounts = mutableMapOf<String, Int>()
+    // API 37 may report a request before or after its result/endpoint callbacks. Markers are
+    // generation-bound and expire so a missing OEM callback cannot misclassify a future session.
+    private val ownRequests = ArrayDeque<RequestMarker>()
+    private var generation = 1L
+    private var nextRequestId = 1L
 
     fun updateAvailable(endpoints: List<CallEndpoint>) {
         availableSnapshotReceived = true
@@ -89,43 +116,77 @@ class AddressedTelecomRouter(
         endpoint != null &&
             current()?.identifier == endpoint.identifier
 
-    fun consumeOwnRequest(endpoint: CallEndpoint): Boolean {
-        val id = endpoint.identifier.toString()
-        val count = ownRequestCounts[id] ?: return false
-        if (count == 1) ownRequestCounts.remove(id) else ownRequestCounts[id] = count - 1
-        return true
+    fun observeRequest(endpoint: CallEndpoint): RequestObservation {
+        val observedAt = now()
+        val expired = pruneExpired(observedAt)
+        val endpointId = endpoint.identifier.toString()
+        val marker = ownRequests.firstOrNull { it.ticket.generation == generation && it.endpointId == endpointId }
+        if (marker != null) ownRequests.remove(marker)
+        return RequestObservation(
+            origin = if (marker == null) RequestOrigin.EXTERNAL else RequestOrigin.SELF,
+            generation = generation,
+            requestId = marker?.ticket?.id,
+            ageMs = marker?.let { (observedAt - it.ticket.createdAt).coerceAtLeast(0) },
+            pendingCount = ownRequests.count { it.ticket.generation == generation },
+            expiredCount = expired,
+        )
     }
 
     fun clearSession() {
-        ownRequestCounts.clear()
+        ownRequests.clear()
+        generation++
     }
+
+    fun generation(): Long = generation
+
+    fun isCurrentGeneration(ticket: RequestTicket): Boolean = ticket.generation == generation
 
     fun request(
         endpoint: CallEndpoint,
-        accepted: () -> Unit,
-        rejected: (CallEndpointException) -> Unit,
-    ) {
+        started: (RequestTicket) -> Unit,
+        accepted: (RequestTicket) -> Unit,
+        rejected: (RequestTicket, CallEndpointException) -> Unit,
+    ): RequestTicket {
         check(available.any { it.identifier == endpoint.identifier }) {
             "Endpoint is no longer in Telecom's current callback set"
         }
-        val id = endpoint.identifier.toString()
-        ownRequestCounts[id] = (ownRequestCounts[id] ?: 0) + 1
+        val createdAt = now()
+        pruneExpired(createdAt)
+        val ticket =
+            RequestTicket(
+                generation = generation,
+                id = nextRequestId++,
+                createdAt = createdAt,
+                expiresAt = createdAt + REQUEST_MARKER_TTL_MS,
+            )
+        ownRequests.addLast(RequestMarker(ticket, endpoint.identifier.toString()))
         try {
+            started(ticket)
             service.requestCallEndpointChange(
                 endpoint,
                 service.mainExecutor,
                 object : OutcomeReceiver<Void?, CallEndpointException> {
-                    override fun onResult(result: Void?) = accepted()
+                    override fun onResult(result: Void?) = accepted(ticket)
 
                     // Keep the marker until the API 37 request callback is consumed. That callback
                     // can be delivered after this result callback.
-                    override fun onError(error: CallEndpointException) = rejected(error)
+                    override fun onError(error: CallEndpointException) = rejected(ticket, error)
                 },
             )
         } catch (error: RuntimeException) {
-            val count = ownRequestCounts[id] ?: 0
-            if (count <= 1) ownRequestCounts.remove(id) else ownRequestCounts[id] = count - 1
+            ownRequests.removeAll { it.ticket == ticket }
             throw error
         }
+        return ticket
+    }
+
+    private fun pruneExpired(at: Long): Int {
+        val before = ownRequests.size
+        ownRequests.removeAll { it.ticket.generation != generation || it.ticket.expiresAt < at }
+        return before - ownRequests.size
+    }
+
+    companion object {
+        internal const val REQUEST_MARKER_TTL_MS = 10_000L
     }
 }

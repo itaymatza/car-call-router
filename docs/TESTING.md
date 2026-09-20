@@ -97,8 +97,10 @@ python3 tools/analyze_device_trace.py exported-log.txt --format json
 
 The analyzer reports malformed records, unsupported schemas, sequence gaps, time regressions,
 missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom
-endpoint is `INCOMPLETE`; a session cannot be `PASS` without a finish and exact target HFP audio
-confirmation.
+endpoint is `INCOMPLETE`. A session is `UNSTABLE` when exact target audio is eventually confirmed
+but the trace also shows an external endpoint request or an endpoint oscillation such as
+BMW → handset → BMW. A session cannot be `PASS` without a finish, exact target HFP audio
+confirmation, and no detected instability.
 
 After collecting multiple runs, summarize the entire batch with:
 
@@ -136,7 +138,10 @@ For a successful run, the exported trace should contain both
 `TELECOM_ENDPOINT_CONFIRMED` and `TARGET_HFP_AUDIO_CONFIRMED` for the same `session`. The events
 include a schema version, sequence, and elapsed milliseconds. Endpoint confirmation without HFP
 audio confirmation is incomplete evidence and must not be counted as a successful microphone and
-speaker result.
+speaker result. Endpoint-request records also include a classification (`SELF`, `PRE_GUARD`,
+`STARTUP_REPLAY`, or `EXTERNAL`), request/generation correlation, callback age, route-match flags,
+policy phase, and request count. The terminal record summarizes requests, route changes,
+oscillations, callback classes, final route, HFP state, and SCO state.
 
 ## Production stability matrix
 

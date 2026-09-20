@@ -30,6 +30,9 @@
 - Requests are single-flight and generation-tokened. AOSP's two-second timeout is respected, new
   requests are separated by 2.5 seconds, timeout/stale-endpoint errors have bounded typed recovery,
   and an endpoint-gone retry requires a newer endpoint snapshot.
+- API 37 request markers are call-generation-bound and expire; late result callbacks are ignored,
+  Samsung startup-request replays are distinguished from genuine external requests, and the
+  diagnostic analyzer rejects route oscillation or external interference as an unstable run.
 - Evidence collection and routing action use separate deadlines, transient alternative routes are
   debounced only during the immediate post-request settling period, and the UI persists the last
   completed session result.

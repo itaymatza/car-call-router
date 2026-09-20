@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Correlate API 37 endpoint-request callbacks with generation-bound, expiring request tickets so
+  delayed callbacks cannot leak across call sessions.
+- Classify Samsung call-start callback replays separately from app requests and genuine external
+  requests, including the pre-ACTIVE/replayed-after-submit ordering observed on the real device.
+- Add request IDs, generations, callback latency, endpoint revision, route context, and a compact
+  per-session diagnostic summary while retaining salted device aliases and no call identifiers.
+- Detect endpoint oscillation and external-request interference as `UNSTABLE` qualification
+  results instead of allowing a later target confirmation to produce a false pass.
+- Suppress repeated identical suspension events and retain three bounded diagnostic log archives
+  so exported evidence is both less noisy and more useful across consecutive calls.
+
 ## 0.3.0-beta.5
 
 - Fix automatic routing on Android 17/Samsung when Telecom replays its call-start endpoint request
