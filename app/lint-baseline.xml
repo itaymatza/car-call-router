@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.13.2" type="baseline" client="gradle" dependencies="false" name="AGP (8.13.2)" variant="all" version="8.13.2">
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk = 36"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="37" column="9"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of Gradle than 8.13 is available: 8.14.5"
+        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="$HOME/work/car-call-router/car-call-router/gradle/wrapper/gradle-wrapper.properties" line="3" column="17"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 8.13.2 is available: 9.4.1"
+        errorLine1="agp = &quot;8.13.2&quot;"
+        errorLine2="      ~~~~~~~~">
+        <location file="$HOME/work/car-call-router/car-call-router/gradle/libs.versions.toml" line="2" column="7"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlin.android than 2.2.21 is available: 2.4.20"
+        errorLine1="kotlin = &quot;2.2.21&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location file="$HOME/work/car-call-router/car-call-router/gradle/libs.versions.toml" line="4" column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlin.jvm than 2.2.21 is available: 2.4.20"
+        errorLine1="kotlin = &quot;2.2.21&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location file="$HOME/work/car-call-router/car-call-router/gradle/libs.versions.toml" line="4" column="10"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;required&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;setup_progress&quot;>%1$d of %2$d required steps complete&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="19" column="5"/>
+    </issue>
+
+    <issue
+        id="HandlerLeak"
+        message="This `Handler` class should be static or leaks might occur (anonymous android.content.AsyncQueryHandler)"
+        errorLine1="        object : AsyncQueryHandler(app.contentResolver) {"
+        errorLine2="        ^">
+        <location file="src/main/java/org/carcallrouter/companion/ProjectionMonitor.kt" line="34" column="9"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/background` with a theme that also paints a background (inferred theme is `@style/AppTheme`)"
+        errorLine1="    android:background=&quot;@color/background&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/layout/activity_main.xml" line="6" column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.validation` appears to be unused"
+        errorLine1="    &lt;string name=&quot;validation&quot;>Reference build • Test only while parked&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="83" column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.permissions` appears to be unused"
+        errorLine1="    &lt;string name=&quot;permissions&quot;>Allow Bluetooth and phone-account access&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="84" column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.target` appears to be unused"
+        errorLine1="    &lt;string name=&quot;target&quot;>Choose target Bluetooth call device&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="85" column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.competitor` appears to be unused"
+        errorLine1="    &lt;string name=&quot;competitor&quot;>Choose explicitly competing device (optional)&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="86" column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.copy_adb` appears to be unused"
+        errorLine1="    &lt;string name=&quot;copy_adb&quot;>Set up one-time ADB authorization&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="87" column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.adb_help` appears to be unused"
+        errorLine1="    &lt;string name=&quot;adb_help&quot;>Requires MANAGE_ONGOING_CALLS authorization through ADB.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="88" column="13"/>
+    </issue>
+
+    <issue
+        id="UnnecessaryRequiredFeature"
+        message="Consider whether this feature (`android.hardware.telephony`) really is required for the app to function; you can set `android:required=&quot;false&quot;` to indicate that the feature is used but not required"
+        errorLine1="    &lt;uses-feature android:name=&quot;android.hardware.telephony&quot; android:required=&quot;true&quot; />"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/AndroidManifest.xml" line="5" column="33"/>
+    </issue>
+
+</issues>

@@ -31,7 +31,8 @@ The repository workflow runs that command on pushes and pull requests with read-
 Kotlin formatting is enforced with ktlint's official style and a 140-character maximum. Run
 `bash gradlew :app:ktlintFormat :core:ktlintFormat :verification:service-tests:ktlintFormat` before
 committing broad mechanical changes. Kotlin compiler warnings and Android lint warnings are treated
-as errors. Plugin and library versions are centralized in `gradle/libs.versions.toml` and updated
+as errors; existing Android lint debt is recorded in `app/lint-baseline.xml`, so new findings fail
+the build. Plugin and library versions are centralized in `gradle/libs.versions.toml` and updated
 through Dependabot.
 
 The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so

@@ -4,7 +4,7 @@
 
 - Centralize plugin and library versions in a Gradle version catalog.
 - Enforce ktlint across all Kotlin modules, Kotlin compiler warnings-as-errors, and Android lint
-  warnings-as-errors; reformat the existing Kotlin source tree to establish a clean baseline.
+  warnings-as-errors with a checked-in baseline; reformat the existing Kotlin source tree.
 - Move the framework-double service harness to a conventional Gradle source layout.
 - Extract Android-independent routing, safety, endpoint identity, and trace behavior into a
   dedicated pure-JVM `:core` module shared by the app and service harness.
