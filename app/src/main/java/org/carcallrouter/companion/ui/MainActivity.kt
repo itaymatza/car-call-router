@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.method.ScrollingMovementMethod
@@ -116,6 +117,16 @@ class MainActivity : Activity() {
         }
         button(R.id.battery_settings) { showBatterySettingsGuide() }
         button(R.id.export) { exportLog() }
+        button(R.id.view_releases) { openUrl(R.string.releases_url) }
+        button(R.id.view_source) { openUrl(R.string.project_url) }
+        button(R.id.report_issue) { openUrl(R.string.issues_url) }
+        findViewById<TextView>(R.id.app_metadata).text =
+            getString(
+                R.string.about_version,
+                BuildConfig.VERSION_NAME,
+                BuildConfig.VERSION_CODE,
+                BuildConfig.APPLICATION_ID,
+            )
         refresh()
     }
 
@@ -412,6 +423,15 @@ class MainActivity : Activity() {
             }
         @Suppress("DEPRECATION")
         startActivityForResult(intent, REQUEST_EXPORT)
+    }
+
+    private fun openUrl(urlResource: Int) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(getString(urlResource)))
+        try {
+            startActivity(intent)
+        } catch (_: RuntimeException) {
+            toast(getString(R.string.link_unavailable))
+        }
     }
 
     @SuppressLint("MissingPermission")

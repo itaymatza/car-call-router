@@ -7,7 +7,7 @@ This pre-release makes the current Car Call Router beta installable as a direct 
 1. Download **car-call-router-0.3.0-beta.3-debug.apk** below.
 2. Open the APK on an Android 14+ phone and allow the browser or file manager to install unknown
    apps when prompted.
-3. Open Call Route Companion and complete the guided permissions, target-device selection, and
+3. Open Car Call Router and complete the guided permissions, target-device selection, and
    one-time ADB authorization.
 4. Test the manual one-shot route while safely parked before enabling automatic routing.
 

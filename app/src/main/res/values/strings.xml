@@ -1,5 +1,6 @@
 <resources>
-    <string name="app_name">Call Route Companion</string>
+    <string name="app_name">Car Call Router</string>
+    <string name="app_description">Routes eligible phone calls to a chosen Bluetooth hands-free device while Android Auto stays connected.</string>
     <string name="tagline">Keep calls on your chosen Bluetooth device</string>
     <string name="setup_required">Setup required</string>
     <string name="ready_label">Ready</string>
@@ -81,4 +82,14 @@
     <string name="logs_title">Recent diagnostic events</string>
     <string name="export">Export redacted log</string>
     <string name="privacy">Private by design: no internet, audio recording, contacts, or call-log access.</string>
+    <string name="about_title">About and support</string>
+    <string name="about_summary">Open-source Android utility for choosing the Bluetooth hands-free endpoint used by eligible calls. Android Auto remains connected for navigation and media.</string>
+    <string name="about_version">Version %1$s (%2$d) · Package %3$s</string>
+    <string name="view_releases">Versions and downloads</string>
+    <string name="view_source">Source and documentation</string>
+    <string name="report_issue">Report a problem</string>
+    <string name="link_unavailable">No app is available to open this link.</string>
+    <string name="project_url" translatable="false">https://github.com/itaymatza/car-call-router</string>
+    <string name="releases_url" translatable="false">https://github.com/itaymatza/car-call-router/releases</string>
+    <string name="issues_url" translatable="false">https://github.com/itaymatza/car-call-router/issues</string>
 </resources>

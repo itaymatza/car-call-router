@@ -1,0 +1,13 @@
+Car Call Router is an open-source Android 14+ utility for phones connected to both Android Auto and a separate Bluetooth hands-free device.
+
+When an eligible cellular call becomes active, the app can ask Android Telecom to move call audio and microphone routing to the Bluetooth device you selected. Android Auto remains connected for navigation and media.
+
+Important requirements and limitations:
+
+• The preferred device must already appear in Android's in-call audio selector.
+• A one-time ADB authorization is required because Android offers no normal permission dialog for this protected Telecom capability.
+• The app is not a dialer and does not read contacts, call history, or audio.
+• It has no internet permission and stores the selected device only in private local preferences.
+• This beta is for parked testing and is not intended for emergency or safety-critical use.
+
+Source code, releases, compatibility guidance, and verification evidence are available in the public GitHub repository.

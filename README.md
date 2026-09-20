@@ -12,9 +12,8 @@
 
 **Keep Android Auto for navigation and media while routing calls through the Bluetooth hands-free device you trust.**
 
-The installed app is named **Call Route Companion**. This repository is also described as
-**Car Call Router** so people searching for an Android Auto call-audio or Bluetooth microphone
-routing fix can find it.
+The installed app and this repository are both named **Car Call Router**, so people searching for
+an Android Auto call-audio or Bluetooth microphone routing fix can find and recognize it easily.
 
 ## The problem
 
@@ -22,7 +21,7 @@ Some phones connected to both Android Auto and a vehicle's native Bluetooth syst
 the Android Auto head unit. On aftermarket units, that can mean a poor microphone even when the
 vehicle's native hands-free system works well.
 
-Call Route Companion automates the same choice a user can make from the active-call audio selector:
+Car Call Router automates the same choice a user can make from the active-call audio selector:
 when an eligible cellular call becomes active, it asks Android Telecom to use a **current,
 user-chosen Bluetooth call endpoint**. Android Auto remains connected for navigation and media.
 The app does not become the default dialer or manipulate general media routing through
@@ -141,7 +140,7 @@ sign-in, downloads as a ZIP, and expires.
 ### Authorize call routing in the app
 
 1. Pair the intended car or headset in Android's Bluetooth settings and keep it nearby and powered on.
-2. Open Call Route Companion and select **Allow permissions**.
+2. Open Car Call Router and select **Allow permissions**.
 3. Select **Choose Bluetooth device**, then choose the intended call device.
 4. Select **Set up one-time ADB authorization** and follow the displayed steps.
 5. Return to the app and tap **Verify**. Continue only after the status says authorization is detected.
@@ -158,7 +157,9 @@ certificate across hosted runners; the signed workflow also pins the expected ce
 Start with the [FAQ](docs/FAQ.md) and [compatibility guide](docs/DEVICE-COMPATIBILITY.md). Read the
 [architecture reference](docs/ARCHITECTURE.md) for the component boundaries and routing state
 machine. The [public-release guide](docs/PUBLIC_RELEASE.md) explains what remains visible in a
-public repository and how to review a change before pushing it. Contributors should follow
+public repository and how to review a change before pushing it. The
+[app metadata guide](docs/APP-METADATA.md) keeps the installed identity, release hub, and reusable
+store listing aligned. Contributors should follow
 [CONTRIBUTING.md](CONTRIBUTING.md); suspected security, privacy, or safety vulnerabilities belong
 in the private reporting path described by [SECURITY.md](SECURITY.md), not a public issue.
 

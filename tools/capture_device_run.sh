@@ -12,7 +12,7 @@ usage() {
     cat <<'EOF'
 Usage: tools/capture_device_run.sh [--serial SERIAL] [--scenario NAME] [--tag TAG] [--package ID] [--output DIR]
 
-Captures only Call Route Companion's privacy-safe ROUTING_TRACE records around one parked test.
+Captures only Car Call Router's privacy-safe ROUTING_TRACE records around one parked test.
 Scenarios: incoming, outgoing, override, hold-resume, reconnect, second-call, conference, other.
 Repeat --tag to classify a run for the production stability matrix. Use --help to list tags.
 

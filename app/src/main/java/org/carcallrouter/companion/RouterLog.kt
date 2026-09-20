@@ -80,7 +80,7 @@ object RouterLog {
                 try {
                     context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { writer ->
                         writer.appendLine(
-                            "Call Route Companion ${BuildConfig.VERSION_NAME}; Android SDK ${android.os.Build.VERSION.SDK_INT}",
+                            "Car Call Router ${BuildConfig.VERSION_NAME}; Android SDK ${android.os.Build.VERSION.SDK_INT}",
                         )
                         writer.appendLine("Device addresses are salted aliases. No phone numbers are recorded.")
                         val previous = File(file.parentFile, "router.previous.log")

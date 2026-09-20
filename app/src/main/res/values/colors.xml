@@ -14,4 +14,5 @@
     <color name="warning_surface">#FFF2D2</color>
     <color name="diagnostic_surface">#13282F</color>
     <color name="diagnostic_text">#D9EDF1</color>
+    <color name="launcher_background">#006A78</color>
 </resources>

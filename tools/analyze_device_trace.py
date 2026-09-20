@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize privacy-safe ROUTING_TRACE records from Call Route Companion."""
+"""Summarize privacy-safe ROUTING_TRACE records from Car Call Router."""
 
 from __future__ import annotations
 

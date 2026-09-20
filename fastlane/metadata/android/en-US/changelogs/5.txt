@@ -1,0 +1,5 @@
+Version 0.3.0-beta.3
+
+• Improves bounded, non-overlapping call-route requests and typed recovery.
+• Adds clearer setup readiness, persistent last-call results, and privacy-safe diagnostics.
+• Publishes APK verification evidence and a durable GitHub pre-release.
