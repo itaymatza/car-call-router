@@ -39,6 +39,7 @@ class RouterInCallService :
     private lateinit var trace: RoutingTrace
     private var projection: Boolean? = null
     private var sequence = 0
+    private var hasObservedCallInInstance = false
     private var disposed = false
     private var policy = RoutingPolicy()
     private var sessionStarted = false
@@ -163,6 +164,8 @@ class RouterInCallService :
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        val repeatedServiceInstance = hasObservedCallInInstance
+        hasObservedCallInInstance = true
         val id = ++sequence
         val callback =
             object : Call.Callback() {
@@ -216,11 +219,23 @@ class RouterInCallService :
             sessionStarted = true
             manualSession = false
             activeTransitionAt = SystemClock.elapsedRealtime()
-            lateBindRecoveryDeadlineAt = activeTransitionAt?.plus(LATE_BIND_EVIDENCE_WINDOW_MS)
             initialEndpointId = router.current()?.identifier?.toString()
-            trace.begin("automatic", "already_active_bind_pending")
-            trace.event("LATE_BIND_RECOVERY_PENDING", "initial_route" to currentRoute())
-            RouterLog.event("LATE_BIND_RECOVERY_PENDING", "Awaiting verified Android Auto, BMW HFP and endpoint evidence")
+            if (repeatedServiceInstance) {
+                trace.begin("automatic", "same_instance_active_rebind")
+                policy.suspend(
+                    "Already-active call returned to the same service instance; automatic takeover suppressed",
+                    RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
+                )
+                trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
+            } else {
+                lateBindRecoveryDeadlineAt = activeTransitionAt?.plus(LATE_BIND_EVIDENCE_WINDOW_MS)
+                trace.begin("automatic", "already_active_bind_pending")
+                trace.event("LATE_BIND_RECOVERY_PENDING", "initial_route" to currentRoute())
+                RouterLog.event(
+                    "LATE_BIND_RECOVERY_PENDING",
+                    "Awaiting verified Android Auto, BMW HFP and endpoint evidence",
+                )
+            }
         }
         queueEvaluation()
     }
