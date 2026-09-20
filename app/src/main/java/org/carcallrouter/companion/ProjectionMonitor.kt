@@ -11,6 +11,7 @@ package org.carcallrouter.companion
 
 import android.content.AsyncQueryHandler
 import android.content.BroadcastReceiver
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -18,6 +19,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import java.lang.ref.WeakReference
 
 /** Main-thread owned, event-driven projection observation using the AndroidX host protocol. */
 class ProjectionMonitor(
@@ -30,41 +32,7 @@ class ProjectionMonitor(
     private var registered = false
     private var generation = 0
     private var lastLoggedState = "uninitialized"
-    private val query =
-        object : AsyncQueryHandler(app.contentResolver) {
-            override fun onQueryComplete(
-                token: Int,
-                cookie: Any?,
-                cursor: Cursor?,
-            ) {
-                val value: Boolean? =
-                    try {
-                        cursor?.use {
-                            val column = it.getColumnIndex(STATE_COLUMN)
-                            if (column < 0 || !it.moveToFirst()) {
-                                null
-                            } else {
-                                when (it.getInt(column)) {
-                                    0, 1 -> false
-                                    2 -> true
-                                    else -> null
-                                }
-                            }
-                        }
-                    } catch (e: RuntimeException) {
-                        RouterLog.event("PROJECTION_ERROR", e.javaClass.simpleName)
-                        null
-                    }
-                if (open && cookie == generation) {
-                    val state = value?.toString() ?: "unknown"
-                    if (state != lastLoggedState) {
-                        lastLoggedState = state
-                        RouterLog.event("PROJECTION", "active=$value; source=AndroidX_host_provider")
-                    }
-                    changed(value)
-                }
-            }
-        }
+    private val query = ProjectionQueryHandler(app.contentResolver, this)
     private val refresh =
         Runnable {
             if (open) {
@@ -93,6 +61,38 @@ class ProjectionMonitor(
             }
         }
 
+    private fun onQueryComplete(
+        cookie: Any?,
+        cursor: Cursor?,
+    ) {
+        val value: Boolean? =
+            try {
+                cursor?.use {
+                    val column = it.getColumnIndex(STATE_COLUMN)
+                    if (column < 0 || !it.moveToFirst()) {
+                        null
+                    } else {
+                        when (it.getInt(column)) {
+                            0, 1 -> false
+                            2 -> true
+                            else -> null
+                        }
+                    }
+                }
+            } catch (e: RuntimeException) {
+                RouterLog.event("PROJECTION_ERROR", e.javaClass.simpleName)
+                null
+            }
+        if (open && cookie == generation) {
+            val state = value?.toString() ?: "unknown"
+            if (state != lastLoggedState) {
+                lastLoggedState = state
+                RouterLog.event("PROJECTION", "active=$value; source=AndroidX_host_provider")
+            }
+            changed(value)
+        }
+    }
+
     fun start() {
         if (open) return
         open = true
@@ -114,6 +114,26 @@ class ProjectionMonitor(
         if (registered) {
             runCatching { app.unregisterReceiver(receiver) }
             registered = false
+        }
+    }
+
+    private class ProjectionQueryHandler(
+        resolver: ContentResolver,
+        monitor: ProjectionMonitor,
+    ) : AsyncQueryHandler(resolver) {
+        private val monitor = WeakReference(monitor)
+
+        override fun onQueryComplete(
+            token: Int,
+            cookie: Any?,
+            cursor: Cursor?,
+        ) {
+            val owner = monitor.get()
+            if (owner == null) {
+                cursor?.close()
+            } else {
+                owner.onQueryComplete(cookie, cursor)
+            }
         }
     }
 

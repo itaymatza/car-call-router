@@ -16,7 +16,10 @@
     <string name="readiness_ready_message">Setup is complete. Enable automatic routing when you are ready.</string>
     <string name="readiness_active_title">Calls will use your selected device</string>
     <string name="readiness_active_message">The app is ready and will make a bounded routing request when an eligible call starts.</string>
-    <string name="setup_progress">%1$d of %2$d required steps complete</string>
+    <plurals name="setup_progress">
+        <item quantity="one">%1$d of %2$d required step complete</item>
+        <item quantity="other">%1$d of %2$d required steps complete</item>
+    </plurals>
     <string name="last_call_title">Last call result</string>
     <string name="last_call_none">No completed routing session has been recorded yet.</string>
     <string name="last_call_summary">%1$s\nResult: %2$s\nReason: %3$s\nBest confirmation: %4$s</string>
@@ -78,12 +81,4 @@
     <string name="logs_title">Recent diagnostic events</string>
     <string name="export">Export redacted log</string>
     <string name="privacy">Private by design: no internet, audio recording, contacts, or call-log access.</string>
-
-    <!-- Kept for compatibility with older layouts and downstream customizations. -->
-    <string name="validation">Reference build • Test only while parked</string>
-    <string name="permissions">Allow Bluetooth and phone-account access</string>
-    <string name="target">Choose target Bluetooth call device</string>
-    <string name="competitor">Choose explicitly competing device (optional)</string>
-    <string name="copy_adb">Set up one-time ADB authorization</string>
-    <string name="adb_help">Requires MANAGE_ONGOING_CALLS authorization through ADB.</string>
 </resources>
