@@ -10,6 +10,7 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /** No numbers, call handles, account IDs, device names or raw addresses are logged. */
 object RouterLog {
@@ -17,6 +18,13 @@ object RouterLog {
     private val main = Handler(Looper.getMainLooper())
     private val listeners = linkedSetOf<() -> Unit>()
     private val recent = java.util.ArrayDeque<String>()
+    private val processSequence = AtomicLong()
+    private val processId =
+        UUID
+            .randomUUID()
+            .toString()
+            .replace("-", "")
+            .take(8)
     private lateinit var file: File
     private lateinit var salt: String
 
@@ -38,7 +46,9 @@ object RouterLog {
         event: String,
         detail: String,
     ) {
-        val line = "${Instant.now()} +${SystemClock.elapsedRealtime()}ms $event $detail"
+        val line =
+            "${Instant.now()} +${SystemClock.elapsedRealtime()}ms pseq=${processSequence.incrementAndGet()} " +
+                "process=$processId $event $detail"
         Log.i("CallRouteCompanion", line)
         synchronized(this) {
             recent.addLast(line)
@@ -47,9 +57,7 @@ object RouterLog {
         io.execute {
             try {
                 if (file.length() > 1_000_000) {
-                    val previous = File(file.parentFile, "router.previous.log")
-                    previous.delete()
-                    file.renameTo(previous)
+                    rotateFiles()
                 }
                 file.appendText(line + "\n")
             } catch (_: Exception) {
@@ -82,9 +90,15 @@ object RouterLog {
                         writer.appendLine(
                             "Car Call Router ${BuildConfig.VERSION_NAME}; Android SDK ${android.os.Build.VERSION.SDK_INT}",
                         )
+                        writer.appendLine(
+                            "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}; " +
+                                "Android ${android.os.Build.VERSION.RELEASE}; security patch ${android.os.Build.VERSION.SECURITY_PATCH}",
+                        )
                         writer.appendLine("Device addresses are salted aliases. No phone numbers are recorded.")
-                        val previous = File(file.parentFile, "router.previous.log")
-                        if (previous.exists()) writer.append(previous.readText())
+                        (MAX_ARCHIVES downTo 1).forEach { index ->
+                            val archive = archive(index)
+                            if (archive.exists()) writer.append(archive.readText())
+                        }
                         if (file.exists()) writer.append(file.readText())
                     } != null
                 } catch (_: Exception) {
@@ -93,4 +107,17 @@ object RouterLog {
             main.post { done(ok) }
         }
     }
+
+    private fun rotateFiles() {
+        archive(MAX_ARCHIVES).delete()
+        for (index in MAX_ARCHIVES - 1 downTo 1) {
+            val source = archive(index)
+            if (source.exists()) source.renameTo(archive(index + 1))
+        }
+        file.renameTo(archive(1))
+    }
+
+    private fun archive(index: Int) = File(file.parentFile, "router.$index.log")
+
+    private const val MAX_ARCHIVES = 3
 }

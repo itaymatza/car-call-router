@@ -17,6 +17,8 @@ class RoutingTrace(
     private var startedAt = 0L
     private var sequence = 0
     private var confirmation = Confirmation.NONE
+    private val eventCounts = mutableMapOf<String, Int>()
+    private val endpointRequestClassifications = mutableMapOf<String, Int>()
 
     fun begin(
         mode: String,
@@ -27,6 +29,8 @@ class RoutingTrace(
         startedAt = now()
         sequence = 0
         confirmation = Confirmation.NONE
+        eventCounts.clear()
+        endpointRequestClassifications.clear()
         event("SESSION_STARTED", "mode" to mode, "trigger" to trigger)
     }
 
@@ -46,6 +50,12 @@ class RoutingTrace(
                 fields.forEach { (key, value) -> add("${token(key)}=${token(value?.toString() ?: "null")}") }
             }.joinToString(" ")
         emit(body)
+        eventCounts[name] = (eventCounts[name] ?: 0) + 1
+        if (name == "ENDPOINT_REQUEST_OBSERVED") {
+            val classification = fields.firstOrNull { it.first == "classification" }?.second?.toString() ?: "unknown"
+            endpointRequestClassifications[classification] =
+                (endpointRequestClassifications[classification] ?: 0) + 1
+        }
     }
 
     fun confirmTelecom() {
@@ -65,6 +75,7 @@ class RoutingTrace(
         phase: RoutingPolicy.Phase,
         reason: RoutingPolicy.ReasonCode,
         termination: String,
+        vararg fields: Pair<String, Any?>,
     ): Confirmation? {
         if (sessionId == null) return null
         val result = confirmation
@@ -74,6 +85,14 @@ class RoutingTrace(
             "reason" to reason,
             "termination" to termination,
             "best_confirmation" to confirmation,
+            "requests" to (eventCounts["REQUEST_SUBMITTED"] ?: 0),
+            "route_changes" to (eventCounts["ENDPOINT_CHANGED"] ?: 0),
+            "endpoint_callbacks" to (eventCounts["ENDPOINT_REQUEST_OBSERVED"] ?: 0),
+            "self_callbacks" to (endpointRequestClassifications["SELF"] ?: 0),
+            "startup_replays" to (endpointRequestClassifications["STARTUP_REPLAY"] ?: 0),
+            "external_callbacks" to (endpointRequestClassifications["EXTERNAL"] ?: 0),
+            "suspensions" to (eventCounts["SESSION_SUSPENDED"] ?: 0),
+            *fields,
         )
         sessionId = null
         return result

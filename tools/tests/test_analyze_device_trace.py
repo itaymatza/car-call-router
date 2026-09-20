@@ -53,6 +53,36 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual("INCOMPLETE", summaries[0].status)
         self.assertFalse(summaries[0].hfp_audio_confirmed)
 
+    def test_route_oscillation_is_unstable_even_with_dual_confirmation(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 10, "ENDPOINT_CHANGED", "route=TARGET")
+            + line("abc", 3, 20, "TELECOM_ENDPOINT_CONFIRMED")
+            + line("abc", 4, 25, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 5, 30, "ENDPOINT_CHANGED", "route=HANDSET")
+            + line("abc", 6, 40, "ENDPOINT_CHANGED", "route=TARGET")
+            + line("abc", 7, 100, "SESSION_FINISHED",
+                   "phase=SUSPENDED reason=CALL_NOT_ACTIVE termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO final_route=TARGET")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("UNSTABLE", summaries[0].status)
+        self.assertEqual(1, summaries[0].route_oscillations)
+
+    def test_startup_replay_is_reported_but_does_not_fail_session(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 5, "ENDPOINT_REQUEST_OBSERVED", "classification=STARTUP_REPLAY")
+            + line("abc", 3, 20, "TELECOM_ENDPOINT_CONFIRMED")
+            + line("abc", 4, 25, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 5, 100, "SESSION_FINISHED",
+                   "phase=SUSPENDED reason=CALL_NOT_ACTIVE termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO final_route=TARGET")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("PASS", summaries[0].status)
+        self.assertEqual(1, summaries[0].startup_replays)
+
     def test_sequence_gap_is_invalid(self):
         content = line("abc", 1, 0, "SESSION_STARTED") + line("abc", 3, 10, "SESSION_FINISHED")
         summaries, _ = self.parse(content)

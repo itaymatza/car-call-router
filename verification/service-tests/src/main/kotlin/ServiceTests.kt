@@ -614,6 +614,27 @@ fun main(args: Array<String>) {
                         check(!SessionBridge.status.contains("SUSPENDED"))
                     }
                 },
+            "api37_pre_active_request_replay_after_our_request_is_not_user_override" to
+                {
+                    Fixture().use { f ->
+                        // Samsung can report the head-unit selection before ACTIVE and replay the
+                        // same callback just after this guard submits its BMW request.
+                        f.service.onCallEndpointRequested(competing)
+                        f.flush()
+                        f.active()
+                        countEquals(f, 1)
+                        f.service.onCallEndpointRequested(competing)
+                        f.flush()
+                        check(!SessionBridge.status.contains("SUSPENDED"))
+                        check(
+                            RouterLog.events.any {
+                                it.first == "ROUTING_TRACE" &&
+                                    it.second.contains("event=ENDPOINT_REQUEST_OBSERVED") &&
+                                    it.second.contains("classification=STARTUP_REPLAY")
+                            },
+                        )
+                    }
+                },
             "api37_external_endpoint_request_suspends_the_session" to
                 {
                     Fixture().use { f ->
@@ -637,6 +658,24 @@ fun main(args: Array<String>) {
                         f.service.onCallEndpointRequested(target)
                         f.flush()
                         check(!SessionBridge.status.contains("SUSPENDED"))
+                    }
+                },
+            "late_request_result_from_finished_generation_is_ignored" to
+                {
+                    Fixture().use { f ->
+                        f.service.autoCompleteRequests = false
+                        f.active()
+                        check(f.service.pendingRequests.size == 1)
+                        f.call.deliverState(Call.STATE_DISCONNECTED)
+                        f.service.onCallRemoved(f.call)
+                        f.flush()
+                        f.service.completeLatest()
+                        f.flush()
+                        check(
+                            RouterLog.events.any {
+                                it.first == "ROUTE_RESULT_IGNORED" && it.second.contains("result=accepted")
+                            },
+                        )
                     }
                 },
             "structured_trace_requires_endpoint_and_exact_hfp_audio_evidence" to
