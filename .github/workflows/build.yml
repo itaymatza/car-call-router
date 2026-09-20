@@ -27,6 +27,8 @@ jobs:
           python3 -m unittest discover -s tools/tests -p 'test_*.py'
           bash -n tools/*.sh verification/service-tests/run.sh
           pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "tools/install.ps1"), [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
+      - name: Bootstrap Android lint baseline
+        run: bash gradlew :app:updateLintBaseline --console=plain
       - name: Compile, unit-test, service-test and lint
         run: bash gradlew :core:check :app:ktlintCheck :app:assembleDebug :app:testDebugUnitTest :verification:service-tests:ktlintCheck :verification:service-tests:run :app:lintDebug --stacktrace --console=plain
       - name: Verify APK signature and manifest identity
@@ -42,3 +44,11 @@ jobs:
             verification/current/apk-verification.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Upload Android lint baseline
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-lint-baseline
+          path: app/lint-baseline.xml
+          if-no-files-found: error
+          retention-days: 1
