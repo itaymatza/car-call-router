@@ -20,7 +20,7 @@ private fun Snapshot(
 ) = PolicySnapshot(now, enabled, authorized, active, singleCall, safeCellularCall,
     projection, targetHfpConnected, targetAvailable, endpointRevision, route)
 
-/** Identical checks under JUnit and offline kotlinc; no Android mocks. */
+/** Named, deterministic policy checks executed by the pure-JVM JUnit module. */
 object PolicyCases {
     private fun policy(initial: Route = Route.COMPETING_DEVICE, manual: Boolean = false) =
         RoutingPolicy().also { it.begin(0, initial, manual) }

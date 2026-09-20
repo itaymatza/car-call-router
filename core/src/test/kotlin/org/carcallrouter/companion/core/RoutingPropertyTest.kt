@@ -1,0 +1,71 @@
+package org.carcallrouter.companion.core
+
+import kotlin.random.Random
+import org.carcallrouter.companion.core.RoutingPolicy.Phase
+import org.carcallrouter.companion.core.RoutingPolicy.Route
+import org.carcallrouter.companion.core.RoutingPolicy.Snapshot
+import org.junit.Test
+
+class RoutingPropertyTest {
+    @Test
+    fun seededStateExplorationPreservesSafetyInvariants() {
+        val random = Random(20260917)
+        val terminal = setOf(Phase.RELEASED, Phase.SUSPENDED, Phase.FAILED)
+        var transitions = 0
+
+        repeat(5_000) { trace ->
+            val manual = random.nextInt(5) == 0
+            val initial = if (random.nextBoolean()) Route.COMPETING_DEVICE else Route.entries.random(random)
+            val policy = RoutingPolicy().also { it.begin(0, initial, manual) }
+            var now = 0L
+            var lastRequest: Long? = null
+
+            repeat(50) {
+                now += random.nextInt(0, 181)
+                val route = when (random.nextInt(10)) {
+                    in 0..4 -> Route.COMPETING_DEVICE
+                    in 5..7 -> Route.TARGET
+                    else -> Route.entries.random(random)
+                }
+                if (random.nextInt(100) == 0) policy.suspend("explicit pause")
+                if (random.nextInt(4) == 0) policy.observeRoute(route, now)
+                fun evidence(): Boolean? = when (random.nextInt(100)) {
+                    0 -> false
+                    in 1..4 -> null
+                    else -> true
+                }
+                val snapshot = Snapshot(
+                    now = now,
+                    enabled = random.nextInt(100) > 1,
+                    authorized = random.nextInt(100) > 1,
+                    active = random.nextInt(100) > 1,
+                    singleCall = random.nextInt(100) > 1,
+                    safeCellularCall = random.nextInt(100) > 1,
+                    projection = evidence(),
+                    targetHfpConnected = evidence(),
+                    targetAvailable = evidence(),
+                    endpointRevision = trace.toLong() + 1,
+                    route = route
+                )
+                val before = policy.phase
+                val decision = policy.evaluate(snapshot)
+                transitions++
+
+                check(policy.requests <= if (manual) 1 else 3)
+                if (before in terminal) check(!decision.requestTarget)
+                if (decision.requestTarget) {
+                    check(snapshot.authorized && snapshot.active && snapshot.singleCall)
+                    check(snapshot.safeCellularCall)
+                    check(snapshot.targetHfpConnected == true && snapshot.targetAvailable == true)
+                    check(manual || (snapshot.enabled && snapshot.projection == true))
+                    check(snapshot.now < 15_500)
+                    check(lastRequest == null || snapshot.now - requireNotNull(lastRequest) >= 2_500)
+                    lastRequest = snapshot.now
+                }
+                decision.wakeAt?.let { check(it > snapshot.now) }
+            }
+        }
+
+        check(transitions == 250_000)
+    }
+}

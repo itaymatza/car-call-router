@@ -7,6 +7,10 @@ kotlin {
     jvmToolchain(17)
 }
 
+dependencies {
+    implementation(project(":core"))
+}
+
 sourceSets {
     main {
         kotlin {
@@ -16,9 +20,6 @@ sourceSets {
             include("stubs/**/*.kt")
             include("org/carcallrouter/companion/RouterSettings.kt")
             include("org/carcallrouter/companion/SessionBridge.kt")
-            include("org/carcallrouter/companion/core/EndpointIdentity.kt")
-            include("org/carcallrouter/companion/core/RoutingPolicy.kt")
-            include("org/carcallrouter/companion/core/RoutingTrace.kt")
             include("org/carcallrouter/companion/telecom/AddressedTelecomRouter.kt")
             include("org/carcallrouter/companion/telecom/RouterInCallService.kt")
         }

@@ -8,10 +8,12 @@ Install a JDK 17 or newer and a Kotlin compiler, then run:
 bash tools/test-all.sh
 ```
 
-The script compiles and runs four deterministic groups: explicit routing-policy cases, seeded
-policy-state exploration, production-service scenarios against local Android-framework doubles,
-and the Python trace/APK-tooling tests. It writes fresh local logs under `verification/current/`,
-which is intentionally ignored by Git.
+The script runs the pure-JVM `:core` JUnit suite and its enforced 90% branch-coverage gate,
+production-service scenarios against local Android-framework doubles, and the Python
+trace/APK-tooling tests. The core suite includes named policy rules, 5,000 seeded traces (250,000
+transitions), connection-order and timing scenarios, and JSONL regression-trace replay. It writes
+fresh local logs under `verification/current/`, which is intentionally ignored by Git. The
+standalone Kotlin compiler is needed only by the lightweight framework-double service runner.
 
 These checks exercise decision rules and lifecycle behavior. They do not install an APK, emulate Android Telecom, validate protected-permission admission, or test a real Bluetooth stack, microphone, projection host, headset, or vehicle.
 
@@ -20,14 +22,14 @@ These checks exercise decision rules and lifecycle behavior. They do not install
 With a suitable Android SDK:
 
 ```sh
-bash gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
+bash gradlew :core:check :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
 ```
 
 The repository workflow runs that command on pushes and pull requests with read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
 
 The Gradle workflow and both installation scripts also run `:verification:service-tests:run`, so
-callback-order and lifecycle regressions cannot be skipped merely because a machine lacks a
-standalone `kotlinc` command. CI also runs the standard-library-only device trace analyzer and
+callback-order and lifecycle regressions are exercised against the same compiled `:core` module.
+CI also runs the standard-library-only device trace analyzer and
 APK-verifier tests. After building, CI verifies the generated APK's signature,
 package/version identity, SDK bounds, required permissions, and debuggable state, then publishes
 the verification record beside the APK.

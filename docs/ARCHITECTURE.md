@@ -8,6 +8,10 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 
 ## Components
 
+The repository separates platform-independent behavior into the pure-JVM `:core` module. The
+Android `:app` and framework-double `:verification:service-tests` modules both depend on that same
+compiled implementation, preventing either harness from maintaining a private copy.
+
 | Component | Responsibility | Safety boundary |
 |---|---|---|
 | `MainActivity` | Collects runtime permission, device selection, master-toggle, manual-test, pause, and diagnostic-export choices. | User actions are explicit. It cannot enable automation without a configured target and granted prerequisites. |
@@ -16,7 +20,7 @@ The design treats autonomous call-audio routing as a safety-sensitive feature. I
 | `ProjectionMonitor` | Reads the AndroidX host-provider state for optional projection gating. | Missing or unknown evidence freezes requests; confirmed loss stops an active guard. It does not infer state from names, Wi-Fi, or process activity. |
 | `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | Broadcast extras are not trusted; state is re-queried from the profile service. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
-| `RoutingPolicy` | Pure Kotlin state machine that decides whether a routing request is permitted, delayed, released, or stopped. | Uses separate evidence and action deadlines, permits one request in flight, enforces a 2.5-second request gap and a three-request maximum, and classifies platform outcomes. |
+| `RoutingPolicy` (`:core`) | Pure Kotlin state machine that decides whether a routing request is permitted, delayed, released, or stopped. | Uses separate evidence and action deadlines, permits one request in flight, enforces a 2.5-second request gap and a three-request maximum, and classifies platform outcomes. |
 | `RoutingTrace` | Emits versioned, redacted, session-sequenced evidence with stable reason codes and elapsed timings. | Separates a Telecom endpoint observation from exact target HFP audio/SCO evidence; it does not claim physical microphone quality. |
 | `EndpointIdentity` and `AddressedTelecomRouter` | Resolve the saved paired target against live API 34+ endpoints and issue the request. | Uses only callback-supplied endpoint objects. Unique label or one-to-one HFP topology is required; ambiguity fails closed. |
 | `RouterInCallService` | Coordinates Telecom, route, endpoint, projection, HFP, and call callbacks on the main thread. | Safety-relevant events are latched before deferred evaluation so that later callbacks cannot erase them. |
