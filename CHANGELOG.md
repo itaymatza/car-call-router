@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0-beta.6
+
 - Correlate API 37 endpoint-request callbacks with generation-bound, expiring request tickets so
   delayed callbacks cannot leak across call sessions.
 - Classify Samsung call-start callback replays separately from app requests and genuine external
