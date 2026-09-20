@@ -23,6 +23,8 @@ if args == ["get-state"]:
     print("device")
 elif args[:3] == ["shell", "pm", "path"]:
     print("package:/data/app/base.apk")
+elif args == ["exec-out", "cat", "/data/app/base.apk"]:
+    print("fixed test apk bytes", end="")
 elif args[:4] == ["shell", "cmd", "appops", "get"]:
     print("MANAGE_ONGOING_CALLS: allow")
 elif args[:3] == ["exec-out", "run-as", "org.carcallrouter.companion"] and args[-1] == "id":
@@ -64,6 +66,16 @@ else:
 
 
 class CaptureDeviceRunTest(unittest.TestCase):
+    def test_override_requires_route_tag(self):
+        completed = subprocess.run(
+            ["bash", str(SCRIPT), "--scenario", "override"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("exactly one override-* tag", completed.stderr)
+
     def test_pass_record_contains_only_new_session(self):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
@@ -76,6 +88,7 @@ class CaptureDeviceRunTest(unittest.TestCase):
             environment["FAKE_ADB_STATE"] = str(temporary / "state")
             completed = subprocess.run(
                 ["bash", str(SCRIPT), "--serial", "FAKE", "--scenario", "outgoing",
+                 "--tag", "cold-start", "--tag", "android-auto-first",
                  "--output", str(output)],
                 input="\n\ny\ny\ny\n",
                 text=True,
@@ -90,6 +103,8 @@ class CaptureDeviceRunTest(unittest.TestCase):
             self.assertEqual("verdict=PASS", (output / "verdict.txt").read_text().splitlines()[0])
             device = (output / "device.txt").read_text(encoding="utf-8")
             self.assertIn("build_fingerprint=samsung/test/test:17/TEST/1:user/release-keys", device)
+            self.assertIn("qualification_tags=cold-start,android-auto-first", device)
+            self.assertRegex(device, r"installed_apk_sha256=[0-9a-f]{64}")
 
 
 if __name__ == "__main__":

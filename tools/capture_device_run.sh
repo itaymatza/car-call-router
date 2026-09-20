@@ -6,13 +6,22 @@ PACKAGE="org.carcallrouter.companion"
 SCENARIO="other"
 SERIAL=""
 OUTPUT=""
+TAGS=()
 
 usage() {
     cat <<'EOF'
-Usage: tools/capture_device_run.sh [--serial SERIAL] [--scenario NAME] [--package ID] [--output DIR]
+Usage: tools/capture_device_run.sh [--serial SERIAL] [--scenario NAME] [--tag TAG] [--package ID] [--output DIR]
 
 Captures only Call Route Companion's privacy-safe ROUTING_TRACE records around one parked test.
-Scenarios: incoming, outgoing, override, hold-resume, reconnect, other.
+Scenarios: incoming, outgoing, override, hold-resume, reconnect, second-call, conference, other.
+Repeat --tag to classify a run for the production stability matrix. Use --help to list tags.
+
+Qualification tags:
+  cold-start warm-start screen-off post-reboot
+  battery-unrestricted battery-optimized battery-restricted
+  android-auto-first bmw-first consecutive after-idle
+  projection-unknown hfp-unknown bmw-disconnect projection-disconnect
+  override-speaker override-handset override-wired override-other-bluetooth
 EOF
 }
 
@@ -20,6 +29,7 @@ while (($#)); do
     case "$1" in
         --serial) SERIAL="${2:?missing serial}"; shift 2 ;;
         --scenario) SCENARIO="${2:?missing scenario}"; shift 2 ;;
+        --tag) TAGS+=("${2:?missing tag}"); shift 2 ;;
         --package) PACKAGE="${2:?missing package}"; shift 2 ;;
         --output) OUTPUT="${2:?missing output directory}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
@@ -27,8 +37,30 @@ while (($#)); do
     esac
 done
 
-case "$SCENARIO" in incoming|outgoing|override|hold-resume|reconnect|other) ;; *)
+case "$SCENARIO" in incoming|outgoing|override|hold-resume|reconnect|second-call|conference|other) ;; *)
     echo "Unsupported scenario: $SCENARIO" >&2; exit 2;; esac
+for tag in "${TAGS[@]}"; do
+    case "$tag" in
+        cold-start|warm-start|screen-off|post-reboot|\
+        battery-unrestricted|battery-optimized|battery-restricted|\
+        android-auto-first|bmw-first|consecutive|after-idle|\
+        projection-unknown|hfp-unknown|bmw-disconnect|projection-disconnect|\
+        override-speaker|override-handset|override-wired|override-other-bluetooth) ;;
+        *) echo "Unsupported qualification tag: $tag" >&2; exit 2 ;;
+    esac
+done
+OVERRIDE_TAGS="$(printf '%s\n' "${TAGS[@]}" | grep -Ec '^override-' || true)"
+DISCONNECT_TAGS="$(printf '%s\n' "${TAGS[@]}" | grep -Ec '^(bmw|projection)-disconnect$' || true)"
+if [[ "$SCENARIO" == "override" && "$OVERRIDE_TAGS" != "1" ]] \
+    || [[ "$SCENARIO" != "override" && "$OVERRIDE_TAGS" != "0" ]]; then
+    echo "The override scenario requires exactly one override-* tag; other scenarios allow none." >&2
+    exit 2
+fi
+if [[ "$SCENARIO" == "reconnect" && "$DISCONNECT_TAGS" != "1" ]] \
+    || [[ "$SCENARIO" != "reconnect" && "$DISCONNECT_TAGS" != "0" ]]; then
+    echo "The reconnect scenario requires exactly one *-disconnect tag; other scenarios allow none." >&2
+    exit 2
+fi
 [[ "$PACKAGE" =~ ^[A-Za-z0-9_]+([.][A-Za-z0-9_]+)+$ ]] || {
     echo "Invalid package ID: $PACKAGE" >&2; exit 2;
 }
@@ -48,8 +80,25 @@ ADB=(adb -s "$SERIAL")
 [[ "$("${ADB[@]}" get-state 2>/dev/null)" == "device" ]] || {
     echo "The selected ADB device is not authorized and online." >&2; exit 1;
 }
-"${ADB[@]}" shell pm path "$PACKAGE" 2>/dev/null | grep -q '^package:' || {
+PACKAGE_PATHS="$("${ADB[@]}" shell pm path "$PACKAGE" 2>/dev/null | tr -d '\r')"
+grep -q '^package:' <<<"$PACKAGE_PATHS" || {
     echo "Package $PACKAGE is not installed for the current Android user." >&2; exit 1;
+}
+[[ "$(grep -c '^package:' <<<"$PACKAGE_PATHS")" == "1" ]] || {
+    echo "Expected one installed base APK for $PACKAGE; split APK installs are not supported." >&2
+    exit 1
+}
+APK_PATH="${PACKAGE_PATHS#package:}"
+if command -v sha256sum >/dev/null; then
+    APK_SHA256="$("${ADB[@]}" exec-out cat "$APK_PATH" | sha256sum | awk '{print $1}')"
+elif command -v shasum >/dev/null; then
+    APK_SHA256="$("${ADB[@]}" exec-out cat "$APK_PATH" | shasum -a 256 | awk '{print $1}')"
+else
+    echo "sha256sum or shasum is required." >&2
+    exit 1
+fi
+[[ "$APK_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || {
+    echo "Could not hash the installed APK." >&2; exit 1;
 }
 APP_OPS="$("${ADB[@]}" shell cmd appops get --uid "$PACKAGE" MANAGE_ONGOING_CALLS 2>/dev/null | tr -d '\r')"
 grep -Eq 'MANAGE_ONGOING_CALLS: allow|allow' <<<"$APP_OPS" || {
@@ -92,9 +141,11 @@ SDK="$("${ADB[@]}" shell getprop ro.build.version.sdk | tr -d '\r\n')"
 BUILD_FINGERPRINT="$("${ADB[@]}" shell getprop ro.build.fingerprint | tr -d '\r\n')"
 VERSION_NAME="$("${ADB[@]}" shell dumpsys package "$PACKAGE" | awk -F= '/versionName=/{gsub(/\r/,"",$2); print $2; exit}')"
 VERSION_CODE="$("${ADB[@]}" shell dumpsys package "$PACKAGE" | awk '/versionCode=/{for(i=1;i<=NF;i++) if($i ~ /^versionCode=/){sub(/^versionCode=/,"",$i); print $i; exit}}')"
+QUALIFICATION_TAGS="$(IFS=,; echo "${TAGS[*]}")"
 cat >"$OUTPUT/device.txt" <<EOF
 captured_utc=$STAMP
 scenario=$SCENARIO
+qualification_tags=$QUALIFICATION_TAGS
 manufacturer=$MANUFACTURER
 model=$MODEL
 android_api=$SDK
@@ -102,6 +153,7 @@ build_fingerprint=$BUILD_FINGERPRINT
 package=$PACKAGE
 version_name=$VERSION_NAME
 version_code=$VERSION_CODE
+installed_apk_sha256=$APK_SHA256
 manage_ongoing_calls=allow
 EOF
 

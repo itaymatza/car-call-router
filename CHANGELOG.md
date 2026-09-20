@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record the exact installed APK hash and controlled qualification tags for parked device runs, and
+  add an offline batch report that enforces build consistency and production-matrix counts.
 - Resolve nine Android lint findings: avoid retaining the projection monitor through an async
   query, use plural resources for setup progress, remove redundant drawing, and delete stale
   compatibility strings.

@@ -20,6 +20,9 @@
 - A privacy-bounded ADB harness isolates each new device session, validates trace integrity, records
   physical speaker/microphone and Android Auto observations, and emits a conservative combined
   pass/fail verdict. Its parser has deterministic CI coverage.
+- Qualification aggregation verifies one unchanged installed APK and phone build, counts only
+  passing evidence toward every matrix cell, identifies missing trials, and reports the `3/n`
+  bound only for failure-free batches.
 - CI fails on APK signature rejection, package/version or SDK drift, missing required permissions,
   and unexpected debuggability; its artifact includes the exact APK and certificate SHA-256 values.
 - Service regressions cover authorization and runtime-permission revocation during a pending route,

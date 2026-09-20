@@ -118,4 +118,10 @@ For repeatable real-device evidence, run
 `bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing` while parked. The
 harness stores only new structured app traces plus explicit physical observations in a local,
 Git-ignored run directory and emits `PASS` only when exact HFP audio and all required observations
-agree.
+agree. Controlled tags classify each matrix cell, and
+
+```sh
+python3 tools/summarize_qualification.py verification/device-runs --require-ready
+```
+
+verifies that the batch used one APK/phone build and reached every required passing count.

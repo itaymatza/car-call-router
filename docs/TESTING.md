@@ -60,12 +60,17 @@ The required result includes `MANAGE_ONGOING_CALLS: allow`. Refresh the app's Di
 From macOS or Linux with `adb` and Python 3 available, connect the authorized phone and run:
 
 ```sh
-bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing
+bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing \
+  --tag cold-start --tag battery-unrestricted --tag android-auto-first
 ```
 
-Supported scenarios are `incoming`, `outgoing`, `override`, `hold-resume`, `reconnect`, and
-`other`. Omit `--serial` only when exactly one authorized ADB device is connected. If the build
-uses a custom application ID, also pass `--package YOUR_APPLICATION_ID`.
+Supported scenarios are `incoming`, `outgoing`, `override`, `hold-resume`, `reconnect`,
+`second-call`, `conference`, and `other`. Override and reconnect runs require exactly one matching
+route/disconnect tag so the corresponding physical observation cannot be skipped. Omit `--serial`
+only when exactly one authorized ADB device is connected. If the build
+uses a custom application ID, also pass `--package YOUR_APPLICATION_ID`. Repeat `--tag` to record
+the lifecycle, battery, connection-order, disconnect, override, or multi-call matrix cells exercised
+by that run; `--help` lists the controlled tag names.
 
 The script verifies that the package is installed and `MANAGE_ONGOING_CALLS` is allowed. It takes
 a baseline, prompts for one parked non-emergency call, then captures only new, structured
@@ -76,7 +81,7 @@ Each local, Git-ignored directory under `verification/device-runs/` contains:
 
 | File | Contents |
 |---|---|
-| `device.txt` | Scenario, UTC capture time, phone model, Android API/build fingerprint, app version, and authorization state. |
+| `device.txt` | Scenario/tags, UTC time, phone/build identity, app version, installed APK SHA-256, and authorization state. |
 | `trace.log` | Only new schema-1 structured routing records; prior sessions are removed. |
 | `report.txt` / `report.json` | Per-session status, confirmations, latencies, finish reason, and anomalies. |
 | `observations.txt` | Parked human checks for native HFP speaker/microphone and preserved Android Auto behavior. |
@@ -94,6 +99,19 @@ The analyzer reports malformed records, unsupported schemas, sequence gaps, time
 missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom
 endpoint is `INCOMPLETE`; a session cannot be `PASS` without a finish and exact target HFP audio
 confirmation.
+
+After collecting multiple runs, summarize the entire batch with:
+
+```sh
+python3 tools/summarize_qualification.py verification/device-runs
+python3 tools/summarize_qualification.py verification/device-runs --format json
+python3 tools/summarize_qualification.py verification/device-runs --require-ready
+```
+
+The summary counts only combined `PASS` runs toward the matrix, verifies that the phone build and
+exact installed APK hash stayed unchanged, lists missing cells, and calculates the approximate
+`3/n` upper failure-rate bound only when the batch has no failures. `--require-ready` exits nonzero
+until all required counts pass, without uploading any device evidence.
 
 ## Current device evidence
 
