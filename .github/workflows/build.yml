@@ -3,7 +3,13 @@ name: Build and test Android source
 on:
   workflow_dispatch:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -24,6 +30,7 @@ jobs:
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Test host tooling
         run: |
+          python3 tools/check_version_consistency.py
           python3 -m unittest discover -s tools/tests -p 'test_*.py'
           bash -n tools/*.sh verification/service-tests/run.sh
           pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "tools/install.ps1"), [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
@@ -34,7 +41,7 @@ jobs:
           REPORT_FILE: verification/current/apk-verification.txt
         run: bash tools/verify-apk.sh app/build/outputs/apk/debug/app-debug.apk org.carcallrouter.companion 5 0.3.0-beta.3 34 36 true
       - name: Upload debug APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: car-call-router-debug-apk
           path: |

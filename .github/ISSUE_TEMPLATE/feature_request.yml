@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a bounded improvement that preserves the safety model.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include phone numbers, Bluetooth addresses, ADB serials, credentials, or unreviewed logs.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the result, including when the app must refuse to act.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and verification
+      description: Which eligibility checks, tests, and physical observations would verify it?
+    validations:
+      required: true

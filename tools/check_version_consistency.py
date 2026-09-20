@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Fail when user-facing or release-critical version declarations drift."""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def capture(path: str, pattern: str, label: str) -> str:
+    match = re.search(pattern, read(path), re.MULTILINE | re.DOTALL)
+    if not match:
+        raise ValueError(f"{path}: could not find {label}")
+    return match.group(1).strip()
+
+
+def main() -> int:
+    try:
+        version_code = capture(
+            "app/build.gradle.kts",
+            r'gradleProperty\("APP_VERSION_CODE"\).*?\.getOrElse\((\d+)\)',
+            "default version code",
+        )
+        version_name = capture(
+            "app/build.gradle.kts",
+            r'gradleProperty\("APP_VERSION_NAME"\).*?\.orElse\("([^\"]+)"\)',
+            "default version name",
+        )
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 1
+
+    expected = {
+        "README.md": [f"APP_VERSION_CODE={version_code}", f"APP_VERSION_NAME={version_name}"],
+        "docs/CONFIGURATION.md": [f"`{version_code}`", f"`{version_name}`"],
+        "docs/PRODUCTION-READINESS.md": [f"`{version_name}` is a production-hardening beta"],
+        "docs/PUBLIC_RELEASE.md": [f"org.carcallrouter.companion {version_code} {version_name} 34 36 true"],
+        "tools/install.sh": [
+            f'VERSION_CODE="${{APP_VERSION_CODE:-{version_code}}}"',
+            f'VERSION_NAME="${{APP_VERSION_NAME:-{version_name}}}"',
+        ],
+        "tools/install.ps1": [
+            f"if (-not $VersionCode) {{ $VersionCode = '{version_code}' }}",
+            f"if (-not $VersionName) {{ $VersionName = '{version_name}' }}",
+        ],
+        ".github/workflows/build.yml": [
+            f"org.carcallrouter.companion {version_code} {version_name} 34 36 true"
+        ],
+        ".github/workflows/release.yml": [
+            f"org.carcallrouter.companion {version_code} {version_name} 34 36 false"
+        ],
+    }
+
+    errors: list[str] = []
+    for path, markers in expected.items():
+        content = read(path)
+        for marker in markers:
+            if marker not in content:
+                errors.append(f"{path}: missing current-version marker: {marker}")
+
+    if errors:
+        print("Version declarations are inconsistent:", file=sys.stderr)
+        for error in errors:
+            print(f"- {error}", file=sys.stderr)
+        return 1
+
+    print(f"Version declarations agree: versionCode={version_code}, versionName={version_name}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
