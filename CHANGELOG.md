@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-- Run the production Telecom-service harness under JUnit/JaCoCo and fail CI below 80% line or 70%
+- Run the production Telecom-service harness under JUnit/JaCoCo and fail CI below 90% line or 75%
   branch coverage for `RouterInCallService`, `AddressedTelecomRouter`, `RouterSettings`, and
-  `SessionBridge`; the pure routing core retains its independent 90% branch floor.
+  `SessionBridge`; the pure routing core enforces independent 95% line and 90% branch floors.
 - Upload HTML/XML coverage and JUnit reports from every CI run and publish exact core/service
   coverage totals in the GitHub job summary.
 - Expand the deterministic suite to 104 core JUnit tests and 73 production-service scenarios,

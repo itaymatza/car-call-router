@@ -9,8 +9,8 @@ bash tools/test-all.sh
 ```
 
 The script runs ktlint for every Kotlin module, the pure-JVM `:core` JUnit suite with its enforced
-90% branch-coverage gate, the production-service JUnit harness with enforced 80% line and 70%
-branch floors, and the Python trace/APK-tooling tests. The service coverage scope contains only
+95% line / 90% branch-coverage gates, the production-service JUnit harness with enforced 90% line
+and 75% branch floors, and the Python trace/APK-tooling tests. The service coverage scope contains only
 `RouterInCallService`, `AddressedTelecomRouter`, `RouterSettings`, and `SessionBridge`; framework
 stubs and test-driver code are excluded. The core suite includes named policy rules, 5,000 seeded
 traces (250,000 transitions), another 750,000 seeded callback/evidence transitions, 7,776
