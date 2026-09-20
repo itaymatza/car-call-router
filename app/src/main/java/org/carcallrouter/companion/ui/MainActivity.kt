@@ -190,8 +190,9 @@ class MainActivity : Activity() {
         syncing = false
 
         setupProgress.text =
-            getString(
-                R.string.setup_progress,
+            resources.getQuantityString(
+                R.plurals.setup_progress,
+                setup.completedSteps,
                 setup.completedSteps,
                 SetupState.REQUIRED_STEPS,
             )

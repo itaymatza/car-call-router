@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Resolve nine Android lint findings: avoid retaining the projection monitor through an async
+  query, use plural resources for setup progress, remove redundant drawing, and delete stale
+  compatibility strings.
 - Centralize plugin and library versions in a Gradle version catalog.
 - Enforce ktlint across all Kotlin modules, Kotlin compiler warnings-as-errors, and Android lint
   warnings-as-errors with a checked-in baseline; reformat the existing Kotlin source tree.
