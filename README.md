@@ -2,9 +2,11 @@
 
 [![Build](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml)
 [![CodeQL](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml)
+[![Latest beta](https://img.shields.io/github/v/release/itaymatza/car-call-router?include_prereleases&label=latest%20beta)](https://github.com/itaymatza/car-call-router/releases)
+[![Downloads](https://img.shields.io/github/downloads/itaymatza/car-call-router/total?label=downloads)](https://github.com/itaymatza/car-call-router/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[**Download APK - Android 14+ beta**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/car-call-router-0.3.0-beta.3-debug.apk)
+[**Download current APK**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/car-call-router-0.3.0-beta.3-debug.apk) · [All versions and release notes](https://github.com/itaymatza/car-call-router/releases)
 
 ![Car Call Router keeps Android Auto for navigation and media while a preferred Bluetooth HFP device handles calls.](docs/assets/social-preview.png)
 
@@ -103,6 +105,18 @@ The selected architecture is therefore a non-UI `InCallService` with a one-time 
 
 See the exact [authorization and troubleshooting guide](docs/AUTHORIZATION.md), [configuration guidance](docs/CONFIGURATION.md), [safety and privacy boundaries](docs/SAFETY.md), and [testing guidance](docs/TESTING.md).
 
+
+## Releases and downloads
+
+[GitHub Releases](https://github.com/itaymatza/car-call-router/releases) is the canonical version
+history. Each published version has release notes and durable downloadable files, so a GitHub
+account is not required just to download the APK.
+
+| Version | Channel | Downloads |
+| --- | --- | --- |
+| `0.3.0-beta.3` | Android 14+ debug beta | [APK](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/car-call-router-0.3.0-beta.3-debug.apk) · [SHA-256](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/car-call-router-0.3.0-beta.3-debug.apk.sha256) · [Verification report](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/apk-verification.txt) |
+
+New versions will appear automatically on the [Releases page](https://github.com/itaymatza/car-call-router/releases).
 
 ## Download and install the APK
 
