@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish a durable GitHub debug pre-release with a direct APK download, checksum, verification
+  report, provenance attestation, and clear signing/qualification limitations.
 - Improve repository discoverability with problem-oriented Android Auto, Bluetooth HFP, call-audio,
   and microphone-routing language plus a shareable social-preview asset.
 - Add problem-first onboarding, compatibility and FAQ documentation, structured community-health

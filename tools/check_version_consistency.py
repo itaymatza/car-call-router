@@ -39,7 +39,11 @@ def main() -> int:
         return 1
 
     expected = {
-        "README.md": [f"APP_VERSION_CODE={version_code}", f"APP_VERSION_NAME={version_name}"],
+        "README.md": [
+            f"APP_VERSION_CODE={version_code}",
+            f"APP_VERSION_NAME={version_name}",
+            f"releases/download/v{version_name}-debug/car-call-router-{version_name}-debug.apk",
+        ],
         "docs/CONFIGURATION.md": [f"`{version_code}`", f"`{version_name}`"],
         "docs/PRODUCTION-READINESS.md": [f"`{version_name}` is a production-hardening beta"],
         "docs/PUBLIC_RELEASE.md": [f"org.carcallrouter.companion {version_code} {version_name} 34 36 true"],
@@ -57,6 +61,13 @@ def main() -> int:
         ".github/workflows/release.yml": [
             f"org.carcallrouter.companion {version_code} {version_name} 34 36 false"
         ],
+        ".github/workflows/publish-debug-prerelease.yml": [
+            f"VERSION_CODE: '{version_code}'",
+            f"VERSION_NAME: {version_name}",
+            f"RELEASE_TAG: v{version_name}-debug",
+            f"APK_NAME: car-call-router-{version_name}-debug.apk",
+        ],
+        "docs/DEBUG-PRERELEASE-NOTES.md": [f"car-call-router-{version_name}-debug.apk"],
     }
 
     errors: list[str] = []

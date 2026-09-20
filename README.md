@@ -4,6 +4,8 @@
 [![CodeQL](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+[**Download APK - Android 14+ beta**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/car-call-router-0.3.0-beta.3-debug.apk)
+
 ![Car Call Router keeps Android Auto for navigation and media while a preferred Bluetooth HFP device handles calls.](docs/assets/social-preview.png)
 
 **Keep Android Auto for navigation and media while routing calls through the Bluetooth hands-free device you trust.**
@@ -60,7 +62,7 @@ The routing proof of concept has been confirmed by the project owner on the inte
 ## Public-repository posture
 
 
-The tracked tree contains no real target-device settings. Device names and Bluetooth addresses are selected at runtime and stored only in the application’s private local preferences. Generated APKs, IDE configuration, local SDK configuration, test logs, captures, and conventional key/certificate files are excluded by `.gitignore`. GitHub Actions compiles, unit-tests, and lints the source, then uploads only the generated debug APK as an expiring build artifact. The APK is not committed to the repository.
+The tracked tree contains no real target-device settings. Device names and Bluetooth addresses are selected at runtime and stored only in the application’s private local preferences. Generated APKs, IDE configuration, local SDK configuration, test logs, captures, and conventional key/certificate files are excluded by `.gitignore`. GitHub Actions compiles, unit-tests, lints, and verifies the source. Normal builds upload an expiring debug artifact; the explicitly labeled debug pre-release publishes a durable APK, digest, and verification report. No APK is committed to the repository.
 
 
 A public repository still exposes its files, commit history, issue/discussion content, and workflow logs. Do not commit exported logs, screenshots, pairing records, keystores, certificates, API keys, or private test notes. If the repository should not be forked, copied, or associated with its GitHub owner, use a private repository and consider a separately planned history rewrite.
@@ -104,21 +106,23 @@ See the exact [authorization and troubleshooting guide](docs/AUTHORIZATION.md), 
 
 ## Download and install the APK
 
-Each successful GitHub Actions run publishes the generated debug APK as a build artifact:
+The easiest path is the durable direct download:
 
-1. Sign in to GitHub and open [Build and test Android source](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml).
-2. Open the latest successful run for the **main** branch.
-3. In the **Artifacts** section, select **car-call-router-debug-apk** to download the ZIP archive.
-4. Extract the archive and transfer **app-debug.apk** to the Android device.
-5. Open **app-debug.apk** on the device. If Android prompts you, temporarily allow **Install unknown apps** for the browser or file manager you used, install the APK, and then disable that permission again.
+1. Download [**car-call-router-0.3.0-beta.3-debug.apk**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.3-debug/car-call-router-0.3.0-beta.3-debug.apk).
+2. Open the downloaded APK on the Android device.
+3. If Android prompts you, temporarily allow **Install unknown apps** for the browser or file
+   manager, install the APK, and then disable that permission again.
 
 If Android reports that the package cannot be updated or is incompatible with the installed version, uninstall the existing build first and retry. Uninstalling clears the app's local configuration.
 
-> This is a debug/test build for Android 14+. Installation alone does not grant protected Telecom access. Open the app and complete the one-time authorization flow below.
+> This is a durable debug/test pre-release for Android 14+, not a production-ready signed release.
+> Installation alone does not grant protected Telecom access. Open the app and complete the
+> one-time authorization flow below. See the [release notes](docs/DEBUG-PRERELEASE-NOTES.md) and
+> [production-readiness gates](docs/PRODUCTION-READINESS.md).
 
-There is not yet a durable public release. The Actions artifact expires and requires a GitHub
-sign-in. A signed pre-release remains gated on protected signing configuration and upgrade
-verification; see [production readiness](docs/PRODUCTION-READINESS.md).
+The [Actions build artifact](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml)
+remains available as a fallback for testing the newest `main` commit, but it requires a GitHub
+sign-in, downloads as a ZIP, and expires.
 
 ### Authorize call routing in the app
 
