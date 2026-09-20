@@ -1,6 +1,9 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ktlint)
 }
 
 val configuredApplicationId = providers.gradleProperty("APP_APPLICATION_ID")
@@ -53,11 +56,26 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
-    lint { abortOnError = true }
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        allWarningsAsErrors.set(true)
+    }
+}
+
+ktlint {
+    baseline.set(file("ktlint-baseline.xml"))
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
 }
 
 dependencies {
     implementation(project(":core"))
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit4)
 }

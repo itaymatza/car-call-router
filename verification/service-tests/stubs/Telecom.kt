@@ -54,12 +54,12 @@ open class InCallService:Context(){
  fun completeLatest(){pendingRequests.removeLastOrNull()?.receiver?.onResult(null)}
  fun failLatest(code:Int){pendingRequests.removeLastOrNull()?.receiver?.onError(CallEndpointException(code))}
  open fun onCreate(){}
- open fun onBind(i:Intent):IBinder?=object:IBinder{}
+ open fun onBind(intent:Intent):IBinder?=object:IBinder{}
  open fun onCallAdded(c:Call){}
  open fun onCallRemoved(c:Call){}
- open fun onCallEndpointChanged(e:CallEndpoint){}
- open fun onAvailableCallEndpointsChanged(e:MutableList<CallEndpoint>){}
- open fun onUnbind(i:Intent)=false
+ open fun onCallEndpointChanged(callEndpoint:CallEndpoint){}
+ open fun onAvailableCallEndpointsChanged(availableEndpoints:MutableList<CallEndpoint>){}
+ open fun onUnbind(intent:Intent)=false
  open fun onDestroy(){}
- open fun dump(fd:FileDescriptor,w:PrintWriter,args:Array<out String>){}
+ open fun dump(fd:FileDescriptor,writer:PrintWriter,args:Array<out String>){}
 }
