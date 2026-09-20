@@ -265,6 +265,31 @@
                 android:layout_marginTop="8dp" android:text="@string/export" />
         </LinearLayout>
 
+        <TextView style="@style/SectionTitle"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/about_title" />
+
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:background="@drawable/bg_card" android:elevation="1dp"
+            android:orientation="vertical" android:padding="18dp">
+            <TextView style="@style/BodyText"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/about_summary" />
+            <TextView android:id="@+id/app_metadata" style="@style/BodyText"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:textIsSelectable="true" />
+            <Button android:id="@+id/view_releases" style="@style/PrimaryButton"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="14dp" android:text="@string/view_releases" />
+            <Button android:id="@+id/view_source" style="@style/SecondaryButton"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="@string/view_source" />
+            <Button android:id="@+id/report_issue" style="@style/QuietButton"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:text="@string/report_issue" />
+        </LinearLayout>
+
         <TextView style="@style/BodyText" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="22dp"
             android:gravity="center" android:text="@string/privacy" android:textSize="12sp" />

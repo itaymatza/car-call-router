@@ -2,7 +2,7 @@
 
 ## Design objective
 
-**Call Route Companion** is an Android 14+ reference application that can make a deliberately bounded request to route an eligible call to a user-selected Bluetooth call endpoint. It is not a dialer, does not own the call lifecycle, and does not promise that a request will be honored. A successful `requestCallEndpointChange()` outcome means the request was accepted; only `onCallEndpointChanged()` verifies the final route. [1]
+**Car Call Router** is an Android 14+ reference application that can make a deliberately bounded request to route an eligible call to a user-selected Bluetooth call endpoint. It is not a dialer, does not own the call lifecycle, and does not promise that a request will be honored. A successful `requestCallEndpointChange()` outcome means the request was accepted; only `onCallEndpointChanged()` verifies the final route. [1]
 
 The design treats autonomous call-audio routing as a safety-sensitive feature. Its default posture is **fail closed**: when it cannot establish that a condition is safe, it makes no request or stops the current session.
 

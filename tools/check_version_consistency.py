@@ -40,6 +40,7 @@ def main() -> int:
 
     expected = {
         "README.md": [
+            "installed app and this repository are both named **Car Call Router**",
             f"APP_VERSION_CODE={version_code}",
             f"APP_VERSION_NAME={version_name}",
             f"releases/download/v{version_name}-debug/car-call-router-{version_name}-debug.apk",
@@ -68,6 +69,21 @@ def main() -> int:
             f"APK_NAME: car-call-router-{version_name}-debug.apk",
         ],
         "docs/DEBUG-PRERELEASE-NOTES.md": [f"car-call-router-{version_name}-debug.apk"],
+        "app/src/main/AndroidManifest.xml": [
+            'android:description="@string/app_description"',
+            'android:icon="@mipmap/ic_launcher"',
+            'android:label="@string/app_name"',
+            'android:roundIcon="@mipmap/ic_launcher_round"',
+            'android:usesCleartextTraffic="false"',
+        ],
+        "app/src/main/res/values/strings.xml": [
+            '<string name="app_name">Car Call Router</string>',
+            "https://github.com/itaymatza/car-call-router/releases",
+        ],
+        "fastlane/metadata/android/en-US/title.txt": ["Car Call Router"],
+        f"fastlane/metadata/android/en-US/changelogs/{version_code}.txt": [
+            f"Version {version_name}",
+        ],
     }
 
     errors: list[str] = []

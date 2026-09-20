@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Align the installed app with the Car Call Router product identity, add Android application
+  metadata and an adaptive themed icon, expose releases/source/support inside the app, and add
+  reusable Android store-listing metadata with automated drift checks.
 - Make GitHub Releases the prominent version and download hub, with latest-version and download
   badges plus direct APK, checksum, verification-report, and full-history links.
 - Publish a durable GitHub debug pre-release with a direct APK download, checksum, verification

@@ -572,7 +572,7 @@ class RouterInCallService :
         writer: PrintWriter,
         args: Array<out String>,
     ) {
-        writer.println("Call Route Companion (redacted)")
+        writer.println("Car Call Router (redacted)")
         writer.println(SessionBridge.status)
         writer.println(RouterLog.recentText())
     }

@@ -12,7 +12,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "Call Route Companion"
+rootProject.name = "Car Call Router"
 include(":app")
 include(":core")
 include(":verification:service-tests")
