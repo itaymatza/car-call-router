@@ -1,0 +1,50 @@
+name: Device compatibility report
+description: Report a parked test result for one phone, projection unit, and call endpoint.
+title: "[Compatibility]: "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: Test only while parked. Review all diagnostic data before sharing it.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: 0.3.0-beta.3
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone model family and Android version
+      placeholder: Samsung Galaxy, Android 17 / One UI version
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Projection and target hands-free setup
+      placeholder: Aftermarket Android Auto plus native vehicle Bluetooth
+    validations:
+      required: true
+  - type: dropdown
+    id: manual-route
+    attributes:
+      label: Did manual in-call selection route both speaker and microphone correctly?
+      options: ["Yes", "No", "Not tested"]
+    validations:
+      required: true
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: Scenarios and results
+      description: Include incoming/outgoing, connection order, repeat count, and redacted reason codes.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed phone numbers, Bluetooth addresses, ADB serials, account details, and unreviewed system data.
+          required: true

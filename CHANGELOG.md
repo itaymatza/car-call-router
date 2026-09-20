@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add problem-first onboarding, compatibility and FAQ documentation, structured community-health
+  files, duplicate-run cancellation, dependency review, and an automated version-consistency gate.
 - Pin signed releases to an expected certificate SHA-256, fail closed on signing-key drift, and
   leave only the intentionally deferred target-SDK warning in the Android lint baseline.
 - Record the exact installed APK hash and controlled qualification tags for parked device runs, and

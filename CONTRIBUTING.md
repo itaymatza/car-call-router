@@ -16,6 +16,12 @@ Run the deterministic suites with a JDK 17+ and Kotlin compiler installed:
 bash tools/test-all.sh
 ```
 
+Before changing a release version, update every release-critical declaration and run:
+
+```sh
+python3 tools/check_version_consistency.py
+```
+
 When an Android SDK is available, also run:
 
 ```sh

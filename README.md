@@ -1,10 +1,35 @@
 # Call Route Companion
 
+[![Build](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml)
+[![CodeQL](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**A generic Android 14+ reference implementation for a safety-bounded, user-configured call-audio route request.**
+**Keep Android Auto for navigation and media while routing calls through the Bluetooth hands-free device you trust.**
 
+## The problem
 
-Call Route Companion is a Kotlin and framework-XML Android utility. When an eligible cellular call makes a fresh transition to `ACTIVE`, it asks Android Telecom to select a **current, user-chosen Bluetooth call endpoint**. It does not change Android Auto media/navigation routing, become the default dialer, or manipulate `AudioManager`.
+Some phones connected to both Android Auto and a vehicle's native Bluetooth system send calls to
+the Android Auto head unit. On aftermarket units, that can mean a poor microphone even when the
+vehicle's native hands-free system works well.
+
+Call Route Companion automates the same choice a user can make from the active-call audio selector:
+when an eligible cellular call becomes active, it asks Android Telecom to use a **current,
+user-chosen Bluetooth call endpoint**. Android Auto remains connected for navigation and media.
+The app does not become the default dialer or manipulate general media routing through
+`AudioManager`.
+
+## Is this for me?
+
+It may fit when all of these are true:
+
+- the phone runs Android 14 or newer;
+- Android Auto and the preferred Bluetooth hands-free device are connected at the same time;
+- manually choosing that Bluetooth device during a call already fixes both speaker and microphone;
+- a one-time ADB authorization is acceptable.
+
+It is not a fix for pairing failures, broken Bluetooth hardware, media-routing problems, emergency
+calls, or systems where the preferred device is absent from Android's in-call audio selector. See
+the [compatibility guide](docs/DEVICE-COMPATIBILITY.md) and [FAQ](docs/FAQ.md) before installing.
 
 
 > This repository contains source code, deterministic tests, and a build workflow. The tracked source tree does **not** include device configurations, Bluetooth addresses, signing materials, APKs, or exported logs. Successful GitHub Actions runs publish a generated debug APK as a downloadable build artifact.
@@ -73,6 +98,10 @@ If Android reports that the package cannot be updated or is incompatible with th
 
 > This is a debug/test build for Android 14+. Installation alone does not grant protected Telecom access. Open the app and complete the one-time authorization flow below.
 
+There is not yet a durable public release. The Actions artifact expires and requires a GitHub
+sign-in. A signed pre-release remains gated on protected signing configuration and upgrade
+verification; see [production readiness](docs/PRODUCTION-READINESS.md).
+
 ### Authorize call routing in the app
 
 1. Pair the intended car or headset in Android's Bluetooth settings and keep it nearby and powered on.
@@ -90,7 +119,12 @@ certificate across hosted runners; the signed workflow also pins the expected ce
 ## Project documentation
 
 
-Read the [architecture reference](docs/ARCHITECTURE.md) for the component boundaries and routing state machine. The [public-release guide](docs/PUBLIC_RELEASE.md) explains what remains visible in a public repository and how to review a change before pushing it. Contributors should follow [CONTRIBUTING.md](CONTRIBUTING.md); suspected security, privacy, or safety vulnerabilities belong in the private reporting path described by [SECURITY.md](SECURITY.md), not a public issue.
+Start with the [FAQ](docs/FAQ.md) and [compatibility guide](docs/DEVICE-COMPATIBILITY.md). Read the
+[architecture reference](docs/ARCHITECTURE.md) for the component boundaries and routing state
+machine. The [public-release guide](docs/PUBLIC_RELEASE.md) explains what remains visible in a
+public repository and how to review a change before pushing it. Contributors should follow
+[CONTRIBUTING.md](CONTRIBUTING.md); suspected security, privacy, or safety vulnerabilities belong
+in the private reporting path described by [SECURITY.md](SECURITY.md), not a public issue.
 
 
 ## Safety model and limitations
