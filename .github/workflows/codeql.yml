@@ -23,7 +23,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-      - uses: github/codeql-action/init@3ea06614dafe36dec890db3446326e0d40ce53d4
+      - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63
         with:
           languages: java-kotlin
       - name: Install SDK packages
