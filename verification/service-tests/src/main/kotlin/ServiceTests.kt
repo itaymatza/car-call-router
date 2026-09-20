@@ -5,8 +5,13 @@ import android.os.TestQueue
 import android.telecom.Call
 import android.telecom.CallEndpoint
 import android.telecom.CallEndpointException
-import org.carcallrouter.companion.*
-import org.carcallrouter.companion.telecom.*
+import org.carcallrouter.companion.Access
+import org.carcallrouter.companion.ProjectionMonitor
+import org.carcallrouter.companion.RouterLog
+import org.carcallrouter.companion.RouterSettings
+import org.carcallrouter.companion.SessionBridge
+import org.carcallrouter.companion.telecom.HfpMonitor
+import org.carcallrouter.companion.telecom.RouterInCallService
 import java.io.File
 
 // Real production service + routing policy; substituted Android/framework boundaries.

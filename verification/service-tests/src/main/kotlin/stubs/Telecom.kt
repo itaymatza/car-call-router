@@ -134,9 +134,9 @@ open class InCallService : Context() {
 
     open fun onBind(intent: Intent): IBinder? = object : IBinder {}
 
-    open fun onCallAdded(c: Call) {}
+    open fun onCallAdded(call: Call) {}
 
-    open fun onCallRemoved(c: Call) {}
+    open fun onCallRemoved(call: Call) {}
 
     open fun onCallEndpointChanged(callEndpoint: CallEndpoint) {}
 
