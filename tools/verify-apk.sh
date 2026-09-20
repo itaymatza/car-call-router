@@ -68,6 +68,15 @@ done
 SIGNATURE="$("$APKSIGNER" verify --verbose --print-certs "$APK")" || fail "signature rejected by apksigner"
 CERT_SHA256="$(awk '/^Signer #1 certificate SHA-256 digest: / {sub(/^Signer #1 certificate SHA-256 digest: /, ""); print; exit}' <<<"$SIGNATURE")"
 [[ -n "$CERT_SHA256" ]] || fail "certificate SHA-256 digest was not reported"
+EXPECTED_CERT_SHA256="${EXPECTED_CERT_SHA256:-}"
+if [[ -n "$EXPECTED_CERT_SHA256" ]]; then
+    NORMALIZED_EXPECTED_CERT="$(tr -d '[:space:]:' <<<"$EXPECTED_CERT_SHA256" | tr '[:upper:]' '[:lower:]')"
+    NORMALIZED_ACTUAL_CERT="$(tr -d '[:space:]:' <<<"$CERT_SHA256" | tr '[:upper:]' '[:lower:]')"
+    [[ "$NORMALIZED_EXPECTED_CERT" =~ ^[0-9a-f]{64}$ ]] \
+        || fail "EXPECTED_CERT_SHA256 must contain exactly 64 hexadecimal characters"
+    [[ "$NORMALIZED_ACTUAL_CERT" == "$NORMALIZED_EXPECTED_CERT" ]] \
+        || fail "signing certificate does not match the pinned SHA-256 digest"
+fi
 if command -v sha256sum >/dev/null; then
     APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
 else

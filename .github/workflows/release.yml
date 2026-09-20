@@ -29,11 +29,13 @@ jobs:
           BETA_KEYSTORE_PASSWORD: ${{ secrets.BETA_KEYSTORE_PASSWORD }}
           BETA_KEY_ALIAS: ${{ secrets.BETA_KEY_ALIAS }}
           BETA_KEY_PASSWORD: ${{ secrets.BETA_KEY_PASSWORD }}
+          BETA_SIGNING_CERT_SHA256: ${{ vars.BETA_SIGNING_CERT_SHA256 }}
         run: |
           test -n "$BETA_KEYSTORE_BASE64"
           test -n "$BETA_KEYSTORE_PASSWORD"
           test -n "$BETA_KEY_ALIAS"
           test -n "$BETA_KEY_PASSWORD"
+          test -n "$BETA_SIGNING_CERT_SHA256"
       - name: Install SDK packages
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Materialize ephemeral signing keystore
@@ -62,6 +64,7 @@ jobs:
       - name: Verify signed APK identity
         env:
           REPORT_FILE: verification/current/apk-release-verification.txt
+          EXPECTED_CERT_SHA256: ${{ vars.BETA_SIGNING_CERT_SHA256 }}
         run: >-
           bash tools/verify-apk.sh
           app/build/outputs/apk/release/app-release.apk

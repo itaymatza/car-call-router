@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pin signed releases to an expected certificate SHA-256, fail closed on signing-key drift, and
+  leave only the intentionally deferred target-SDK warning in the Android lint baseline.
 - Record the exact installed APK hash and controlled qualification tags for parked device runs, and
   add an offline batch report that enforces build consistency and production-matrix counts.
 - Resolve nine Android lint findings: avoid retaining the projection monitor through an async

@@ -39,12 +39,14 @@ esac
 APKSIGNER = r'''#!/usr/bin/env bash
 set -eu
 echo 'Verifies'
-echo 'Signer #1 certificate SHA-256 digest: 001122'
+echo 'Signer #1 certificate SHA-256 digest: 0000000000000000000000000000000000000000000000000000000000000011'
 '''
+
+CERT_SHA256 = "0" * 62 + "11"
 
 
 class VerifyApkTest(unittest.TestCase):
-    def run_verifier(self, package="org.carcallrouter.companion"):
+    def run_verifier(self, package="org.carcallrouter.companion", expected_cert=None):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -58,6 +60,8 @@ class VerifyApkTest(unittest.TestCase):
         environment = os.environ.copy()
         environment["ANDROID_BUILD_TOOLS"] = str(root)
         environment["REPORT_FILE"] = str(report)
+        if expected_cert is not None:
+            environment["EXPECTED_CERT_SHA256"] = expected_cert
         result = subprocess.run(
             ["bash", str(SCRIPT), str(apk), package, "5", "0.3.0-beta.3", "34", "36", "true"],
             text=True,
@@ -72,8 +76,17 @@ class VerifyApkTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         content = report.read_text(encoding="utf-8")
         self.assertIn("verified=true", content)
-        self.assertIn("certificate_sha256=001122", content)
+        self.assertIn(f"certificate_sha256={CERT_SHA256}", content)
         self.assertRegex(content, r"apk_sha256=[0-9a-f]{64}")
+
+    def test_matching_pinned_certificate_is_accepted(self):
+        result, _ = self.run_verifier(expected_cert=CERT_SHA256.upper())
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_mismatched_pinned_certificate_fails_closed(self):
+        result, _ = self.run_verifier(expected_cert="f" * 64)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("does not match the pinned", result.stderr)
 
     def test_identity_mismatch_fails_closed(self):
         result, _ = self.run_verifier(package="example.wrong")

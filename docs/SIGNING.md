@@ -6,7 +6,7 @@ signed by a different certificate, and uninstalling clears local configuration a
 requires the protected AppOps authorization again.
 
 The `Build signed beta APK` workflow uses a dedicated `beta-signing` GitHub environment. It refuses
-to build unless all four environment secrets are present:
+to build unless all four environment secrets and the pinned certificate variable are present:
 
 | Secret | Value |
 |---|---|
@@ -15,13 +15,27 @@ to build unless all four environment secrets are present:
 | `BETA_KEY_ALIAS` | Alias of the signing key |
 | `BETA_KEY_PASSWORD` | Private-key password |
 
+Set the environment variable `BETA_SIGNING_CERT_SHA256` to the signing certificate's 64-character
+SHA-256 digest. It is intentionally a variable rather than a secret because a certificate
+fingerprint is public release identity. Obtain it on the trusted machine and remove separators:
+
+```sh
+keytool -list -v -J-Duser.language=en -keystore car-call-router-beta.jks -alias YOUR_ALIAS \
+  | sed -n 's/.*SHA256: //p' | tr -d ':' | tr 'A-F' 'a-f'
+```
+
+The release workflow compares the built APK against this pinned digest before publishing anything.
+This prevents a replaced or accidentally regenerated keystore from silently changing update
+identity.
+
 Create the signing key once on a trusted offline machine. Keep an encrypted backup outside GitHub;
 losing the key makes future in-place updates impossible. Never commit the keystore, its Base64
 encoding, passwords, certificate export, or command output containing secrets.
 
-Configure the four secrets under **Settings → Environments → beta-signing**. Restrict deployments
-to the protected branch and, if appropriate, require reviewer approval. Run the workflow manually
-for beta builds or push an annotated `v*` tag for a GitHub release. The workflow emits:
+Configure the four secrets and certificate variable under **Settings → Environments →
+beta-signing**. Restrict deployments to the protected branch and, if appropriate, require reviewer
+approval. Run the workflow manually for beta builds or push an annotated `v*` tag for a GitHub
+release. The workflow emits:
 
 - the non-debuggable signed APK;
 - an APK and certificate verification record;
