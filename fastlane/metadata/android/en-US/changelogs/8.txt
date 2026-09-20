@@ -1,0 +1,5 @@
+Version 0.3.0-beta.6
+
+- Correlate endpoint callbacks with expiring, call-generation-bound request tickets.
+- Distinguish Samsung startup replays from genuine external endpoint requests.
+- Add richer privacy-safe session diagnostics and unstable-route detection.
