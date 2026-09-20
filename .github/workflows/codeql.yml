@@ -30,4 +30,4 @@ jobs:
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Build analyzed source
         run: bash gradlew :app:assembleDebug --stacktrace --console=plain
-      - uses: github/codeql-action/analyze@3ea06614dafe36dec890db3446326e0d40ce53d4
+      - uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63
