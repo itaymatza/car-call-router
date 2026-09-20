@@ -67,6 +67,8 @@ android {
     lint {
         abortOnError = true
         baseline = file("lint-baseline.xml")
+        // Dependabot owns version-availability reporting; lint still enforces source findings.
+        disable += setOf("AndroidGradlePluginVersion", "NewerVersionAvailable")
         warningsAsErrors = true
     }
 }

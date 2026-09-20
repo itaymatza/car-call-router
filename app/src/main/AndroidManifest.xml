@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
-    <uses-feature android:name="android.hardware.telephony" android:required="true" />
+    <!-- A device without telephony cannot satisfy the SIM-backed call safety gate. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="true"
+        tools:ignore="UnnecessaryRequiredFeature" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- getPhoneAccount requires this to classify a call as SIM-backed. -->
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />

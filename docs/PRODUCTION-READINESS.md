@@ -44,8 +44,9 @@
 - Pass the complete Gradle build, JVM tests, service tests, Android lint, and APK verification for
   the release commit; repeat the APK gate against the separately signed, non-debuggable release.
 - Verify upgrade and fresh-install flows, including AppOps authorization detection, revocation, reboot, process death, and settings preservation.
-- Configure and protect the `beta-signing` environment secrets, run the signed workflow, and prove
-  that an update signed with the same key retains application data and the AppOps authorization.
+- Configure and protect the `beta-signing` environment secrets and pinned certificate variable,
+  run the signed workflow, and prove that an update signed with the same key retains application
+  data and the AppOps authorization.
 - Confirm the privacy and safety documentation matches the final behavior and that no real device identifiers or private logs are committed.
 
 ## Stability rule

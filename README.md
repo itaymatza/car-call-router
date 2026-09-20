@@ -85,7 +85,7 @@ See the exact [authorization and troubleshooting guide](docs/AUTHORIZATION.md), 
 
 For repeatable in-place beta upgrades, configure the protected signed build described in
 [stable beta signing](docs/SIGNING.md). Ordinary GitHub debug artifacts do not have a stable
-certificate across hosted runners.
+certificate across hosted runners; the signed workflow also pins the expected certificate digest.
 
 ## Project documentation
 
