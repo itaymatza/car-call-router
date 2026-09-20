@@ -306,7 +306,11 @@ class RouterInCallService :
             "id" to RouterLog.deviceId(callEndpoint.identifier.toString()),
             "origin" to if (own) "self" else "external",
         )
-        if (sessionStarted && !own) {
+        // Samsung/Telecom can replay its call-start endpoint choice alongside the ACTIVE
+        // transition. At that point no user override can be inferred: the callback may describe
+        // the route that the platform selected while setting up the call. Only treat another
+        // request as an override after this guard has submitted a request or verified the target.
+        if (guardHasActed() && !own) {
             suspendSessionFromEvent(
                 "Another in-call UI requested an endpoint; respecting possible user override",
                 RoutingPolicy.ReasonCode.EXTERNAL_ENDPOINT_REQUEST,
