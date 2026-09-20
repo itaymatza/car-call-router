@@ -1,10 +1,16 @@
-# Call Route Companion
+# Car Call Router for Android Auto and Bluetooth HFP
 
 [![Build](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/build.yml)
 [![CodeQL](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml/badge.svg)](https://github.com/itaymatza/car-call-router/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+![Car Call Router keeps Android Auto for navigation and media while a preferred Bluetooth HFP device handles calls.](docs/assets/social-preview.png)
+
 **Keep Android Auto for navigation and media while routing calls through the Bluetooth hands-free device you trust.**
+
+The installed app is named **Call Route Companion**. This repository is also described as
+**Car Call Router** so people searching for an Android Auto call-audio or Bluetooth microphone
+routing fix can find it.
 
 ## The problem
 
@@ -17,6 +23,18 @@ when an eligible cellular call becomes active, it asks Android Telecom to use a 
 user-chosen Bluetooth call endpoint**. Android Auto remains connected for navigation and media.
 The app does not become the default dialer or manipulate general media routing through
 `AudioManager`.
+
+### Common symptoms this project targets
+
+- Android Auto uses the wrong or poor-quality microphone for phone calls.
+- Calls go through an aftermarket Android Auto head unit instead of the car's native Bluetooth.
+- You want Android Auto to stay connected for maps and music while another Bluetooth HFP device
+  handles call speaker and microphone audio.
+- Manually selecting the preferred car Bluetooth device during every call works, but you want that
+  call-audio selection automated.
+
+If those phrases describe your problem, start with [Is this for me?](#is-this-for-me) and the
+[compatibility guide](docs/DEVICE-COMPATIBILITY.md).
 
 ## Is this for me?
 

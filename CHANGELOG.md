@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Improve repository discoverability with problem-oriented Android Auto, Bluetooth HFP, call-audio,
+  and microphone-routing language plus a shareable social-preview asset.
 - Add problem-first onboarding, compatibility and FAQ documentation, structured community-health
   files, duplicate-run cancellation, dependency review, and an automated version-consistency gate.
 - Pin signed releases to an expected certificate SHA-256, fail closed on signing-key drift, and
