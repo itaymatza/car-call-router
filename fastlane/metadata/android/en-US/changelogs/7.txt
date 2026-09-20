@@ -1,0 +1,5 @@
+Version 0.3.0-beta.5
+
+- Fix automatic routing when Samsung/Telecom replays its call-start endpoint request.
+- Preserve genuine post-action user override protection.
+- Add regression coverage for the observed Android 17 callback ordering.
