@@ -16,6 +16,7 @@ private fun snapshot(
     projection: Boolean? = true,
     targetHfpConnected: Boolean? = true,
     targetHfpAudio: Boolean? = false,
+    selectorRecoveryAvailable: Boolean? = false,
     targetAvailable: Boolean? = true,
     route: Route = Route.COMPETING_DEVICE,
 ) = Snapshot(
@@ -28,6 +29,7 @@ private fun snapshot(
     projection = projection,
     targetHfpConnected = targetHfpConnected,
     targetHfpAudio = targetHfpAudio,
+    selectorRecoveryAvailable = selectorRecoveryAvailable,
     targetAvailable = targetAvailable,
     endpointRevision = 1,
     route = route,
@@ -91,6 +93,57 @@ object PolicyCases {
                 check(p.requests == 1)
                 check(p.phase == Phase.FAILED)
                 check(p.reasonCode == ReasonCode.TARGET_AUDIO_NOT_CONFIRMED)
+            },
+            "split-brain failure restores the manual BMW selector once" to {
+                val p = policy(actionWindowMs = 4_000)
+                check(p.evaluate(snapshot(0, route = Route.TARGET)).requestTarget)
+                val recovery =
+                    p.evaluate(
+                        snapshot(
+                            4_000,
+                            route = Route.TARGET,
+                            targetHfpAudio = false,
+                            selectorRecoveryAvailable = true,
+                        ),
+                    )
+                check(recovery.restoreSelector)
+                check(!recovery.requestTarget)
+                check(p.requests == 1)
+                check(p.selectorRecoveries == 1)
+                p.selectorRecoverySucceeded()
+                check(p.reasonCode == ReasonCode.SELECTOR_RECOVERY_ACCEPTED)
+                p.evaluate(snapshot(4_100, route = Route.COMPETING_DEVICE, selectorRecoveryAvailable = true))
+                check(p.phase == Phase.FAILED)
+                check(p.reasonCode == ReasonCode.SELECTOR_RECOVERY_CONFIRMED)
+            },
+            "selector recovery never guesses or loops" to {
+                listOf(
+                    snapshot(4_000, route = Route.COMPETING_DEVICE, selectorRecoveryAvailable = true),
+                    snapshot(4_000, route = Route.TARGET, selectorRecoveryAvailable = false),
+                    snapshot(4_000, route = Route.TARGET, selectorRecoveryAvailable = null),
+                ).forEach { finalSnapshot ->
+                    val p = policy(actionWindowMs = 4_000)
+                    p.evaluate(snapshot(0))
+                    check(!p.evaluate(finalSnapshot).restoreSelector)
+                    check(p.phase == Phase.FAILED)
+                    check(p.selectorRecoveries == 0)
+                }
+
+                val timeout = policy(actionWindowMs = 4_000)
+                timeout.evaluate(snapshot(0, route = Route.TARGET))
+                check(
+                    timeout.evaluate(snapshot(4_000, route = Route.TARGET, selectorRecoveryAvailable = true)).restoreSelector,
+                )
+                check(!timeout.evaluate(snapshot(6_500, route = Route.TARGET, selectorRecoveryAvailable = true)).restoreSelector)
+                check(timeout.reasonCode == ReasonCode.SELECTOR_RECOVERY_NOT_CONFIRMED)
+                check(timeout.selectorRecoveries == 1)
+
+                val rejected = policy(actionWindowMs = 4_000)
+                rejected.evaluate(snapshot(0, route = Route.TARGET))
+                rejected.evaluate(snapshot(4_000, route = Route.TARGET, selectorRecoveryAvailable = true))
+                rejected.selectorRecoveryFailed()
+                check(rejected.reasonCode == ReasonCode.SELECTOR_RECOVERY_FAILED)
+                check(rejected.selectorRecoveries == 1)
             },
             "accepted Telecom request still needs BMW SCO" to {
                 val p = policy(actionWindowMs = 1_000)

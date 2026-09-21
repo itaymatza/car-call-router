@@ -211,6 +211,53 @@ fun main(args: Array<String>) {
                     check(SessionBridge.status.contains("TARGET_AUDIO_NOT_CONFIRMED"))
                 }
             },
+            "split_brain_failure_restores_phone_selector_once" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    countEquals(f, 1)
+                    TestQueue.advanceTo(4_500)
+                    countEquals(f, 2)
+                    check(f.service.issuedRequests[0].second == TARGET_ID.toString())
+                    check(f.service.issuedRequests[1].second == COMPETING_ID.toString())
+                    check(SessionBridge.status.contains("RECOVERING_SELECTOR"))
+                    check(SessionBridge.status.contains("selectorRecoveries=1"))
+                    f.route(competing)
+                    check(SessionBridge.status.contains("SELECTOR_RECOVERY_CONFIRMED"))
+                    TestQueue.advanceTo(10_000)
+                    countEquals(f, 2)
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" && it.second.contains("event=SELECTOR_RECOVERY_SUBMITTED")
+                        },
+                    )
+                }
+            },
+            "selector_recovery_requires_exact_verified_split_brain" to {
+                Fixture(initialEndpoint = target, available = listOf(target, other)).use { f ->
+                    f.activateAndSettle()
+                    TestQueue.advanceTo(4_500)
+                    countEquals(f, 1)
+                }
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    f.route(speaker)
+                    TestQueue.advanceTo(4_500)
+                    countEquals(f, 1)
+                }
+            },
+            "selector_recovery_rejection_never_retries" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.service.autoCompleteRequests = false
+                    f.activateAndSettle()
+                    TestQueue.advanceTo(4_500)
+                    countEquals(f, 2)
+                    f.service.failLatest(CallEndpointException.ERROR_UNSPECIFIED)
+                    f.flush()
+                    check(SessionBridge.status.contains("SELECTOR_RECOVERY_FAILED"))
+                    TestQueue.advanceTo(10_000)
+                    countEquals(f, 2)
+                }
+            },
             "manual_one_shot_bypasses_toggle_and_projection" to {
                 Fixture(enabled = false, projected = false).use { f ->
                     f.activateWithoutSettling()

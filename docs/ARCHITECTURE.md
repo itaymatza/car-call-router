@@ -20,7 +20,7 @@ compiled implementation, preventing either harness from maintaining a private co
 | `ProjectionMonitor` | Reads the AndroidX host-provider state for optional projection gating. | Missing or unknown evidence freezes requests; confirmed loss stops an active guard. It does not infer state from names, Wi-Fi, or process activity. |
 | `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | It starts only for verified projection or an explicit manual test, stops on confirmed projection loss, and re-queries profile state rather than trusting broadcast extras. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
-| `RoutingPolicy` (`:core`) | Pure Kotlin state machine that decides whether the one-shot routing transaction is permitted, delayed, verified, or stopped. | Waits for call-start routing to settle, permits exactly one automatic request, and requires stable target HFP/SCO audio before success. |
+| `RoutingPolicy` (`:core`) | Pure Kotlin state machine that decides whether the one-shot routing transaction is permitted, delayed, verified, or stopped. | Waits for call-start routing to settle, permits exactly one automatic BMW request, requires stable target HFP/SCO audio, and can restore a provably stale Samsung selector once. |
 | `RoutingTrace` | Emits versioned, redacted, session-sequenced evidence with stable reason codes and elapsed timings. | Separates a Telecom endpoint observation from exact target HFP audio/SCO evidence; it does not claim physical microphone quality. |
 | `EndpointIdentity` and `AddressedTelecomRouter` | Resolve the saved paired target against live API 34+ endpoints and issue the request. | Uses only callback-supplied endpoint objects. Unique label or one-to-one HFP topology is required; ambiguity fails closed. |
 | `RouterInCallService` | Coordinates Telecom, route, endpoint, projection, HFP, and call callbacks on the main thread. | Safety-relevant events are latched before deferred evaluation so that later callbacks cannot erase them. |
@@ -33,7 +33,8 @@ compiled implementation, preventing either harness from maintaining a private co
 4. After a 500 ms post-ACTIVE settling delay, `AddressedTelecomRouter` submits the exact current target callback object once, even when Telecom already displays BMW but actual SCO belongs elsewhere.
 5. A matching endpoint produces diagnostic `TELECOM_ENDPOINT_CONFIRMED`, but neither an accepted outcome nor the endpoint display proves that physical call audio moved.
 6. Only the exact configured Bluetooth address owning HFP/SCO continuously for the confirmation interval produces `TARGET_HFP_AUDIO_CONFIRMED` and releases the transaction.
-7. The transaction never retries or reasserts. API 37 endpoint-request callbacks are recorded but do not control the policy because Samsung also emits them during call startup. Manual Dialer changes remain system-owned.
+7. The transaction never retries or reasserts BMW. API 37 endpoint-request callbacks are recorded but do not control the policy because Samsung also emits them during call startup. Manual Dialer changes remain system-owned.
+8. If the transaction expires in the exact captured split state—Telecom displays BMW while the configured Android Auto endpoint still owns SCO—the app makes one bounded selector-recovery request for that already-active Android Auto endpoint. This reconciles Samsung's display with physical audio so BMW becomes selectable again. It is not a second BMW attempt and is never repeated.
 
 ## State machine
 
@@ -45,13 +46,14 @@ compiled implementation, preventing either harness from maintaining a private co
 | `WAITING` | A fresh active call was observed; prerequisites are being checked. |
 | `VERIFYING` | A bounded routing request was submitted and callback evidence is awaited. |
 | `STABILIZING` | Target HFP/SCO audio was observed and must remain stable for the confirmation interval. |
+| `RECOVERING_SELECTOR` | BMW audio failed in a verified split state; one Android Auto display-restoration request is pending so manual BMW selection remains possible. |
 | `RELEASED` | Stable target HFP/SCO audio was confirmed; user and system routing own the remaining call. |
 | `SUSPENDED` | A user choice or safety-relevant event stopped further requests for this call session. |
 | `FAILED` | The bounded window or request budget expired, or Telecom threw an exception. |
 
 ## Automatic versus manual mode
 
-The master toggle is off by default. Automatic mode requires the projection-host gate and a fresh active transition. The manual one-shot exists for a parked, controlled test while the service is already bound. It retains Telecom authorization, runtime permission, SIM/non-emergency classification, single-call, target-availability, and target-identity checks. It performs no more than one request in its verification window.
+The master toggle is off by default. Automatic mode requires the projection-host gate and a fresh active transition. The manual one-shot exists for a parked, controlled test while the service is already bound. It retains Telecom authorization, runtime permission, SIM/non-emergency classification, single-call, target-availability, and target-identity checks. It performs no more than one BMW request in its verification window. A failed split-brain transaction may additionally perform the single selector-recovery request described above.
 
 ## Platform compatibility
 

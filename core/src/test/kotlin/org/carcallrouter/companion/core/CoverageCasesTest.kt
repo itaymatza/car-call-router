@@ -126,6 +126,7 @@ class CoverageCasesTest {
         projection = true,
         targetHfpConnected = true,
         targetHfpAudio = targetHfpAudio,
+        selectorRecoveryAvailable = false,
         targetAvailable = true,
         endpointRevision = 1,
         route = route,

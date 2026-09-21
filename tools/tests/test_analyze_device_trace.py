@@ -53,6 +53,21 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual("INCOMPLETE", summaries[0].status)
         self.assertFalse(summaries[0].hfp_audio_confirmed)
 
+    def test_selector_recovery_is_reported_without_masking_route_failure(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 500, "REQUEST_SUBMITTED", "attempt=1")
+            + line("abc", 3, 4500, "SELECTOR_RECOVERY_SUBMITTED", "displayed_route=TARGET target_sco=false")
+            + line("abc", 4, 4600, "ENDPOINT_CHANGED", "route=COMPETING_DEVICE")
+            + line("abc", 5, 5000, "SESSION_FINISHED",
+                   "phase=FAILED reason=SELECTOR_RECOVERY_CONFIRMED termination=call_removed "
+                   "best_confirmation=TELECOM_ENDPOINT final_route=COMPETING_DEVICE")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("FAIL", summaries[0].status)
+        self.assertEqual(1, summaries[0].requests)
+        self.assertEqual(1, summaries[0].selector_recoveries)
+
     def test_hfp_audio_passes_when_telecom_display_remains_split_brain(self):
         content = (
             line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
