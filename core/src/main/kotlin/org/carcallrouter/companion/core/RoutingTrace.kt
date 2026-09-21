@@ -85,6 +85,7 @@ class RoutingTrace(
             "termination" to termination,
             "best_confirmation" to confirmation,
             "requests" to (eventCounts["REQUEST_SUBMITTED"] ?: 0),
+            "selector_recoveries" to (eventCounts["SELECTOR_RECOVERY_SUBMITTED"] ?: 0),
             "route_changes" to (eventCounts["ENDPOINT_CHANGED"] ?: 0),
             "endpoint_callbacks" to (eventCounts["ENDPOINT_REQUEST_OBSERVED"] ?: 0),
             "self_callbacks" to (endpointRequestClassifications["SELF"] ?: 0),

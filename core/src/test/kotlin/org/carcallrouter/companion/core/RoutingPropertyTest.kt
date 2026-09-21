@@ -47,6 +47,7 @@ class RoutingPropertyTest {
                         projection = evidence(),
                         targetHfpConnected = evidence(),
                         targetHfpAudio = evidence(),
+                        selectorRecoveryAvailable = evidence(),
                         targetAvailable = evidence(),
                         endpointRevision = trace.toLong() + 1,
                         route = route,
@@ -56,6 +57,7 @@ class RoutingPropertyTest {
                 transitions++
 
                 check(policy.requests <= 1)
+                check(policy.selectorRecoveries <= 1)
                 if (before in terminal) check(!decision.requestTarget)
                 if (decision.requestTarget) {
                     check(snapshot.authorized && snapshot.active && snapshot.singleCall)

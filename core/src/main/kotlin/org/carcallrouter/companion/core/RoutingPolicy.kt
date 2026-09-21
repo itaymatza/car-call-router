@@ -3,8 +3,9 @@ package org.carcallrouter.companion.core
 /**
  * A bounded, one-shot call-routing transaction.
  *
- * Android Auto is allowed to finish its call-start routing, one request is made for the configured
- * endpoint, and success is based on target HFP audio rather than Telecom's displayed endpoint.
+ * Android Auto is allowed to finish its call-start routing, one BMW request is made, and success
+ * is based on target HFP audio rather than Telecom's displayed endpoint. A failed split-brain
+ * transaction may restore the already-active Android Auto endpoint once for manual selection.
  */
 class RoutingPolicy(
     private val evidenceWindowMs: Long = 10_000,
@@ -13,7 +14,7 @@ class RoutingPolicy(
     private val platformRequestTimeoutMs: Long = 2_500,
     private val targetAudioStableMs: Long = 250,
 ) {
-    enum class Phase { IDLE, WAITING, VERIFYING, STABILIZING, RELEASED, SUSPENDED, FAILED }
+    enum class Phase { IDLE, WAITING, VERIFYING, STABILIZING, RECOVERING_SELECTOR, RELEASED, SUSPENDED, FAILED }
 
     enum class Route { TARGET, COMPETING_DEVICE, OTHER_BLUETOOTH, SPEAKER, HANDSET, WIRED, STREAMING, UNKNOWN }
 
@@ -53,6 +54,11 @@ class RoutingPolicy(
         TARGET_AUDIO_CONFIRMING,
         TARGET_AUDIO_CONFIRMED,
         TARGET_AUDIO_NOT_CONFIRMED,
+        SELECTOR_RECOVERY_SUBMITTED,
+        SELECTOR_RECOVERY_ACCEPTED,
+        SELECTOR_RECOVERY_CONFIRMED,
+        SELECTOR_RECOVERY_NOT_CONFIRMED,
+        SELECTOR_RECOVERY_FAILED,
         ROUTE_MOVED_AFTER_CONFIRMATION,
         ALTERNATIVE_ROUTE_DURING_REQUEST,
         ALTERNATIVE_ROUTE_DEBOUNCE,
@@ -79,6 +85,8 @@ class RoutingPolicy(
         val targetHfpConnected: Boolean?,
         /** True only while the configured HFP device owns call audio. */
         val targetHfpAudio: Boolean?,
+        /** True only when the configured competing endpoint currently owns HFP audio. */
+        val selectorRecoveryAvailable: Boolean?,
         /** null means Telecom has not delivered its first endpoint snapshot yet. */
         val targetAvailable: Boolean?,
         /** Monotonically increases for every available-endpoint callback in this call session. */
@@ -89,6 +97,7 @@ class RoutingPolicy(
 
     data class Decision(
         val requestTarget: Boolean = false,
+        val restoreSelector: Boolean = false,
         val requestAttempt: Int? = null,
         val wakeAt: Long? = null,
     )
@@ -101,6 +110,8 @@ class RoutingPolicy(
         private set
     var requests = 0
         private set
+    var selectorRecoveries = 0
+        private set
     var verified = false
         private set
 
@@ -111,6 +122,8 @@ class RoutingPolicy(
     private var inFlightAttempt: Int? = null
     private var inFlightUntil: Long? = null
     private var targetAudioSince: Long? = null
+    private var selectorRecoveryDeadline: Long? = null
+    private var selectorRecoveryAccepted = false
 
     fun begin(
         now: Long,
@@ -124,7 +137,10 @@ class RoutingPolicy(
         inFlightAttempt = null
         inFlightUntil = null
         targetAudioSince = null
+        selectorRecoveryDeadline = null
+        selectorRecoveryAccepted = false
         requests = 0
+        selectorRecoveries = 0
         verified = false
         phase = Phase.WAITING
         reason =
@@ -152,7 +168,7 @@ class RoutingPolicy(
     /**
      * Route callbacks are intentionally observational. They cannot reliably distinguish Samsung
      * call-start routing from a deliberate user choice, and this transaction never reasserts after
-     * its single request.
+     * its single BMW request.
      */
     fun observeRoute(
         route: Route,
@@ -201,6 +217,21 @@ class RoutingPolicy(
         }
     }
 
+    fun selectorRecoverySucceeded() {
+        if (phase != Phase.RECOVERING_SELECTOR) return
+        selectorRecoveryAccepted = true
+        reason = "Telecom accepted selector recovery; awaiting Android Auto endpoint display"
+        reasonCode = ReasonCode.SELECTOR_RECOVERY_ACCEPTED
+    }
+
+    fun selectorRecoveryFailed() {
+        if (phase != Phase.RECOVERING_SELECTOR) return
+        fail(
+            "Could not restore Samsung's manual BMW selector after split-brain routing",
+            ReasonCode.SELECTOR_RECOVERY_FAILED,
+        )
+    }
+
     fun evaluate(s: Snapshot): Decision {
         if (phase in terminalPhases) return Decision()
         if (!s.authorized) return stop("Telecom authorization is missing or revoked", ReasonCode.AUTHORIZATION_MISSING)
@@ -213,6 +244,26 @@ class RoutingPolicy(
         }
         if (!manual && s.projection == null) {
             return waitFor("Waiting for Android Auto projection evidence", ReasonCode.PROJECTION_UNKNOWN, s.now)
+        }
+        selectorRecoveryDeadline?.let { deadline ->
+            if (s.route == Route.COMPETING_DEVICE) {
+                return fail(
+                    "Android Auto endpoint display restored; manual BMW selection is available",
+                    ReasonCode.SELECTOR_RECOVERY_CONFIRMED,
+                )
+            }
+            if (s.now >= deadline) {
+                return fail(
+                    if (selectorRecoveryAccepted) {
+                        "Telecom accepted selector recovery but did not display Android Auto"
+                    } else {
+                        "Selector recovery timed out before Telecom returned a result"
+                    },
+                    ReasonCode.SELECTOR_RECOVERY_NOT_CONFIRMED,
+                )
+            }
+            phase = Phase.RECOVERING_SELECTOR
+            return Decision(wakeAt = deadline)
         }
         if (s.targetHfpConnected == false) {
             return stop("Configured BMW device is not connected for HFP", ReasonCode.TARGET_HFP_DISCONNECTED)
@@ -287,6 +338,23 @@ class RoutingPolicy(
         }
 
         if (s.now >= currentDeadline()) {
+            if (
+                selectorRecoveries == 0 &&
+                s.route == Route.TARGET &&
+                s.targetHfpAudio == false &&
+                s.selectorRecoveryAvailable == true
+            ) {
+                selectorRecoveries = 1
+                selectorRecoveryDeadline = s.now + platformRequestTimeoutMs
+                selectorRecoveryAccepted = false
+                phase = Phase.RECOVERING_SELECTOR
+                reason = "BMW display and SCO disagree; restoring Android Auto display for manual selection"
+                reasonCode = ReasonCode.SELECTOR_RECOVERY_SUBMITTED
+                return Decision(
+                    restoreSelector = true,
+                    wakeAt = requireNotNull(selectorRecoveryDeadline),
+                )
+            }
             return fail(
                 "BMW HFP audio was not confirmed after the one-shot request",
                 ReasonCode.TARGET_AUDIO_NOT_CONFIRMED,

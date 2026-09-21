@@ -17,7 +17,13 @@ the confirmation interval. A timeout may still be followed by late SCO confirmat
 authorizes another request. Endpoint disappearance, external cancellation, unknown errors, and
 runtime exceptions stop the transaction.
 
-Safety-relevant callback edges are latched before deferred evaluation. Therefore, confirmed projection loss, confirmed target HFP loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session. Temporary unknown projection/HFP evidence and transient Telecom endpoint-list gaps are not treated as confirmed loss: the transaction waits, stale endpoints are never submitted, and evaluation resumes only from fresh callback evidence within the bounded window. `onCallEndpointRequested()` is recorded but never interpreted as verified user intent, because Samsung emits the same callback during startup; the one-request budget guarantees it cannot create a routing fight.
+If BMW is not confirmed and the final evidence proves the specific Samsung regression—Telecom
+still displays BMW while the configured Android Auto endpoint owns SCO—the app may make one
+additional request for that Android Auto endpoint. Its only purpose is to restore truthful selector
+state so the user can choose BMW manually. It is forbidden when the SCO owner or endpoint identity
+is unknown, when another route is displayed, or after one recovery attempt; it never retries BMW.
+
+Safety-relevant callback edges are latched before deferred evaluation. Therefore, confirmed projection loss, confirmed target HFP loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session. Temporary unknown projection/HFP evidence and transient Telecom endpoint-list gaps are not treated as confirmed loss: the transaction waits, stale endpoints are never submitted, and evaluation resumes only from fresh callback evidence within the bounded window. `onCallEndpointRequested()` is recorded but never interpreted as verified user intent, because Samsung emits the same callback during startup; the one-BMW-request budget guarantees it cannot create a routing fight.
 
 ## Authorization safety
 

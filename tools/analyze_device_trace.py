@@ -34,6 +34,7 @@ class SessionSummary:
     mode: str
     trigger: str
     requests: int
+    selector_recoveries: int
     endpoint_callbacks: int
     self_callbacks: int
     startup_replays: int
@@ -165,6 +166,7 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             mode=start.fields.get("mode", "unknown") if start else "unknown",
             trigger=start.fields.get("trigger", "unknown") if start else "unknown",
             requests=sum(event.event == "REQUEST_SUBMITTED" for event in session_events),
+            selector_recoveries=sum(event.event == "SELECTOR_RECOVERY_SUBMITTED" for event in session_events),
             endpoint_callbacks=len(request_callbacks),
             self_callbacks=classifications.count("SELF"),
             startup_replays=classifications.count("STARTUP_REPLAY"),
@@ -193,6 +195,7 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
         print(f"Session {item.session}: {item.status}", file=out)
         print(f"  mode/trigger: {item.mode}/{item.trigger}", file=out)
         print(f"  requests: {item.requests}", file=out)
+        print(f"  selector recoveries: {item.selector_recoveries}", file=out)
         print(
             f"  endpoint callbacks: {item.endpoint_callbacks} "
             f"(self={item.self_callbacks}, startup_replay={item.startup_replays}, external={item.external_callbacks})",
@@ -215,7 +218,7 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
 
 
 def render_csv(summaries: list[SessionSummary], out: TextIO) -> None:
-    fieldnames = list(asdict(SessionSummary("", "", "", "", 0, 0, 0, 0, 0, 0, 0,
+    fieldnames = list(asdict(SessionSummary("", "", "", "", 0, 0, 0, 0, 0, 0, 0, 0,
                                             False, None, False, None, "", "", "", "", "",
                                             0, [])).keys())
     writer = csv.DictWriter(out, fieldnames=fieldnames)

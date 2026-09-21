@@ -8,10 +8,14 @@
   split state where Telecom shows BMW while Android Auto owns SCO now forces the one request.
 - Make API 37 endpoint-request callbacks observational. Samsung call-start callbacks no longer
   masquerade as user overrides or suspend the transaction, and the app never reasserts after its
-  one request.
+  one BMW request.
 - Add deterministic regressions for the captured Samsung split-brain trace, transient SCO,
   selector preservation, post-completion manual changes, request-result races, and the strict
-  one-request budget.
+  one-BMW-request budget.
+- Restore Samsung's manual in-call BMW choice after an unsuccessful split-brain transaction. When
+  Telecom still displays BMW but the configured Android Auto endpoint verifiably owns SCO, make
+  one bounded request to display Android Auto again so BMW can be selected manually; never retry
+  BMW, guess an endpoint, or loop.
 
 ## 0.3.0-beta.10
 

@@ -22,7 +22,7 @@ runs it through Gradle/JUnit so JaCoCo can measure the production boundary.
 
 The production-service harness includes the captured Samsung failure shape: Telecom displays BMW,
 Android Auto owns SCO, and another `InCallService` request arrives immediately after ACTIVE. It
-also verifies the settling delay, strict one-request budget, stable-SCO requirement, result races,
+also verifies the settling delay, strict one-BMW-request budget, stable-SCO requirement, result races,
 manual selector preservation, lifecycle cancellation, late binding, and request-marker isolation.
 
 These checks exercise decision rules and lifecycle behavior. They do not install an APK, emulate Android Telecom, validate protected-permission admission, or test a real Bluetooth stack, microphone, projection host, headset, or vehicle.
@@ -112,7 +112,8 @@ endpoint is `INCOMPLETE`. A session is `UNSTABLE` when exact target audio is eve
 but the trace also shows an endpoint oscillation such as BMW → handset → BMW. Endpoint-request
 callbacks are reported for diagnostics only because Android can emit them during call startup without
 a user action. A session cannot be `PASS` without a finish, exact target HFP audio confirmation, and
-no detected instability.
+no detected instability. `selector_recoveries` reports the bounded Samsung selector-restoration path;
+it remains a routing failure until a later manual BMW selection produces exact target HFP audio.
 
 After collecting multiple runs, summarize the entire batch with:
 

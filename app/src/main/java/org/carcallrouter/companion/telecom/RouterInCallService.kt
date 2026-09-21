@@ -525,12 +525,20 @@ class RouterInCallService :
                 else -> address in hfp.connected
             }
         val target = targetEndpoint()
+        val competitor = competitorEndpoint()
         val endpointAvailable = if (router.hasAvailableSnapshot()) target.endpoint != null else null
         val targetHfpAudio =
             when {
                 address == null -> false
                 !hfp.known -> null
                 else -> address in hfp.audioConnected
+            }
+        val competitorAddress = settings.competitorAddress?.uppercase()
+        val selectorRecoveryAvailable =
+            when {
+                competitorAddress == null -> false
+                !hfp.known -> null
+                else -> competitorAddress in hfp.audioConnected && competitor.endpoint != null
             }
         val now = SystemClock.elapsedRealtime()
         val route = currentRoute()
@@ -621,6 +629,7 @@ class RouterInCallService :
                     projection = projection,
                     targetHfpConnected = hfpConnected,
                     targetHfpAudio = targetHfpAudio,
+                    selectorRecoveryAvailable = selectorRecoveryAvailable,
                     targetAvailable = endpointAvailable,
                     endpointRevision = router.endpointRevision(),
                     route = route,
@@ -748,6 +757,57 @@ class RouterInCallService :
                 trace.event("REQUEST_ERROR", "attempt" to attempt, "type" to e.javaClass.simpleName)
             }
         }
+        if (decision.restoreSelector && competitor.endpoint != null) {
+            val competitorId = RouterLog.deviceId(competitorAddress)
+            try {
+                RouterLog.event(
+                    "SELECTOR_RECOVERY_REQUEST",
+                    "target=$competitorId; backend=Telecom.requestCallEndpointChange; basis=${competitor.basis}",
+                )
+                trace.event(
+                    "SELECTOR_RECOVERY_SUBMITTED",
+                    "target" to competitorId,
+                    "basis" to competitor.basis,
+                    "displayed_route" to route,
+                    "target_sco" to targetHfpAudio,
+                )
+                router.request(
+                    competitor.endpoint,
+                    started = { ticket ->
+                        trace.event(
+                            "SELECTOR_RECOVERY_CONTEXT",
+                            "request" to ticket.id,
+                            "generation" to ticket.generation,
+                        )
+                    },
+                    accepted = { ticket ->
+                        if (!router.isCurrentGeneration(ticket)) return@request
+                        policy.selectorRecoverySucceeded()
+                        trace.event(
+                            "SELECTOR_RECOVERY_ACCEPTED",
+                            "request" to ticket.id,
+                            "generation" to ticket.generation,
+                        )
+                        queueEvaluation()
+                    },
+                    rejected = { ticket, error ->
+                        if (!router.isCurrentGeneration(ticket)) return@request
+                        policy.selectorRecoveryFailed()
+                        trace.event(
+                            "SELECTOR_RECOVERY_REJECTED",
+                            "request" to ticket.id,
+                            "generation" to ticket.generation,
+                            "code" to error.code,
+                        )
+                        queueEvaluation()
+                    },
+                )
+            } catch (e: RuntimeException) {
+                policy.selectorRecoveryFailed()
+                RouterLog.event("SELECTOR_RECOVERY_ERROR", "type=${e.javaClass.simpleName}")
+                trace.event("SELECTOR_RECOVERY_ERROR", "type" to e.javaClass.simpleName)
+            }
+        }
         if (route == RoutingPolicy.Route.TARGET) trace.confirmTelecom()
         if (policy.verified) trace.confirmTargetHfpAudio()
         val state =
@@ -760,7 +820,8 @@ class RouterInCallService :
                     "HFP connected=${hfpConnected ?: "unknown"}; SCO=${targetHfpAudio ?: "unknown"}",
                 "Endpoint resolution: ${target.reason}",
                 "Route: $route",
-                "Controller: ${policy.phase}; attempts=${policy.requests}; reason=${policy.reasonCode}",
+                "Controller: ${policy.phase}; attempts=${policy.requests}; " +
+                    "selectorRecoveries=${policy.selectorRecoveries}; reason=${policy.reasonCode}",
                 policy.reason,
             ).joinToString("\n")
         if (state != lastPublished) {

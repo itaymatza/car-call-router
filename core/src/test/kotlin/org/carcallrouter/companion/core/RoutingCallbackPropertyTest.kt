@@ -38,6 +38,7 @@ class RoutingCallbackPropertyTest {
                         projection = evidence(random),
                         targetHfpConnected = evidence(random),
                         targetHfpAudio = evidence(random),
+                        selectorRecoveryAvailable = evidence(random),
                         targetAvailable = evidence(random),
                         endpointRevision = session.toLong() * 100 + it,
                         route = route,
@@ -48,6 +49,7 @@ class RoutingCallbackPropertyTest {
 
                 if (before in terminal) assertEquals(false, decision.requestTarget)
                 check(policy.requests <= 1)
+                check(policy.selectorRecoveries <= 1)
                 decision.wakeAt?.let { wake -> check(wake > now) }
                 if (decision.requestTarget) {
                     check(snapshot.authorized && snapshot.active && snapshot.singleCall)

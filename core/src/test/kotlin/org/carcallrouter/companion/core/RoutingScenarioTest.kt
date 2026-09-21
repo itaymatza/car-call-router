@@ -80,6 +80,7 @@ class RoutingScenarioTest {
         projection: Boolean? = true,
         targetHfpConnected: Boolean? = true,
         targetHfpAudio: Boolean? = false,
+        selectorRecoveryAvailable: Boolean? = false,
         targetAvailable: Boolean? = true,
         route: Route = Route.COMPETING_DEVICE,
     ) = Snapshot(
@@ -92,6 +93,7 @@ class RoutingScenarioTest {
         projection = projection,
         targetHfpConnected = targetHfpConnected,
         targetHfpAudio = targetHfpAudio,
+        selectorRecoveryAvailable = selectorRecoveryAvailable,
         targetAvailable = targetAvailable,
         endpointRevision = 1,
         route = route,
