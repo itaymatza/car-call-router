@@ -34,7 +34,7 @@ compiled implementation, preventing either harness from maintaining a private co
 5. A matching endpoint produces diagnostic `TELECOM_ENDPOINT_CONFIRMED`, but neither an accepted outcome nor the endpoint display proves that physical call audio moved.
 6. Only the exact configured Bluetooth address owning HFP/SCO continuously for the confirmation interval produces `TARGET_HFP_AUDIO_CONFIRMED` and releases the transaction.
 7. The transaction never retries or reasserts BMW. API 37 endpoint-request callbacks are recorded but do not control the policy because Samsung also emits them during call startup. Manual Dialer changes remain system-owned.
-8. If the transaction expires in the exact captured split state—Telecom displays BMW while the configured Android Auto endpoint still owns SCO—the app makes one bounded selector-recovery request for that already-active Android Auto endpoint. This reconciles Samsung's display with physical audio so BMW becomes selectable again. It is not a second BMW attempt and is never repeated.
+8. If the transaction expires in the exact captured split state—Telecom displays BMW while the configured Android Auto endpoint still owns SCO—the app makes one bounded selector-recovery request for that already-active Android Auto endpoint. This reconciles Samsung's display with physical audio so BMW becomes selectable again. It is not a second BMW attempt and is never repeated. A subsequent speaker, handset, wired, or other-Bluetooth route suspends the policy; an already-submitted platform request cannot be recalled.
 
 Every active session starts with `SESSION_ENVIRONMENT` and emits a deduplicated
 `EVIDENCE_SNAPSHOT` whenever routing inputs or the resulting policy decision change. These records

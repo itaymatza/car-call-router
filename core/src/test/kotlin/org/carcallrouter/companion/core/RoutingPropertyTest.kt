@@ -58,13 +58,28 @@ class RoutingPropertyTest {
 
                 check(policy.requests <= 1)
                 check(policy.selectorRecoveries <= 1)
-                if (before in terminal) check(!decision.requestTarget)
+                if (before in terminal) {
+                    check(!decision.requestTarget)
+                    check(!decision.restoreSelector)
+                }
                 if (decision.requestTarget) {
                     check(snapshot.authorized && snapshot.active && snapshot.singleCall)
                     check(snapshot.safeCellularCall)
                     check(snapshot.targetHfpConnected == true && snapshot.targetAvailable == true)
                     check(snapshot.targetHfpAudio == false)
                     check(manual || (snapshot.enabled && snapshot.projection == true))
+                }
+                if (decision.restoreSelector) {
+                    check(!decision.requestTarget)
+                    check(decision.requestAttempt == null)
+                    check(snapshot.route == Route.TARGET)
+                    check(snapshot.targetHfpConnected == true)
+                    check(snapshot.targetAvailable == true)
+                    check(snapshot.targetHfpAudio == false)
+                    check(snapshot.selectorRecoveryAvailable == true)
+                    check(policy.requests == 1)
+                    check(policy.selectorRecoveries == 1)
+                    check(policy.phase == Phase.RECOVERING_SELECTOR)
                 }
                 decision.wakeAt?.let { check(it > snapshot.now) }
             }

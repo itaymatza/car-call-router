@@ -252,6 +252,13 @@ class RoutingPolicy(
                     ReasonCode.SELECTOR_RECOVERY_CONFIRMED,
                 )
             }
+            if (s.route in protectedUserRoutes) {
+                suspend(
+                    "Protected route selected during selector recovery; no further action will be taken",
+                    ReasonCode.USER_OVERRIDE,
+                )
+                return Decision()
+            }
             if (s.now >= deadline) {
                 return fail(
                     if (selectorRecoveryAccepted) {
@@ -414,6 +421,7 @@ class RoutingPolicy(
     }
 
     private companion object {
+        val protectedUserRoutes = setOf(Route.SPEAKER, Route.HANDSET, Route.WIRED, Route.OTHER_BLUETOOTH)
         val terminalPhases = setOf(Phase.IDLE, Phase.RELEASED, Phase.SUSPENDED, Phase.FAILED)
     }
 }

@@ -170,6 +170,25 @@ object PolicyCases {
                 check(accepted.reasonCode == ReasonCode.SELECTOR_RECOVERY_NOT_CONFIRMED)
                 check(accepted.reason.contains("accepted"))
             },
+            "protected user routes stop selector recovery" to {
+                listOf(Route.SPEAKER, Route.HANDSET, Route.WIRED, Route.OTHER_BLUETOOTH).forEach { route ->
+                    val p = policy(actionWindowMs = 4_000)
+                    p.evaluate(snapshot(0, route = Route.TARGET))
+                    check(
+                        p.evaluate(
+                            snapshot(4_000, route = Route.TARGET, selectorRecoveryAvailable = true),
+                        ).restoreSelector,
+                    )
+                    p.selectorRecoverySucceeded()
+                    val decision = p.evaluate(snapshot(4_100, route = route))
+                    check(!decision.requestTarget)
+                    check(!decision.restoreSelector)
+                    check(p.phase == Phase.SUSPENDED)
+                    check(p.reasonCode == ReasonCode.USER_OVERRIDE)
+                    check(p.requests == 1)
+                    check(p.selectorRecoveries == 1)
+                }
+            },
             "accepted Telecom request still needs BMW SCO" to {
                 val p = policy(actionWindowMs = 1_000)
                 val request = p.evaluate(snapshot(0))
