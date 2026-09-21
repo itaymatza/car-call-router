@@ -15,6 +15,10 @@ import org.carcallrouter.companion.telecom.AddressedTelecomRouter
 import org.carcallrouter.companion.telecom.HfpMonitor
 import org.carcallrouter.companion.telecom.RouterInCallService
 import java.io.File
+import java.io.FileDescriptor
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.lang.ref.WeakReference
 
 // Production service + deterministic framework boundaries. This is not Android emulation or a
 // substitute for real-device Telecom/Bluetooth qualification.
@@ -424,6 +428,229 @@ fun main(args: Array<String>) {
                             it.first == "ROUTING_TRACE" && it.second.contains("TARGET_HFP_AUDIO_CONFIRMED")
                         },
                     )
+                }
+            },
+            "hfp_monitor_follows_projection_and_manual_lifecycle" to {
+                Fixture(projected = false).use { f ->
+                    check(HfpMonitor.starts == 0)
+                    f.service.routeNow()
+                    f.flush()
+                    check(HfpMonitor.starts == 1)
+                }
+                Fixture(projected = true).use { f ->
+                    check(HfpMonitor.starts == 1)
+                    ProjectionMonitor.emit(false)
+                    f.flush()
+                    ProjectionMonitor.emit(true)
+                    f.flush()
+                    check(HfpMonitor.starts == 2)
+                }
+            },
+            "confirmed_projection_loss_suspends_active_transaction" to {
+                Fixture().use { f ->
+                    f.activateAndSettle()
+                    ProjectionMonitor.emit(false)
+                    ProjectionMonitor.emit(true)
+                    f.flush()
+                    check(SessionBridge.status.contains("PROJECTION_DISCONNECTED"))
+                    countEquals(f, 1)
+                }
+            },
+            "confirmed_hfp_loss_suspends_active_transaction" to {
+                Fixture().use { f ->
+                    f.activateAndSettle()
+                    HfpMonitor.emit(setOf(COMPETING, OTHER))
+                    HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                    f.flush()
+                    check(SessionBridge.status.contains("TARGET_HFP_DISCONNECTED"))
+                    countEquals(f, 1)
+                }
+            },
+            "temporary_unknown_evidence_can_recover_before_request" to {
+                Fixture(projected = null).use { f ->
+                    f.activateWithoutSettling()
+                    ProjectionMonitor.emit(true)
+                    f.flush()
+                    f.settle()
+                    countEquals(f, 1)
+                }
+                Fixture().use { f ->
+                    HfpMonitor.emit(emptySet(), known = false)
+                    f.activateWithoutSettling()
+                    f.settle()
+                    countEquals(f, 0)
+                    HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                    f.flush()
+                    countEquals(f, 1)
+                }
+            },
+            "details_and_conference_callbacks_are_safety_relevant" to {
+                Fixture().use { f ->
+                    f.call.deliverDetails()
+                    val child = Call(Call.Details(Call.STATE_ACTIVE))
+                    f.call.callbacks.toList().forEach {
+                        it.onChildrenChanged(f.call, mutableListOf(child))
+                        it.onChildrenChanged(f.call, mutableListOf())
+                    }
+                    f.flush()
+                    check(SessionBridge.status.contains("CONFERENCE_OBSERVED"))
+                    countEquals(f, 0)
+                }
+            },
+            "active_without_pre_active_transition_is_suppressed" to {
+                Fixture(initialState = Call.STATE_HOLDING).use { f ->
+                    f.call.deliverState(Call.STATE_ACTIVE)
+                    f.flush()
+                    check(SessionBridge.status.contains("NO_FRESH_ACTIVE_TRANSITION"))
+                    countEquals(f, 0)
+                }
+            },
+            "same_active_call_rebind_is_suppressed" to {
+                Fixture(initialState = Call.STATE_ACTIVE).use { f ->
+                    f.settle()
+                    countEquals(f, 1)
+                    f.service.onUnbind(Intent())
+                    f.service.onBind(Intent())
+                    f.service.onAvailableCallEndpointsChanged(mutableListOf(target, competing, other))
+                    f.service.onCallAdded(f.call)
+                    f.flush()
+                    check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    countEquals(f, 1)
+                }
+            },
+            "late_bind_protected_route_and_timeout_are_suppressed" to {
+                Fixture(projected = null, initialState = Call.STATE_ACTIVE, available = emptyList()).use { f ->
+                    f.route(speaker)
+                    check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    countEquals(f, 0)
+                }
+                Fixture(projected = null, initialState = Call.STATE_ACTIVE).use { f ->
+                    check(SessionBridge.status.contains("LATE_BIND_RECOVERY_EVIDENCE"))
+                    TestQueue.advanceTo(5_000)
+                    check(SessionBridge.status.contains("ALREADY_ACTIVE_BIND"))
+                    countEquals(f, 0)
+                }
+            },
+            "late_bind_waits_for_endpoint_and_handles_ineligible_state" to {
+                Fixture(initialState = Call.STATE_ACTIVE, available = emptyList()).use { f ->
+                    check(SessionBridge.status.contains("LATE_BIND_RECOVERY_EVIDENCE"))
+                    f.endpoints(listOf(target, competing, other))
+                    f.settle()
+                    countEquals(f, 1)
+                }
+                Fixture(enabled = false, initialState = Call.STATE_ACTIVE).use { f ->
+                    f.settle()
+                    countEquals(f, 0)
+                    check(SessionBridge.status.contains("DISABLED"))
+                }
+            },
+            "all_platform_route_types_are_observed" to {
+                val earpiece = CallEndpoint("Earpiece", CallEndpoint.TYPE_EARPIECE)
+                val wired = CallEndpoint("Wired", CallEndpoint.TYPE_WIRED_HEADSET)
+                val streaming = CallEndpoint("Streaming", CallEndpoint.TYPE_STREAMING)
+                val unknown = CallEndpoint("Unknown", CallEndpoint.TYPE_UNKNOWN)
+                Fixture().use { f ->
+                    f.activateWithoutSettling()
+                    listOf(earpiece, wired, streaming, other, unknown).forEach(f::route)
+                    HfpMonitor.emit(emptySet(), known = false)
+                    f.route(other)
+                    val traces = RouterLog.events.filter { it.first == "ROUTING_TRACE" }.map { it.second }
+                    listOf("HANDSET", "WIRED", "STREAMING", "OTHER_BLUETOOTH", "UNKNOWN").forEach { route ->
+                        check(traces.any { "route=$route" in it })
+                    }
+                }
+            },
+            "request_error_fallback_and_late_rejection_are_covered" to {
+                Fixture().use { f ->
+                    f.service.autoCompleteRequests = false
+                    f.activateAndSettle()
+                    f.service.failLatest(CallEndpointException.ERROR_UNSPECIFIED)
+                    f.flush()
+                    check(SessionBridge.status.contains("REQUEST_FAILED"))
+                }
+                Fixture().use { f ->
+                    f.service.autoCompleteRequests = false
+                    f.activateAndSettle()
+                    f.service.onCallRemoved(f.call)
+                    f.flush()
+                    f.service.failLatest(CallEndpointException.ERROR_UNSPECIFIED)
+                    f.flush()
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTE_RESULT_IGNORED" && it.second.contains("result=rejected")
+                        },
+                    )
+                }
+            },
+            "adapter_rejects_stale_endpoint_and_clears_runtime_marker" to {
+                reset()
+                val service = InCallService()
+                val adapter = AddressedTelecomRouter(service)
+                adapter.updateAvailable(listOf(competing))
+                check(runCatching { adapter.request(target, {}, {}, { _, _ -> }) }.isFailure)
+                service.requestException = SecurityException("test")
+                adapter.updateAvailable(listOf(target))
+                check(runCatching { adapter.request(target, {}, {}, { _, _ -> }) }.isFailure)
+                check(adapter.observeRequest(target).origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL)
+            },
+            "settings_and_session_bridge_diagnostics_are_round_tripped" to {
+                reset()
+                val settings = RouterSettings(Context())
+                check(settings.lastSession == null)
+                check(settings.lastBound == 0L)
+                settings.setTarget(TARGET, "Target test device")
+                settings.setCompetitor(COMPETING, "Competing test device")
+                check(runCatching { settings.setCompetitor(TARGET.lowercase(), "invalid") }.isFailure)
+                settings.setTarget(COMPETING.lowercase(), "Replacement target")
+                check(settings.competitorAddress == null)
+                settings.markBound()
+                check(settings.lastBound > 0L)
+                settings.recordLastSession("RELEASED", "TARGET_AUDIO_CONFIRMED", "TARGET_HFP_AUDIO")
+                val last = checkNotNull(settings.lastSession)
+                check(last.phase == "RELEASED")
+                check(last.reason == "TARGET_AUDIO_CONFIRMED")
+                check(last.confirmation == "TARGET_HFP_AUDIO")
+
+                var updates = 0
+                val listener = {
+                    updates++
+                    Unit
+                }
+                SessionBridge.observe(listener)
+                SessionBridge.publish("test")
+                SessionBridge.remove(listener)
+                SessionBridge.publish("ignored")
+                check(updates == 2)
+                SessionBridge.controller = WeakReference(null)
+            },
+            "unbind_dump_and_call_state_names_are_covered" to {
+                Fixture(initialState = Call.STATE_NEW).use { f ->
+                    f.call.deliverState(Call.STATE_SELECT_PHONE_ACCOUNT)
+                    f.call.deliverState(Call.STATE_DIALING)
+                    f.call.deliverState(Call.STATE_CONNECTING)
+                    f.call.deliverState(Call.STATE_ACTIVE)
+                    f.flush()
+                    f.call.deliverState(Call.STATE_DISCONNECTING)
+                    f.call.deliverState(99)
+                    f.flush()
+                    val output = StringWriter()
+                    f.service.dump(FileDescriptor.out, PrintWriter(output, true), emptyArray())
+                    check("Car Call Router (redacted)" in output.toString())
+                    check(!f.service.onUnbind(Intent()))
+                    check(SessionBridge.controller == null)
+                }
+            },
+            "completed_call_persists_verified_session" to {
+                Fixture().use { f ->
+                    f.activateAndSettle()
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(750)
+                    f.service.onCallRemoved(f.call)
+                    f.flush()
+                    val last = checkNotNull(RouterSettings(f.service).lastSession)
+                    check(last.phase == "RELEASED")
+                    check(last.reason == "TARGET_AUDIO_CONFIRMED")
+                    check(last.confirmation == "TARGET_HFP_AUDIO")
                 }
             },
             "request_markers_expire_and_are_generation_bound" to {
