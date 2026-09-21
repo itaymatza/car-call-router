@@ -13,7 +13,7 @@ usage() {
 Usage: tools/capture_device_run.sh [--serial SERIAL] [--scenario NAME] [--tag TAG] [--package ID] [--output DIR]
 
 Captures only Car Call Router's privacy-safe ROUTING_TRACE records around one parked test.
-Scenarios: incoming, outgoing, override, hold-resume, reconnect, second-call, conference, other.
+Scenarios: incoming, outgoing, selector-recovery, override, hold-resume, reconnect, second-call, conference, other.
 Repeat --tag to classify a run for the production stability matrix. Use --help to list tags.
 
 Qualification tags:
@@ -37,7 +37,7 @@ while (($#)); do
     esac
 done
 
-case "$SCENARIO" in incoming|outgoing|override|hold-resume|reconnect|second-call|conference|other) ;; *)
+case "$SCENARIO" in incoming|outgoing|selector-recovery|override|hold-resume|reconnect|second-call|conference|other) ;; *)
     echo "Unsupported scenario: $SCENARIO" >&2; exit 2;; esac
 for tag in "${TAGS[@]}"; do
     case "$tag" in
@@ -120,10 +120,10 @@ capture_app_log() {
     local destination="$1"
     : >"$TEMP_DIR/app.log"
     if "${ADB[@]}" exec-out run-as "$PACKAGE" id >/dev/null 2>&1; then
-        "${ADB[@]}" exec-out run-as "$PACKAGE" cat files/router.previous.log \
-            >>"$TEMP_DIR/app.log" 2>/dev/null || true
-        "${ADB[@]}" exec-out run-as "$PACKAGE" cat files/router.log \
-            >>"$TEMP_DIR/app.log" 2>/dev/null || true
+        for log_name in router.3.log router.2.log router.1.log router.log; do
+            "${ADB[@]}" exec-out run-as "$PACKAGE" cat "files/$log_name" \
+                >>"$TEMP_DIR/app.log" 2>/dev/null || true
+        done
     else
         echo "Warning: private app-log access failed; using the current filtered logcat buffer." >&2
         "${ADB[@]}" logcat -d -v threadtime -s CallRouteCompanion:I '*:S' >"$TEMP_DIR/app.log"
@@ -138,6 +138,10 @@ python3 "$ROOT/tools/analyze_device_trace.py" "$TEMP_DIR/before.trace" --session
 MANUFACTURER="$("${ADB[@]}" shell getprop ro.product.manufacturer | tr -d '\r\n')"
 MODEL="$("${ADB[@]}" shell getprop ro.product.model | tr -d '\r\n')"
 SDK="$("${ADB[@]}" shell getprop ro.build.version.sdk | tr -d '\r\n')"
+ANDROID_RELEASE="$("${ADB[@]}" shell getprop ro.build.version.release | tr -d '\r\n')"
+SECURITY_PATCH="$("${ADB[@]}" shell getprop ro.build.version.security_patch | tr -d '\r\n')"
+BUILD_ID="$("${ADB[@]}" shell getprop ro.build.id | tr -d '\r\n')"
+ONE_UI_VERSION="$("${ADB[@]}" shell getprop ro.build.version.oneui | tr -d '\r\n')"
 BUILD_FINGERPRINT="$("${ADB[@]}" shell getprop ro.build.fingerprint | tr -d '\r\n')"
 VERSION_NAME="$("${ADB[@]}" shell dumpsys package "$PACKAGE" | awk -F= '/versionName=/{gsub(/\r/,"",$2); print $2; exit}')"
 VERSION_CODE="$("${ADB[@]}" shell dumpsys package "$PACKAGE" | awk '/versionCode=/{for(i=1;i<=NF;i++) if($i ~ /^versionCode=/){sub(/^versionCode=/,"",$i); print $i; exit}}')"
@@ -149,6 +153,10 @@ qualification_tags=$QUALIFICATION_TAGS
 manufacturer=$MANUFACTURER
 model=$MODEL
 android_api=$SDK
+android_release=${ANDROID_RELEASE:-unknown}
+security_patch=${SECURITY_PATCH:-unknown}
+build_id=${BUILD_ID:-unknown}
+one_ui_version=${ONE_UI_VERSION:-unknown}
 build_fingerprint=$BUILD_FINGERPRINT
 package=$PACKAGE
 version_name=$VERSION_NAME
@@ -190,9 +198,16 @@ ask_observation android_auto_preserved "Did Android Auto navigation/media remain
 if [[ "$SCENARIO" == "override" ]]; then
     ask_observation user_override_respected "Was the manual route override respected without route fighting?"
 fi
+if [[ "$SCENARIO" == "selector-recovery" ]]; then
+    ask_observation split_brain_seen "Did Samsung Phone show BMW while call audio was actually on Android Auto?"
+    ask_observation selector_matched_actual_audio "Did the selector return to Android Auto after the bounded recovery?"
+    ask_observation target_became_selectable "Could you then select BMW manually?"
+    ask_observation manual_target_speaker_and_mic "Did that manual BMW selection move both speaker and microphone?"
+fi
 
 VERDICT="FAIL"
-if python3 "$ROOT/tools/analyze_device_trace.py" "$OUTPUT/trace.log" --require-pass >/dev/null \
+if python3 "$ROOT/tools/analyze_device_trace.py" "$OUTPUT/trace.log" \
+    --require-pass --require-diagnostics >/dev/null \
     && ! grep -qv '=yes$' "$OUTPUT/observations.txt"; then
     VERDICT="PASS"
 fi

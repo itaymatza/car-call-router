@@ -27,6 +27,23 @@ object RouterLog {
 
 object ProcessDiagnostics {
     fun snapshot(c: Context) = "processAgeMs=0; uiState=NEVER_OPENED"
+
+    fun traceFields(c: Context): Array<Pair<String, Any?>> =
+        arrayOf(
+            "app_version" to "test",
+            "app_version_code" to 1,
+            "sdk" to 37,
+            "android_release" to "test",
+            "security_patch" to "test",
+            "manufacturer" to "test",
+            "model" to "test",
+            "process_age_ms" to 0,
+            "ui_state" to "NEVER_OPENED",
+            "importance" to 100,
+            "interactive" to true,
+            "battery_exempt" to true,
+            "standby_bucket" to 10,
+        )
 }
 
 class ProjectionMonitor(

@@ -3,6 +3,7 @@ package org.carcallrouter.companion
 import android.app.ActivityManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 
@@ -34,6 +35,29 @@ object ProcessDiagnostics {
         return "processAgeMs=${processAgeMs()}; uiState=$uiState; importance=${processInfo.importance}; " +
             "interactive=${power?.isInteractive}; batteryExempt=${power?.isIgnoringBatteryOptimizations(context.packageName)}; " +
             "standbyBucket=${runCatching { usage?.appStandbyBucket }.getOrNull() ?: "unknown"}"
+    }
+
+    /** Structured, privacy-safe environment fields attached to each routing session. */
+    fun traceFields(context: Context): Array<Pair<String, Any?>> {
+        val processInfo = ActivityManager.RunningAppProcessInfo()
+        ActivityManager.getMyMemoryState(processInfo)
+        val power = context.getSystemService(PowerManager::class.java)
+        val usage = context.getSystemService(UsageStatsManager::class.java)
+        return arrayOf(
+            "app_version" to BuildConfig.VERSION_NAME,
+            "app_version_code" to BuildConfig.VERSION_CODE,
+            "sdk" to Build.VERSION.SDK_INT,
+            "android_release" to Build.VERSION.RELEASE,
+            "security_patch" to Build.VERSION.SECURITY_PATCH,
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+            "process_age_ms" to processAgeMs(),
+            "ui_state" to uiState,
+            "importance" to processInfo.importance,
+            "interactive" to power?.isInteractive,
+            "battery_exempt" to power?.isIgnoringBatteryOptimizations(context.packageName),
+            "standby_bucket" to runCatching { usage?.appStandbyBucket }.getOrNull(),
+        )
     }
 
     fun previousExit(context: Context): String {

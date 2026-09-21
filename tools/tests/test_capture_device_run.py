@@ -30,7 +30,7 @@ elif args[:4] == ["shell", "cmd", "appops", "get"]:
 elif args[:3] == ["exec-out", "run-as", "org.carcallrouter.companion"] and args[-1] == "id":
     print("uid=10000")
 elif args[:4] == ["exec-out", "run-as", "org.carcallrouter.companion", "cat"]:
-    if args[-1].endswith("router.previous.log"):
+    if not args[-1].endswith("router.log"):
         sys.exit(1)
     state = Path(os.environ["FAKE_ADB_STATE"])
     count = int(state.read_text() or "0") if state.exists() else 0
@@ -44,16 +44,27 @@ elif args[:4] == ["exec-out", "run-as", "org.carcallrouter.companion", "cat"]:
     event("old", 4, 3, "SESSION_FINISHED", "phase=SUCCEEDED reason=TARGET_VERIFIED termination=call_removed best_confirmation=TARGET_HFP_AUDIO")
     if count > 0:
         event("new", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
-        event("new", 2, 20, "REQUEST_SUBMITTED", "attempt=1")
-        event("new", 3, 40, "TELECOM_ENDPOINT_CONFIRMED")
-        event("new", 4, 60, "TARGET_HFP_AUDIO_CONFIRMED")
-        event("new", 5, 70, "SESSION_FINISHED", "phase=SUCCEEDED reason=TARGET_VERIFIED termination=call_removed best_confirmation=TARGET_HFP_AUDIO")
+        event("new", 2, 1, "SESSION_ENVIRONMENT", "sdk=37 model=TestModel")
+        event("new", 3, 10, "EVIDENCE_SNAPSHOT", "route=COMPETING_DEVICE hfp_audio_owner=COMPETITOR target_sco=false")
+        event("new", 4, 20, "REQUEST_SUBMITTED", "attempt=1")
+        event("new", 5, 21, "REQUEST_CONTEXT", "attempt=1 request=1")
+        event("new", 6, 40, "TELECOM_ENDPOINT_CONFIRMED")
+        event("new", 7, 60, "TARGET_HFP_AUDIO_CONFIRMED")
+        event("new", 8, 70, "SESSION_FINISHED", "phase=SUCCEEDED reason=TARGET_VERIFIED termination=call_removed best_confirmation=TARGET_HFP_AUDIO")
 elif args[:3] == ["shell", "getprop", "ro.product.manufacturer"]:
     print("Samsung")
 elif args[:3] == ["shell", "getprop", "ro.product.model"]:
     print("TestModel")
 elif args[:3] == ["shell", "getprop", "ro.build.version.sdk"]:
     print("37")
+elif args[:3] == ["shell", "getprop", "ro.build.version.release"]:
+    print("17")
+elif args[:3] == ["shell", "getprop", "ro.build.version.security_patch"]:
+    print("2026-09-01")
+elif args[:3] == ["shell", "getprop", "ro.build.id"]:
+    print("TEST1")
+elif args[:3] == ["shell", "getprop", "ro.build.version.oneui"]:
+    print("90000")
 elif args[:3] == ["shell", "getprop", "ro.build.fingerprint"]:
     print("samsung/test/test:17/TEST/1:user/release-keys")
 elif args[:3] == ["shell", "dumpsys", "package"]:
@@ -103,6 +114,8 @@ class CaptureDeviceRunTest(unittest.TestCase):
             self.assertEqual("verdict=PASS", (output / "verdict.txt").read_text().splitlines()[0])
             device = (output / "device.txt").read_text(encoding="utf-8")
             self.assertIn("build_fingerprint=samsung/test/test:17/TEST/1:user/release-keys", device)
+            self.assertIn("security_patch=2026-09-01", device)
+            self.assertIn("one_ui_version=90000", device)
             self.assertIn("qualification_tags=cold-start,android-auto-first", device)
             self.assertRegex(device, r"installed_apk_sha256=[0-9a-f]{64}")
 

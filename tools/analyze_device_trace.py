@@ -35,6 +35,8 @@ class SessionSummary:
     trigger: str
     requests: int
     selector_recoveries: int
+    request_contexts: int
+    selector_recovery_contexts: int
     endpoint_callbacks: int
     self_callbacks: int
     startup_replays: int
@@ -50,6 +52,14 @@ class SessionSummary:
     termination: str
     best_confirmation: str
     final_route: str
+    final_hfp_audio_owner: str
+    evidence_snapshots: int
+    projection_changes: int
+    environment_captured: bool
+    split_brain_observed: bool
+    selector_recovery_confirmed: bool
+    diagnostic_complete: bool
+    diagnostic_gaps: list[str]
     events: int
     anomalies: list[str]
 
@@ -140,6 +150,38 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
         ]
         route_events = [event for event in session_events if event.event == "ENDPOINT_CHANGED"]
         routes = [event.fields.get("route", "UNKNOWN") for event in route_events]
+        evidence_events = [event for event in session_events if event.event == "EVIDENCE_SNAPSHOT"]
+        request_count = sum(event.event == "REQUEST_SUBMITTED" for event in session_events)
+        request_contexts = sum(event.event == "REQUEST_CONTEXT" for event in session_events)
+        selector_recoveries = sum(
+            event.event == "SELECTOR_RECOVERY_SUBMITTED" for event in session_events
+        )
+        selector_recovery_contexts = sum(
+            event.event == "SELECTOR_RECOVERY_CONTEXT" for event in session_events
+        )
+        environment_captured = any(
+            event.event == "SESSION_ENVIRONMENT" for event in session_events
+        )
+        split_brain_observed = any(
+            event.fields.get("route") == "TARGET"
+            and event.fields.get("hfp_audio_owner") == "COMPETITOR"
+            and event.fields.get("target_sco") == "false"
+            for event in evidence_events
+        )
+        diagnostic_gaps = []
+        if not environment_captured:
+            diagnostic_gaps.append("missing SESSION_ENVIRONMENT")
+        if not evidence_events:
+            diagnostic_gaps.append("missing EVIDENCE_SNAPSHOT")
+        if request_contexts < request_count:
+            diagnostic_gaps.append(
+                f"missing REQUEST_CONTEXT ({request_contexts}/{request_count})"
+            )
+        if selector_recovery_contexts < selector_recoveries:
+            diagnostic_gaps.append(
+                "missing SELECTOR_RECOVERY_CONTEXT "
+                f"({selector_recovery_contexts}/{selector_recoveries})"
+            )
         route_oscillations = sum(
             routes[index] == routes[index - 2] and routes[index] != routes[index - 1]
             for index in range(2, len(routes))
@@ -165,8 +207,10 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             status=status,
             mode=start.fields.get("mode", "unknown") if start else "unknown",
             trigger=start.fields.get("trigger", "unknown") if start else "unknown",
-            requests=sum(event.event == "REQUEST_SUBMITTED" for event in session_events),
-            selector_recoveries=sum(event.event == "SELECTOR_RECOVERY_SUBMITTED" for event in session_events),
+            requests=request_count,
+            selector_recoveries=selector_recoveries,
+            request_contexts=request_contexts,
+            selector_recovery_contexts=selector_recovery_contexts,
             endpoint_callbacks=len(request_callbacks),
             self_callbacks=classifications.count("SELF"),
             startup_replays=classifications.count("STARTUP_REPLAY"),
@@ -182,6 +226,21 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             termination=finish.fields.get("termination", "open") if finish else "open",
             best_confirmation=finish.fields.get("best_confirmation", derived_confirmation) if finish else derived_confirmation,
             final_route=finish.fields.get("final_route", routes[-1] if routes else "unknown") if finish else (routes[-1] if routes else "unknown"),
+            final_hfp_audio_owner=(
+                evidence_events[-1].fields.get("hfp_audio_owner", "unknown")
+                if evidence_events else "unknown"
+            ),
+            evidence_snapshots=len(evidence_events),
+            projection_changes=sum(
+                event.event == "PROJECTION_CHANGED" for event in session_events
+            ),
+            environment_captured=environment_captured,
+            split_brain_observed=split_brain_observed,
+            selector_recovery_confirmed=any(
+                event.event == "SELECTOR_RECOVERY_CONFIRMED" for event in session_events
+            ),
+            diagnostic_complete=not diagnostic_gaps,
+            diagnostic_gaps=diagnostic_gaps,
             events=len(session_events),
             anomalies=anomalies,
         ))
@@ -197,6 +256,11 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
         print(f"  requests: {item.requests}", file=out)
         print(f"  selector recoveries: {item.selector_recoveries}", file=out)
         print(
+            f"  request contexts: {item.request_contexts}/{item.requests}; "
+            f"selector contexts: {item.selector_recovery_contexts}/{item.selector_recoveries}",
+            file=out,
+        )
+        print(
             f"  endpoint callbacks: {item.endpoint_callbacks} "
             f"(self={item.self_callbacks}, startup_replay={item.startup_replays}, external={item.external_callbacks})",
             file=out,
@@ -211,6 +275,19 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
             f"best={item.best_confirmation}; final_route={item.final_route}",
             file=out,
         )
+        print(
+            f"  evidence: {item.evidence_snapshots} snapshots; "
+            f"final_hfp_owner={item.final_hfp_audio_owner}; "
+            f"split_brain={item.split_brain_observed}; "
+            f"selector_recovered={item.selector_recovery_confirmed}",
+            file=out,
+        )
+        print(
+            f"  diagnostics: {'complete' if item.diagnostic_complete else 'incomplete'}",
+            file=out,
+        )
+        for gap in item.diagnostic_gaps:
+            print(f"  diagnostic gap: {gap}", file=out)
         for anomaly in item.anomalies:
             print(f"  anomaly: {anomaly}", file=out)
     for warning in warnings:
@@ -218,14 +295,13 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
 
 
 def render_csv(summaries: list[SessionSummary], out: TextIO) -> None:
-    fieldnames = list(asdict(SessionSummary("", "", "", "", 0, 0, 0, 0, 0, 0, 0, 0,
-                                            False, None, False, None, "", "", "", "", "",
-                                            0, [])).keys())
+    fieldnames = list(SessionSummary.__dataclass_fields__)
     writer = csv.DictWriter(out, fieldnames=fieldnames)
     writer.writeheader()
     for item in summaries:
         row = asdict(item)
         row["anomalies"] = "; ".join(item.anomalies)
+        row["diagnostic_gaps"] = "; ".join(item.diagnostic_gaps)
         writer.writerow(row)
 
 
@@ -260,6 +336,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="write canonical trace records after applying session exclusions")
     parser.add_argument("--require-pass", action="store_true",
                         help="exit nonzero unless at least one session exists and all sessions pass")
+    parser.add_argument("--require-diagnostics", action="store_true",
+                        help="exit nonzero unless every session has complete structured diagnostics")
     args = parser.parse_args(argv)
 
     try:
@@ -290,6 +368,10 @@ def main(argv: list[str] | None = None) -> int:
         render_text(summaries, warnings, sys.stdout)
 
     if args.require_pass and (not summaries or warnings or any(item.status != "PASS" for item in summaries)):
+        return 1
+    if args.require_diagnostics and (
+        not summaries or warnings or any(not item.diagnostic_complete for item in summaries)
+    ):
         return 1
     return 0
 

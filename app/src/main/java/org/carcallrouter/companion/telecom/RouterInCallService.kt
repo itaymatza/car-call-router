@@ -51,6 +51,7 @@ class RouterInCallService :
     private var manualSession = false
     private var hfpStarted = false
     private var lastTracePolicy: Pair<RoutingPolicy.Phase, RoutingPolicy.ReasonCode>? = null
+    private var lastTraceEvidence: String? = null
     private var lastSafety = "No calls"
     private var manualCooldownUntil = 0L
     private var activeTransitionAt: Long? = null
@@ -98,6 +99,7 @@ class RouterInCallService :
         manualSession = false
         hfpStarted = false
         lastTracePolicy = null
+        lastTraceEvidence = null
         projection = null
         lastPublished = ""
         activeTransitionAt = null
@@ -121,7 +123,11 @@ class RouterInCallService :
         hfp = newHfpMonitor()
         projectionMonitor =
             ProjectionMonitor(this) { value ->
+                val previous = projection
                 projection = value
+                if (trace.isActive() && value != previous) {
+                    trace.event("PROJECTION_CHANGED", "active" to value, "previous" to previous)
+                }
                 if (value == true) ensureHfpMonitoring("projection_active")
                 if (value == false && !manualSession) stopHfpMonitoring("projection_inactive")
                 if (!manualSession && guardHasActed() && value == false) {
@@ -234,7 +240,7 @@ class RouterInCallService :
             manualSession = false
             activeTransitionAt = SystemClock.elapsedRealtime()
             if (replayedCallObject) {
-                trace.begin("automatic", "same_instance_active_rebind")
+                beginTrace("automatic", "same_instance_active_rebind")
                 policy.suspend(
                     "Same already-active call object returned to the service; automatic takeover suppressed",
                     RoutingPolicy.ReasonCode.ALREADY_ACTIVE_BIND,
@@ -242,7 +248,7 @@ class RouterInCallService :
                 trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
             } else {
                 lateBindRecoveryDeadlineAt = activeTransitionAt?.plus(LATE_BIND_EVIDENCE_WINDOW_MS)
-                trace.begin("automatic", "already_active_bind_pending")
+                beginTrace("automatic", "already_active_bind_pending")
                 trace.event("LATE_BIND_RECOVERY_PENDING", "initial_route" to currentRoute())
                 RouterLog.event(
                     "LATE_BIND_RECOVERY_PENDING",
@@ -275,7 +281,7 @@ class RouterInCallService :
             activeTransitionAt = SystemClock.elapsedRealtime()
             lateBindRecoveryDeadlineAt = null
             if (record.sawPreActive && previous != Call.STATE_HOLDING) {
-                trace.begin("automatic", "fresh_active_transition")
+                beginTrace("automatic", "fresh_active_transition")
                 policy.begin(SystemClock.elapsedRealtime(), currentRoute())
                 trace.event("ACTIVE_TRANSITION", "call" to record.id, "initial_route" to currentRoute())
                 RouterLog.event(
@@ -283,13 +289,22 @@ class RouterInCallService :
                     "call=${record.id}; detected ACTIVE transition; target=${RouterLog.deviceId(settings.targetAddress)}",
                 )
             } else {
-                trace.begin("automatic", "active_without_fresh_transition")
+                beginTrace("automatic", "active_without_fresh_transition")
                 policy.suspend(
                     "No fresh answered/connected transition observed",
                     RoutingPolicy.ReasonCode.NO_FRESH_ACTIVE_TRANSITION,
                 )
                 trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
             }
+        }
+        if (state != previous && trace.isActive()) {
+            trace.event(
+                "CALL_STATE_CHANGED",
+                "call" to record.id,
+                "previous" to stateName(previous),
+                "current" to stateName(state),
+                "records" to records.size,
+            )
         }
         queueEvaluation()
     }
@@ -318,6 +333,7 @@ class RouterInCallService :
             router.clearSession()
             policy = RoutingPolicy()
             lastTracePolicy = null
+            lastTraceEvidence = null
             sessionStarted = false
             manualSession = false
             manualCooldownUntil = 0L
@@ -448,7 +464,7 @@ class RouterInCallService :
     ) {
         if (disposed) return
         sessionStarted = true
-        trace.begin("automatic", "safety_event")
+        beginTrace("automatic", "safety_event")
         if (policy.phase == RoutingPolicy.Phase.SUSPENDED && policy.reasonCode == code) return
         policy.suspend(reason, code)
         handler.removeCallbacks(tick)
@@ -460,6 +476,18 @@ class RouterInCallService :
         if (disposed) return
         handler.removeCallbacks(evaluateEvent)
         handler.post(evaluateEvent)
+    }
+
+    private fun beginTrace(
+        mode: String,
+        trigger: String,
+    ) {
+        val starting = !trace.isActive()
+        trace.begin(mode, trigger)
+        if (starting) {
+            trace.event("SESSION_ENVIRONMENT", *ProcessDiagnostics.traceFields(this))
+            lastTraceEvidence = null
+        }
     }
 
     private fun currentRoute(): RoutingPolicy.Route {
@@ -497,6 +525,19 @@ class RouterInCallService :
             connectedHfpCount = if (hfp.known) hfp.connected.size else 0,
         )
     }
+
+    private fun hfpAudioOwner(
+        targetAddress: String?,
+        competitorAddress: String?,
+    ): String =
+        when {
+            !hfp.known -> "UNKNOWN"
+            hfp.audioConnected.isEmpty() -> "NONE"
+            hfp.audioConnected.size > 1 -> "MULTIPLE"
+            targetAddress != null && targetAddress in hfp.audioConnected -> "TARGET"
+            competitorAddress != null && competitorAddress in hfp.audioConnected -> "COMPETITOR"
+            else -> "OTHER"
+        }
 
     private fun liveCalls(): List<Call> =
         records.keys.filter {
@@ -635,6 +676,50 @@ class RouterInCallService :
                     route = route,
                 ),
             )
+        val evidence =
+            listOf<Pair<String, Any?>>(
+                "enabled" to settings.enabled,
+                "authorized" to Access.ongoingCalls(this),
+                "runtime_granted" to Access.runtimeGranted(this),
+                "manual" to manualSession,
+                "active" to active,
+                "live_calls" to live.size,
+                "records" to records.size,
+                "safe_cellular" to safe,
+                "projection" to projection,
+                "hfp_monitoring" to hfpStarted,
+                "hfp_known" to hfp.known,
+                "hfp_connected_count" to hfp.connected.size,
+                "hfp_audio_count" to hfp.audioConnected.size,
+                "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                "target_configured" to (address != null),
+                "target_hfp_connected" to hfpConnected,
+                "target_sco" to targetHfpAudio,
+                "competitor_configured" to (competitorAddress != null),
+                "competitor_hfp_connected" to
+                    if (hfp.known && competitorAddress != null) competitorAddress in hfp.connected else null,
+                "competitor_sco" to
+                    if (hfp.known && competitorAddress != null) competitorAddress in hfp.audioConnected else null,
+                "endpoint_snapshot" to router.hasAvailableSnapshot(),
+                "endpoint_revision" to router.endpointRevision(),
+                "target_available" to endpointAvailable,
+                "target_resolution" to (target.basis ?: "UNRESOLVED"),
+                "competitor_available" to (competitor.endpoint != null),
+                "competitor_resolution" to (competitor.basis ?: "UNRESOLVED"),
+                "route" to route,
+                "phase" to policy.phase,
+                "reason" to policy.reasonCode,
+                "requests" to policy.requests,
+                "selector_recoveries" to policy.selectorRecoveries,
+                "request_target" to decision.requestTarget,
+                "restore_selector" to decision.restoreSelector,
+                "wake_in_ms" to decision.wakeAt?.let { (it - now).coerceAtLeast(0) },
+            )
+        val evidenceKey = evidence.joinToString("|") { (key, value) -> "$key=$value" }
+        if (trace.isActive() && evidenceKey != lastTraceEvidence) {
+            lastTraceEvidence = evidenceKey
+            trace.event("EVIDENCE_SNAPSHOT", *evidence.toTypedArray())
+        }
         val policyState = policy.phase to policy.reasonCode
         if (policyState != lastTracePolicy) {
             lastTracePolicy = policyState
@@ -644,6 +729,25 @@ class RouterInCallService :
                 "reason" to policy.reasonCode,
                 "attempts" to policy.requests,
             )
+            when (policy.reasonCode) {
+                RoutingPolicy.ReasonCode.SELECTOR_RECOVERY_CONFIRMED ->
+                    trace.event(
+                        "SELECTOR_RECOVERY_CONFIRMED",
+                        "route" to route,
+                        "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                        "target_sco" to targetHfpAudio,
+                    )
+                RoutingPolicy.ReasonCode.SELECTOR_RECOVERY_NOT_CONFIRMED,
+                RoutingPolicy.ReasonCode.SELECTOR_RECOVERY_FAILED,
+                ->
+                    trace.event(
+                        "SELECTOR_RECOVERY_TERMINATED",
+                        "reason" to policy.reasonCode,
+                        "route" to route,
+                        "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                    )
+                else -> Unit
+            }
         }
         if (decision.requestTarget && target.endpoint != null) {
             val attempt = requireNotNull(decision.requestAttempt)
@@ -770,6 +874,9 @@ class RouterInCallService :
                     "basis" to competitor.basis,
                     "displayed_route" to route,
                     "target_sco" to targetHfpAudio,
+                    "competitor_sco" to true,
+                    "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                    "endpoint_revision" to router.endpointRevision(),
                 )
                 router.request(
                     competitor.endpoint,
@@ -778,26 +885,67 @@ class RouterInCallService :
                             "SELECTOR_RECOVERY_CONTEXT",
                             "request" to ticket.id,
                             "generation" to ticket.generation,
+                            "endpoint_revision" to router.endpointRevision(),
+                            "pre_route" to currentRoute(),
+                            "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
                         )
                     },
                     accepted = { ticket ->
-                        if (!router.isCurrentGeneration(ticket)) return@request
+                        val latency = (SystemClock.elapsedRealtime() - ticket.createdAt).coerceAtLeast(0)
+                        if (!router.isCurrentGeneration(ticket)) {
+                            trace.event(
+                                "SELECTOR_RECOVERY_RESULT_IGNORED",
+                                "request" to ticket.id,
+                                "generation" to ticket.generation,
+                                "current_generation" to router.generation(),
+                                "result" to "accepted",
+                                "latency_ms" to latency,
+                            )
+                            return@request
+                        }
                         policy.selectorRecoverySucceeded()
+                        RouterLog.event(
+                            "SELECTOR_RECOVERY_ACCEPTED",
+                            "request=${ticket.id}; generation=${ticket.generation}; latencyMs=$latency; " +
+                                "route=${currentRoute()}",
+                        )
                         trace.event(
                             "SELECTOR_RECOVERY_ACCEPTED",
                             "request" to ticket.id,
                             "generation" to ticket.generation,
+                            "latency_ms" to latency,
+                            "route" to currentRoute(),
+                            "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
                         )
                         queueEvaluation()
                     },
                     rejected = { ticket, error ->
-                        if (!router.isCurrentGeneration(ticket)) return@request
+                        val latency = (SystemClock.elapsedRealtime() - ticket.createdAt).coerceAtLeast(0)
+                        if (!router.isCurrentGeneration(ticket)) {
+                            trace.event(
+                                "SELECTOR_RECOVERY_RESULT_IGNORED",
+                                "request" to ticket.id,
+                                "generation" to ticket.generation,
+                                "current_generation" to router.generation(),
+                                "result" to "rejected",
+                                "latency_ms" to latency,
+                                "code" to error.code,
+                            )
+                            return@request
+                        }
                         policy.selectorRecoveryFailed()
+                        RouterLog.event(
+                            "SELECTOR_RECOVERY_REJECTED",
+                            "request=${ticket.id}; generation=${ticket.generation}; latencyMs=$latency; code=${error.code}",
+                        )
                         trace.event(
                             "SELECTOR_RECOVERY_REJECTED",
                             "request" to ticket.id,
                             "generation" to ticket.generation,
+                            "latency_ms" to latency,
                             "code" to error.code,
+                            "route" to currentRoute(),
+                            "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
                         )
                         queueEvaluation()
                     },
@@ -844,7 +992,7 @@ class RouterInCallService :
         // This explicit one-shot bypasses only auto toggle/projection, NOT safety/identity checks.
         sessionStarted = true
         manualSession = true
-        trace.begin("manual", "route_now")
+        beginTrace("manual", "route_now")
         policy.begin(now, currentRoute(), manualOneShot = true)
         manualCooldownUntil = now + 1_500
         RouterLog.event("MANUAL_TEST", "One request only; projection gate bypassed explicitly")
@@ -860,7 +1008,7 @@ class RouterInCallService :
 
     override fun pauseSession() {
         sessionStarted = true
-        trace.begin("manual", "pause")
+        beginTrace("manual", "pause")
         policy.suspend("Paused by user for this call session", RoutingPolicy.ReasonCode.USER_PAUSED)
         handler.removeCallbacks(tick)
         RouterLog.event("USER_PAUSE", "No further requests this session; an already-submitted request cannot be recalled")

@@ -68,6 +68,43 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual(1, summaries[0].requests)
         self.assertEqual(1, summaries[0].selector_recoveries)
 
+    def test_structured_diagnostics_explain_split_brain_and_recovery(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 1, "SESSION_ENVIRONMENT", "sdk=37 model=SM-Test")
+            + line("abc", 3, 500, "EVIDENCE_SNAPSHOT",
+                   "route=TARGET hfp_audio_owner=COMPETITOR target_sco=false projection=true")
+            + line("abc", 4, 600, "REQUEST_SUBMITTED", "attempt=1")
+            + line("abc", 5, 601, "REQUEST_CONTEXT", "attempt=1 request=1")
+            + line("abc", 6, 4500, "SELECTOR_RECOVERY_SUBMITTED", "displayed_route=TARGET")
+            + line("abc", 7, 4501, "SELECTOR_RECOVERY_CONTEXT", "request=2")
+            + line("abc", 8, 4600, "SELECTOR_RECOVERY_CONFIRMED",
+                   "route=COMPETING_DEVICE hfp_audio_owner=COMPETITOR")
+            + line("abc", 9, 5000, "SESSION_FINISHED",
+                   "phase=FAILED reason=SELECTOR_RECOVERY_CONFIRMED termination=call_removed")
+        )
+        summaries, warnings = self.parse(content)
+        self.assertEqual([], warnings)
+        item = summaries[0]
+        self.assertTrue(item.diagnostic_complete)
+        self.assertTrue(item.split_brain_observed)
+        self.assertTrue(item.selector_recovery_confirmed)
+        self.assertEqual("COMPETITOR", item.final_hfp_audio_owner)
+        self.assertEqual(1, item.request_contexts)
+        self.assertEqual(1, item.selector_recovery_contexts)
+
+    def test_diagnostic_gaps_do_not_reclassify_behavioral_result(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=manual trigger=route_now")
+            + line("abc", 2, 10, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 3, 20, "SESSION_FINISHED",
+                   "phase=RELEASED reason=TARGET_AUDIO_CONFIRMED termination=call_removed")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("PASS", summaries[0].status)
+        self.assertFalse(summaries[0].diagnostic_complete)
+        self.assertIn("missing SESSION_ENVIRONMENT", summaries[0].diagnostic_gaps)
+
     def test_hfp_audio_passes_when_telecom_display_remains_split_brain(self):
         content = (
             line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")

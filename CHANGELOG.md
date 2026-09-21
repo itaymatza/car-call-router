@@ -16,6 +16,12 @@
   Telecom still displays BMW but the configured Android Auto endpoint verifiably owns SCO, make
   one bounded request to display Android Auto again so BMW can be selected manually; never retry
   BMW, guess an endpoint, or loop.
+- Put privacy-safe environment and evidence snapshots in each structured session trace, including
+  projection, call eligibility, Telecom route, endpoint-resolution basis, actual HFP/SCO owner,
+  policy decision, request generation/revision, and selector-recovery result.
+- Add analyzer diagnostic-completeness checks, an exact selector-recovery parked-test scenario,
+  all-HFP-owner service regressions, JDK 17/21 host-contract CI, merge-queue checks, and PR-retarget
+  triggers so moving a pull request onto `main` cannot silently skip CI.
 
 ## 0.3.0-beta.10
 
