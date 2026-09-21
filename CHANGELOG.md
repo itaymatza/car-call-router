@@ -2,15 +2,16 @@
 
 ## Unreleased
 
-- Run the production Telecom-service harness under JUnit/JaCoCo and fail CI below 90% line or 75%
-  branch coverage for `RouterInCallService`, `AddressedTelecomRouter`, `RouterSettings`, and
-  `SessionBridge`; the pure routing core enforces independent 95% line and 90% branch floors.
-- Upload HTML/XML coverage and JUnit reports from every CI run and publish exact core/service
-  coverage totals in the GitHub job summary.
-- Expand the deterministic suite to 104 core JUnit tests and 75 production-service scenarios,
-  including 750,000 callback/evidence transitions, 7,776 exhaustive eligibility combinations,
-  late-bind endpoint-before-snapshot ordering, protected-route variants, expiring request markers,
-  generation isolation, runtime failures, and cached-endpoint invalidation.
+- Replace the callback-fighting startup guard with a bounded transaction: wait 500 ms after ACTIVE,
+  make at most one BMW endpoint request, verify stable target HFP/SCO audio, and stop.
+- Treat Telecom's displayed endpoint as diagnostic evidence rather than physical audio proof. A
+  split state where Telecom shows BMW while Android Auto owns SCO now forces the one request.
+- Make API 37 endpoint-request callbacks observational. Samsung call-start callbacks no longer
+  masquerade as user overrides or suspend the transaction, and the app never reasserts after its
+  one request.
+- Add deterministic regressions for the captured Samsung split-brain trace, transient SCO,
+  selector preservation, post-completion manual changes, request-result races, and the strict
+  one-request budget.
 
 ## 0.3.0-beta.10
 

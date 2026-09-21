@@ -53,6 +53,21 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual("INCOMPLETE", summaries[0].status)
         self.assertFalse(summaries[0].hfp_audio_confirmed)
 
+    def test_hfp_audio_passes_when_telecom_display_remains_split_brain(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 500, "REQUEST_SUBMITTED", "attempt=1")
+            + line("abc", 3, 780, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 4, 900, "SESSION_FINISHED",
+                   "phase=RELEASED reason=TARGET_AUDIO_CONFIRMED termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO final_route=STREAMING")
+        )
+        summaries, warnings = self.parse(content)
+        self.assertEqual([], warnings)
+        self.assertEqual("PASS", summaries[0].status)
+        self.assertFalse(summaries[0].endpoint_confirmed)
+        self.assertTrue(summaries[0].hfp_audio_confirmed)
+
     def test_route_oscillation_is_unstable_even_with_dual_confirmation(self):
         content = (
             line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
@@ -82,6 +97,20 @@ class TraceAnalyzerTest(unittest.TestCase):
         summaries, _ = self.parse(content)
         self.assertEqual("PASS", summaries[0].status)
         self.assertEqual(1, summaries[0].startup_replays)
+
+    def test_external_callback_is_observational_and_does_not_fail_session(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 7, "ENDPOINT_REQUEST_OBSERVED", "classification=EXTERNAL observational=true")
+            + line("abc", 3, 20, "TELECOM_ENDPOINT_CONFIRMED")
+            + line("abc", 4, 25, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 5, 100, "SESSION_FINISHED",
+                   "phase=SUCCEEDED reason=TARGET_AUDIO_CONFIRMED termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO final_route=TARGET")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("PASS", summaries[0].status)
+        self.assertEqual(1, summaries[0].external_callbacks)
 
     def test_sequence_gap_is_invalid(self):
         content = line("abc", 1, 0, "SESSION_STARTED") + line("abc", 3, 10, "SESSION_FINISHED")

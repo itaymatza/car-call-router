@@ -18,11 +18,36 @@ class RoutingEvidenceMatrixTest {
                             for (projection in nullableBooleans) {
                                 for (hfp in nullableBooleans) {
                                     for (available in nullableBooleans) {
-                                        for (route in Route.entries) {
-                                            val policy = RoutingPolicy().also { it.begin(0, route) }
-                                            val decision =
-                                                policy.evaluate(
-                                                    snapshot(
+                                        for (audio in nullableBooleans) {
+                                            for (route in Route.entries) {
+                                                val policy = RoutingPolicy(settleDelayMs = 0).also { it.begin(0, route) }
+                                                val decision =
+                                                    policy.evaluate(
+                                                        snapshot(
+                                                            enabled,
+                                                            authorized,
+                                                            active,
+                                                            singleCall,
+                                                            safe,
+                                                            projection,
+                                                            hfp,
+                                                            audio,
+                                                            available,
+                                                            route,
+                                                        ),
+                                                    )
+                                                val expected =
+                                                    enabled &&
+                                                        authorized &&
+                                                        active &&
+                                                        singleCall &&
+                                                        safe &&
+                                                        projection == true &&
+                                                        hfp == true &&
+                                                        available == true &&
+                                                        audio == false
+                                                val label =
+                                                    snapshotLabel(
                                                         enabled,
                                                         authorized,
                                                         active,
@@ -30,39 +55,18 @@ class RoutingEvidenceMatrixTest {
                                                         safe,
                                                         projection,
                                                         hfp,
+                                                        audio,
                                                         available,
                                                         route,
-                                                    ),
+                                                    )
+                                                assertEquals(
+                                                    "Unexpected decision for $label",
+                                                    expected,
+                                                    decision.requestTarget,
                                                 )
-                                            val expected =
-                                                enabled &&
-                                                    authorized &&
-                                                    active &&
-                                                    singleCall &&
-                                                    safe &&
-                                                    projection == true &&
-                                                    hfp == true &&
-                                                    available == true &&
-                                                    route != Route.TARGET
-                                            val label =
-                                                snapshotLabel(
-                                                    enabled,
-                                                    authorized,
-                                                    active,
-                                                    singleCall,
-                                                    safe,
-                                                    projection,
-                                                    hfp,
-                                                    available,
-                                                    route,
-                                                )
-                                            assertEquals(
-                                                "Unexpected decision for $label",
-                                                expected,
-                                                decision.requestTarget,
-                                            )
-                                            combinations++
-                                            if (decision.requestTarget) requests++
+                                                combinations++
+                                                if (decision.requestTarget) requests++
+                                            }
                                         }
                                     }
                                 }
@@ -72,8 +76,8 @@ class RoutingEvidenceMatrixTest {
                 }
             }
         }
-        assertEquals(6_912, combinations)
-        assertEquals(7, requests)
+        assertEquals(20_736, combinations)
+        assertEquals(8, requests)
     }
 
     @Test
@@ -87,31 +91,38 @@ class RoutingEvidenceMatrixTest {
                             for (projection in nullableBooleans) {
                                 for (hfp in nullableBooleans) {
                                     for (available in nullableBooleans) {
-                                        val route = Route.COMPETING_DEVICE
-                                        val policy = RoutingPolicy().also { it.begin(0, route, manualOneShot = true) }
-                                        val decision =
-                                            policy.evaluate(
-                                                snapshot(
-                                                    enabled,
-                                                    authorized,
-                                                    active,
-                                                    singleCall,
-                                                    safe,
-                                                    projection,
-                                                    hfp,
-                                                    available,
-                                                    route,
-                                                ),
-                                            )
-                                        val expected =
-                                            authorized &&
-                                                active &&
-                                                singleCall &&
-                                                safe &&
-                                                hfp == true &&
-                                                available == true
-                                        assertEquals(expected, decision.requestTarget)
-                                        combinations++
+                                        for (audio in nullableBooleans) {
+                                            val route = Route.COMPETING_DEVICE
+                                            val policy =
+                                                RoutingPolicy(settleDelayMs = 0).also {
+                                                    it.begin(0, route, manualOneShot = true)
+                                                }
+                                            val decision =
+                                                policy.evaluate(
+                                                    snapshot(
+                                                        enabled,
+                                                        authorized,
+                                                        active,
+                                                        singleCall,
+                                                        safe,
+                                                        projection,
+                                                        hfp,
+                                                        audio,
+                                                        available,
+                                                        route,
+                                                    ),
+                                                )
+                                            val expected =
+                                                authorized &&
+                                                    active &&
+                                                    singleCall &&
+                                                    safe &&
+                                                    hfp == true &&
+                                                    available == true &&
+                                                    audio == false
+                                            assertEquals(expected, decision.requestTarget)
+                                            combinations++
+                                        }
                                     }
                                 }
                             }
@@ -120,7 +131,7 @@ class RoutingEvidenceMatrixTest {
                 }
             }
         }
-        assertEquals(864, combinations)
+        assertEquals(2_592, combinations)
     }
 
     private fun snapshot(
@@ -131,9 +142,10 @@ class RoutingEvidenceMatrixTest {
         safe: Boolean,
         projection: Boolean?,
         hfp: Boolean?,
+        audio: Boolean?,
         available: Boolean?,
         route: Route,
-    ) = Snapshot(0, enabled, authorized, active, singleCall, safe, projection, hfp, available, 1, route)
+    ) = Snapshot(0, enabled, authorized, active, singleCall, safe, projection, hfp, audio, available, 1, route)
 
     private fun snapshotLabel(
         enabled: Boolean,
@@ -143,10 +155,11 @@ class RoutingEvidenceMatrixTest {
         safe: Boolean,
         projection: Boolean?,
         hfp: Boolean?,
+        audio: Boolean?,
         available: Boolean?,
         route: Route,
     ) = "enabled=$enabled authorized=$authorized active=$active single=$singleCall safe=$safe " +
-        "projection=$projection hfp=$hfp available=$available route=$route"
+        "projection=$projection hfp=$hfp audio=$audio available=$available route=$route"
 
     private companion object {
         val booleans = listOf(false, true)

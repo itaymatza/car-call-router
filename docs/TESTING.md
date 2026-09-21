@@ -13,16 +13,17 @@ The script runs ktlint for every Kotlin module, the pure-JVM `:core` JUnit suite
 and 75% branch floors, and the Python trace/APK-tooling tests. The service coverage scope contains only
 `RouterInCallService`, `AddressedTelecomRouter`, `RouterSettings`, and `SessionBridge`; framework
 stubs and test-driver code are excluded. The core suite includes named policy rules, 5,000 seeded
-traces (250,000 transitions), another 750,000 seeded callback/evidence transitions, 7,776
-exhaustive automatic/manual eligibility combinations, connection-order and timing scenarios, and
-JSONL regression-trace replay. It writes
+traces (250,000 transitions), another 750,000 seeded callback/evidence transitions, exhaustive
+automatic/manual eligibility combinations, and split-brain, timing, transient-SCO, and manual-
+control scenarios. It writes
 fresh local logs under `verification/current/`, which is intentionally ignored by Git. The
 framework-double service runner remains available for focused debugging, but normal verification
 runs it through Gradle/JUnit so JaCoCo can measure the production boundary.
 
-The production-service harness also executes 1,312 adversarial late-bind interleavings: every
-ordering of projection, HFP, endpoint-snapshot, and current-route evidence with protected-route
-handset, speaker, and wired edge inserted at each boundary, plus 1,000 reproducible callback storms.
+The production-service harness includes the captured Samsung failure shape: Telecom displays BMW,
+Android Auto owns SCO, and another `InCallService` request arrives immediately after ACTIVE. It
+also verifies the settling delay, strict one-request budget, stable-SCO requirement, result races,
+manual selector preservation, lifecycle cancellation, late binding, and request-marker isolation.
 
 These checks exercise decision rules and lifecycle behavior. They do not install an APK, emulate Android Telecom, validate protected-permission admission, or test a real Bluetooth stack, microphone, projection host, headset, or vehicle.
 
@@ -108,9 +109,10 @@ python3 tools/analyze_device_trace.py exported-log.txt --format json
 The analyzer reports malformed records, unsupported schemas, sequence gaps, time regressions,
 missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom
 endpoint is `INCOMPLETE`. A session is `UNSTABLE` when exact target audio is eventually confirmed
-but the trace also shows an external endpoint request or an endpoint oscillation such as
-BMW → handset → BMW. A session cannot be `PASS` without a finish, exact target HFP audio
-confirmation, and no detected instability.
+but the trace also shows an endpoint oscillation such as BMW → handset → BMW. Endpoint-request
+callbacks are reported for diagnostics only because Android can emit them during call startup without
+a user action. A session cannot be `PASS` without a finish, exact target HFP audio confirmation, and
+no detected instability.
 
 After collecting multiple runs, summarize the entire batch with:
 
@@ -139,7 +141,7 @@ On 2026-09-19, the project owner confirmed the proof of concept on the intended 
 6. After the call becomes active, tap **Route this call now** once.
 7. Confirm the app reports the target endpoint as verified. Speak and listen through the intended device; ask the helper which microphone is heard.
 8. Confirm navigation/media remains active on Android Auto.
-9. Manually select speaker in the Phone UI. Confirm the app respects that override and does not switch back.
+9. Manually select speaker and then BMW in the Phone UI. Confirm every endpoint remains selectable and the app never switches back after its single transaction.
 10. End the call and complete the capture prompts. If working manually, export the redacted diagnostic log after a failure and inspect it before sharing. Only after the one-shot test succeeds should automatic mode be enabled.
 
 Repeat separately for outgoing and incoming calls. Then test call hold/resume and a second incoming call; the expected safe behavior is to stop automatic reassertion. Conferences and emergency calls must never be used as positive routing tests.
@@ -148,9 +150,9 @@ For a successful run, the exported trace should contain both
 `TELECOM_ENDPOINT_CONFIRMED` and `TARGET_HFP_AUDIO_CONFIRMED` for the same `session`. The events
 include a schema version, sequence, and elapsed milliseconds. Endpoint confirmation without HFP
 audio confirmation is incomplete evidence and must not be counted as a successful microphone and
-speaker result. Endpoint-request records also include a classification (`SELF`, `PRE_GUARD`,
-`STARTUP_REPLAY`, or `EXTERNAL`), request/generation correlation, callback age, route-match flags,
-policy phase, and request count. The terminal record summarizes requests, route changes,
+speaker result. Endpoint-request records classify the request as `SELF` or `EXTERNAL` for
+diagnostics only and include generation correlation, callback age, route-match flags, policy phase,
+and request count. The terminal record summarizes requests, route changes,
 oscillations, callback classes, final route, HFP state, and SCO state.
 
 ## Production stability matrix

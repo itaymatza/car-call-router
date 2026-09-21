@@ -20,7 +20,6 @@ class RoutingCallbackPropertyTest {
             val initial = Route.entries.random(random)
             val policy = RoutingPolicy().also { it.begin(0, initial, manual) }
             var now = 0L
-            var lastRequestAt: Long? = null
 
             repeat(50) {
                 now += random.nextLong(0, 251)
@@ -38,6 +37,7 @@ class RoutingCallbackPropertyTest {
                         safeCellularCall = random.nextInt(100) > 2,
                         projection = evidence(random),
                         targetHfpConnected = evidence(random),
+                        targetHfpAudio = evidence(random),
                         targetAvailable = evidence(random),
                         endpointRevision = session.toLong() * 100 + it,
                         route = route,
@@ -47,15 +47,14 @@ class RoutingCallbackPropertyTest {
                 transitions++
 
                 if (before in terminal) assertEquals(false, decision.requestTarget)
-                check(policy.requests <= if (manual) 1 else 3)
+                check(policy.requests <= 1)
                 decision.wakeAt?.let { wake -> check(wake > now) }
                 if (decision.requestTarget) {
                     check(snapshot.authorized && snapshot.active && snapshot.singleCall)
                     check(snapshot.safeCellularCall)
                     check(snapshot.targetHfpConnected == true && snapshot.targetAvailable == true)
+                    check(snapshot.targetHfpAudio == false)
                     check(manual || (snapshot.enabled && snapshot.projection == true))
-                    lastRequestAt?.let { previous -> check(now - previous >= 2_500) }
-                    lastRequestAt = now
 
                     val attempt = requireNotNull(decision.requestAttempt)
                     when (random.nextInt(7)) {

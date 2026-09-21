@@ -59,14 +59,13 @@ class RoutingTrace(
     }
 
     fun confirmTelecom() {
-        if (confirmation != Confirmation.NONE) return
-        confirmation = Confirmation.TELECOM_ENDPOINT
+        if ((eventCounts["TELECOM_ENDPOINT_CONFIRMED"] ?: 0) > 0) return
+        if (confirmation == Confirmation.NONE) confirmation = Confirmation.TELECOM_ENDPOINT
         event("TELECOM_ENDPOINT_CONFIRMED")
     }
 
     fun confirmTargetHfpAudio() {
-        if (confirmation == Confirmation.TARGET_HFP_AUDIO) return
-        if (confirmation == Confirmation.NONE) confirmTelecom()
+        if ((eventCounts["TARGET_HFP_AUDIO_CONFIRMED"] ?: 0) > 0) return
         confirmation = Confirmation.TARGET_HFP_AUDIO
         event("TARGET_HFP_AUDIO_CONFIRMED")
     }

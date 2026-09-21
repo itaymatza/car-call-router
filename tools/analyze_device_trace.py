@@ -143,14 +143,11 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             routes[index] == routes[index - 2] and routes[index] != routes[index - 1]
             for index in range(2, len(routes))
         )
-        if hfp and not endpoint:
-            anomalies.append("HFP audio confirmation appeared without endpoint confirmation")
-
         if anomalies:
             status = "INVALID"
         elif finish is None:
             status = "OPEN"
-        elif hfp is not None and (classifications.count("EXTERNAL") > 0 or route_oscillations > 0):
+        elif hfp is not None and route_oscillations > 0:
             status = "UNSTABLE"
         elif hfp is not None:
             status = "PASS"

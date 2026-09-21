@@ -55,9 +55,7 @@ class RouterInCallService :
     private var manualCooldownUntil = 0L
     private var activeTransitionAt: Long? = null
     private var lateBindRecoveryDeadlineAt: Long? = null
-    private var initialEndpointId: String? = null
     private var lastEndpointId: String? = null
-    private val preGuardEndpointRequests = mutableMapOf<String, Long>()
 
     private data class Record(
         val id: Int,
@@ -104,9 +102,7 @@ class RouterInCallService :
         lastPublished = ""
         activeTransitionAt = null
         lateBindRecoveryDeadlineAt = null
-        initialEndpointId = null
         lastEndpointId = null
-        preGuardEndpointRequests.clear()
         trace =
             RoutingTrace(
                 now = SystemClock::elapsedRealtime,
@@ -237,7 +233,6 @@ class RouterInCallService :
             sessionStarted = true
             manualSession = false
             activeTransitionAt = SystemClock.elapsedRealtime()
-            initialEndpointId = router.current()?.identifier?.toString()
             if (replayedCallObject) {
                 trace.begin("automatic", "same_instance_active_rebind")
                 policy.suspend(
@@ -279,7 +274,6 @@ class RouterInCallService :
             manualSession = false
             activeTransitionAt = SystemClock.elapsedRealtime()
             lateBindRecoveryDeadlineAt = null
-            initialEndpointId = router.current()?.identifier?.toString()
             if (record.sawPreActive && previous != Call.STATE_HOLDING) {
                 trace.begin("automatic", "fresh_active_transition")
                 policy.begin(SystemClock.elapsedRealtime(), currentRoute())
@@ -329,9 +323,7 @@ class RouterInCallService :
             manualCooldownUntil = 0L
             activeTransitionAt = null
             lateBindRecoveryDeadlineAt = null
-            initialEndpointId = null
             lastEndpointId = null
-            preGuardEndpointRequests.clear()
             RouterLog.event("SESSION_END", "No audio reset, disconnect, A2DP or projection operation performed")
         }
         queueEvaluation()
@@ -403,41 +395,17 @@ class RouterInCallService :
         val now = SystemClock.elapsedRealtime()
         val endpointId = callEndpoint.identifier.toString()
         val observation = router.observeRequest(callEndpoint)
-        val guardActed = guardHasActed()
-        val matchesInitial = endpointId == initialEndpointId
         val matchesCurrent = endpointId == router.current()?.identifier?.toString()
         val matchesTarget = endpointId == targetEndpoint().endpoint?.identifier?.toString()
-        val priorPreGuardAt = preGuardEndpointRequests[endpointId]
         val transitionAge = activeTransitionAt?.let { (now - it).coerceAtLeast(0) }
-        val startupReplay =
-            observation.origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL &&
-                sessionStarted &&
-                !policy.verified &&
-                (
-                    (priorPreGuardAt != null && now - priorPreGuardAt <= STARTUP_REPLAY_WINDOW_MS) ||
-                        (matchesInitial && transitionAge != null && transitionAge <= INITIAL_ROUTE_REPLAY_WINDOW_MS)
-                )
-        val protectedLateBindRequest =
-            lateBindRecoveryDeadlineAt != null &&
-                callEndpoint.endpointType in PROTECTED_ENDPOINT_TYPES
-        val classification =
-            when {
-                observation.origin == AddressedTelecomRouter.RequestOrigin.SELF -> "SELF"
-                startupReplay -> "STARTUP_REPLAY"
-                protectedLateBindRequest -> "EXTERNAL"
-                guardActed -> "EXTERNAL"
-                else -> "PRE_GUARD"
-            }
-        if (!guardActed && observation.origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL) {
-            preGuardEndpointRequests[endpointId] = now
-        }
+        val classification = observation.origin.name
         RouterLog.event(
             "ENDPOINT_REQUEST_OBSERVED",
             "type=${callEndpoint.endpointType}; classification=$classification; " +
                 "request=${observation.requestId ?: "none"}; generation=${observation.generation}; " +
                 "ageMs=${observation.ageMs ?: "none"}; pending=${observation.pendingCount}; " +
-                "expired=${observation.expiredCount}; guardActed=$guardActed; " +
-                "matchesInitial=$matchesInitial; matchesCurrent=$matchesCurrent; matchesTarget=$matchesTarget; " +
+                "expired=${observation.expiredCount}; observational=true; " +
+                "matchesCurrent=$matchesCurrent; matchesTarget=$matchesTarget; " +
                 "id=${RouterLog.deviceId(endpointId)}",
         )
         trace.event(
@@ -450,24 +418,16 @@ class RouterInCallService :
             "age_ms" to (observation.ageMs ?: "none"),
             "pending" to observation.pendingCount,
             "expired" to observation.expiredCount,
-            "guard_acted" to guardActed,
-            "matches_initial" to matchesInitial,
+            "observational" to true,
             "matches_current" to matchesCurrent,
             "matches_target" to matchesTarget,
             "transition_age_ms" to (transitionAge ?: "none"),
             "phase" to policy.phase,
             "attempts" to policy.requests,
         )
-        // Samsung/Telecom can replay its call-start endpoint choice alongside the ACTIVE
-        // transition. At that point no user override can be inferred: the callback may describe
-        // the route that the platform selected while setting up the call. Only treat another
-        // request as an override after this guard has submitted a request or verified the target.
-        if (classification == "EXTERNAL") {
-            suspendSessionFromEvent(
-                "Another in-call UI requested an endpoint; respecting possible user override",
-                RoutingPolicy.ReasonCode.EXTERNAL_ENDPOINT_REQUEST,
-            )
-        }
+        // This callback reports requests from another InCallService, not verified user intent.
+        // Samsung emits it during call startup. The router therefore records it but never blocks
+        // the Dialer's selector or changes the bounded one-shot transaction because of it.
         queueEvaluation()
     }
 
@@ -566,6 +526,12 @@ class RouterInCallService :
             }
         val target = targetEndpoint()
         val endpointAvailable = if (router.hasAvailableSnapshot()) target.endpoint != null else null
+        val targetHfpAudio =
+            when {
+                address == null -> false
+                !hfp.known -> null
+                else -> address in hfp.audioConnected
+            }
         val now = SystemClock.elapsedRealtime()
         val route = currentRoute()
         val lateBindDeadline = lateBindRecoveryDeadlineAt
@@ -654,6 +620,7 @@ class RouterInCallService :
                     safeCellularCall = safe,
                     projection = projection,
                     targetHfpConnected = hfpConnected,
+                    targetHfpAudio = targetHfpAudio,
                     targetAvailable = endpointAvailable,
                     endpointRevision = router.endpointRevision(),
                     route = route,
@@ -781,16 +748,8 @@ class RouterInCallService :
                 trace.event("REQUEST_ERROR", "attempt" to attempt, "type" to e.javaClass.simpleName)
             }
         }
-        val sco =
-            when {
-                address == null -> false
-                !hfp.known -> null
-                else -> address in hfp.audioConnected
-            }
-        if (route == RoutingPolicy.Route.TARGET) {
-            trace.confirmTelecom()
-            if (sco == true) trace.confirmTargetHfpAudio()
-        }
+        if (route == RoutingPolicy.Route.TARGET) trace.confirmTelecom()
+        if (policy.verified) trace.confirmTargetHfpAudio()
         val state =
             listOf(
                 "Service: bound",
@@ -798,7 +757,7 @@ class RouterInCallService :
                 "Call: ${if (active) "ACTIVE" else "not active"}; live=${live.size}",
                 "Safety: $lastSafety",
                 "Selected device: endpoint resolved=${target.endpoint != null}; " +
-                    "HFP connected=${hfpConnected ?: "unknown"}; SCO=${sco ?: "unknown"}",
+                    "HFP connected=${hfpConnected ?: "unknown"}; SCO=${targetHfpAudio ?: "unknown"}",
                 "Endpoint resolution: ${target.reason}",
                 "Route: $route",
                 "Controller: ${policy.phase}; attempts=${policy.requests}; reason=${policy.reasonCode}",
@@ -886,20 +845,12 @@ class RouterInCallService :
     }
 
     companion object {
-        private const val STARTUP_REPLAY_WINDOW_MS = 2_500L
-        private const val INITIAL_ROUTE_REPLAY_WINDOW_MS = 750L
         private const val LATE_BIND_EVIDENCE_WINDOW_MS = 5_000L
         private val DEFINITE_USER_OWNED_ROUTES =
             setOf(
                 RoutingPolicy.Route.HANDSET,
                 RoutingPolicy.Route.SPEAKER,
                 RoutingPolicy.Route.WIRED,
-            )
-        private val PROTECTED_ENDPOINT_TYPES =
-            setOf(
-                CallEndpoint.TYPE_EARPIECE,
-                CallEndpoint.TYPE_SPEAKER,
-                CallEndpoint.TYPE_WIRED_HEADSET,
             )
 
         private fun isPreActive(state: Int) =
