@@ -47,7 +47,10 @@ class RoutingCallbackPropertyTest {
                 val decision = policy.evaluate(snapshot)
                 transitions++
 
-                if (before in terminal) assertEquals(false, decision.requestTarget)
+                if (before in terminal) {
+                    assertEquals(false, decision.requestTarget)
+                    assertEquals(false, decision.restoreSelector)
+                }
                 check(policy.requests <= 1)
                 check(policy.selectorRecoveries <= 1)
                 decision.wakeAt?.let { wake -> check(wake > now) }
@@ -67,6 +70,18 @@ class RoutingCallbackPropertyTest {
                         4 -> policy.requestFailed(attempt, RequestError.UNSPECIFIED)
                         5 -> policy.requestFailed(attempt + 1, RequestError.RUNTIME_EXCEPTION)
                     }
+                }
+                if (decision.restoreSelector) {
+                    check(!decision.requestTarget)
+                    check(decision.requestAttempt == null)
+                    check(snapshot.route == Route.TARGET)
+                    check(snapshot.targetHfpConnected == true)
+                    check(snapshot.targetAvailable == true)
+                    check(snapshot.targetHfpAudio == false)
+                    check(snapshot.selectorRecoveryAvailable == true)
+                    check(policy.requests == 1)
+                    check(policy.selectorRecoveries == 1)
+                    check(policy.phase == Phase.RECOVERING_SELECTOR)
                 }
             }
         }

@@ -32,6 +32,8 @@ private val target = CallEndpoint("Target test device", CallEndpoint.TYPE_BLUETO
 private val competing = CallEndpoint("Competing test device", CallEndpoint.TYPE_BLUETOOTH, COMPETING_ID)
 private val other = CallEndpoint("Other test device", CallEndpoint.TYPE_BLUETOOTH, OTHER_ID)
 private val speaker = CallEndpoint("Speaker", CallEndpoint.TYPE_SPEAKER)
+private val handset = CallEndpoint("Handset", CallEndpoint.TYPE_EARPIECE)
+private val wired = CallEndpoint("Wired", CallEndpoint.TYPE_WIRED_HEADSET)
 
 private fun reset() {
     TestQueue.reset()
@@ -281,6 +283,27 @@ fun main(args: Array<String>) {
                     check(SessionBridge.status.contains("SELECTOR_RECOVERY_FAILED"))
                     TestQueue.advanceTo(10_000)
                     countEquals(f, 2)
+                }
+            },
+            "protected_user_routes_stop_selector_recovery" to {
+                listOf(speaker, handset, wired, other).forEach { protectedRoute ->
+                    Fixture(initialEndpoint = target).use { f ->
+                        f.activateAndSettle()
+                        TestQueue.advanceTo(4_500)
+                        countEquals(f, 2)
+                        f.route(protectedRoute)
+                        check(SessionBridge.status.contains("SUSPENDED"))
+                        check(SessionBridge.status.contains("USER_OVERRIDE"))
+                        TestQueue.advanceTo(10_000)
+                        countEquals(f, 2)
+                        check(
+                            RouterLog.events.any {
+                                it.first == "ROUTING_TRACE" &&
+                                    "event=POLICY_STATE" in it.second &&
+                                    "reason=USER_OVERRIDE" in it.second
+                            },
+                        )
+                    }
                 }
             },
             "manual_one_shot_bypasses_toggle_and_projection" to {
@@ -624,13 +647,11 @@ fun main(args: Array<String>) {
                 }
             },
             "all_platform_route_types_are_observed" to {
-                val earpiece = CallEndpoint("Earpiece", CallEndpoint.TYPE_EARPIECE)
-                val wired = CallEndpoint("Wired", CallEndpoint.TYPE_WIRED_HEADSET)
                 val streaming = CallEndpoint("Streaming", CallEndpoint.TYPE_STREAMING)
                 val unknown = CallEndpoint("Unknown", CallEndpoint.TYPE_UNKNOWN)
                 Fixture().use { f ->
                     f.activateWithoutSettling()
-                    listOf(earpiece, wired, streaming, other, unknown).forEach(f::route)
+                    listOf(handset, wired, streaming, other, unknown).forEach(f::route)
                     HfpMonitor.emit(emptySet(), known = false)
                     f.route(other)
                     val traces = RouterLog.events.filter { it.first == "ROUTING_TRACE" }.map { it.second }

@@ -22,6 +22,9 @@
 - Add analyzer diagnostic-completeness checks, an exact selector-recovery parked-test scenario,
   all-HFP-owner service regressions, JDK 17/21 host-contract CI, merge-queue checks, and PR-retarget
   triggers so moving a pull request onto `main` cannot silently skip CI.
+- Suspend selector recovery when a protected speaker, handset, wired, or other-Bluetooth route is
+  observed; add deterministic and randomized invariants for the recovery action, and correct the
+  stale pre-one-shot safety description in the README.
 
 ## 0.3.0-beta.10
 
