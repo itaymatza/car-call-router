@@ -145,6 +145,31 @@ object PolicyCases {
                 check(rejected.reasonCode == ReasonCode.SELECTOR_RECOVERY_FAILED)
                 check(rejected.selectorRecoveries == 1)
             },
+            "selector recovery callback races and accepted timeout are bounded" to {
+                val outsideRecovery = policy()
+                outsideRecovery.selectorRecoverySucceeded()
+                outsideRecovery.selectorRecoveryFailed()
+                check(outsideRecovery.phase == Phase.WAITING)
+
+                val accepted = policy(actionWindowMs = 4_000)
+                accepted.evaluate(snapshot(0, route = Route.TARGET))
+                val recovery =
+                    accepted.evaluate(
+                        snapshot(
+                            4_000,
+                            route = Route.TARGET,
+                            selectorRecoveryAvailable = true,
+                        ),
+                    )
+                accepted.selectorRecoverySucceeded()
+                val pending = accepted.evaluate(snapshot(5_000, route = Route.TARGET))
+                check(accepted.phase == Phase.RECOVERING_SELECTOR)
+                check(pending.wakeAt == recovery.wakeAt)
+                accepted.evaluate(snapshot(requireNotNull(recovery.wakeAt), route = Route.TARGET))
+                check(accepted.phase == Phase.FAILED)
+                check(accepted.reasonCode == ReasonCode.SELECTOR_RECOVERY_NOT_CONFIRMED)
+                check(accepted.reason.contains("accepted"))
+            },
             "accepted Telecom request still needs BMW SCO" to {
                 val p = policy(actionWindowMs = 1_000)
                 val request = p.evaluate(snapshot(0))
