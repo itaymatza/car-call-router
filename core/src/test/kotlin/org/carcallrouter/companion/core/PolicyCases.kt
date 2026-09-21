@@ -174,11 +174,11 @@ object PolicyCases {
                 listOf(Route.SPEAKER, Route.HANDSET, Route.WIRED, Route.OTHER_BLUETOOTH).forEach { route ->
                     val p = policy(actionWindowMs = 4_000)
                     p.evaluate(snapshot(0, route = Route.TARGET))
-                    check(
+                    val recovery =
                         p.evaluate(
                             snapshot(4_000, route = Route.TARGET, selectorRecoveryAvailable = true),
-                        ).restoreSelector,
-                    )
+                        )
+                    check(recovery.restoreSelector)
                     p.selectorRecoverySucceeded()
                     val decision = p.evaluate(snapshot(4_100, route = route))
                     check(!decision.requestTarget)
