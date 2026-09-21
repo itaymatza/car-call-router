@@ -230,6 +230,31 @@ fun main(args: Array<String>) {
                             it.first == "ROUTING_TRACE" && it.second.contains("event=SELECTOR_RECOVERY_SUBMITTED")
                         },
                     )
+                    val traces = RouterLog.events.filter { it.first == "ROUTING_TRACE" }.map { it.second }
+                    check(traces.any { "event=SESSION_ENVIRONMENT" in it && "sdk=37" in it })
+                    check(
+                        traces.any {
+                            "event=EVIDENCE_SNAPSHOT" in it &&
+                                "route=TARGET" in it &&
+                                "hfp_audio_owner=COMPETITOR" in it &&
+                                "target_sco=false" in it
+                        },
+                    )
+                    check(
+                        traces.any {
+                            "event=SELECTOR_RECOVERY_SUBMITTED" in it &&
+                                "competitor_sco=true" in it &&
+                                "endpoint_revision=" in it
+                        },
+                    )
+                    check(
+                        traces.any {
+                            "event=SELECTOR_RECOVERY_CONTEXT" in it &&
+                                "pre_route=TARGET" in it &&
+                                "hfp_audio_owner=COMPETITOR" in it
+                        },
+                    )
+                    check(traces.any { "event=SELECTOR_RECOVERY_CONFIRMED" in it })
                 }
             },
             "selector_recovery_requires_exact_verified_split_brain" to {
@@ -501,6 +526,13 @@ fun main(args: Array<String>) {
                     f.flush()
                     check(SessionBridge.status.contains("PROJECTION_DISCONNECTED"))
                     countEquals(f, 1)
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=PROJECTION_CHANGED" in it.second &&
+                                "active=false" in it.second
+                        },
+                    )
                 }
             },
             "confirmed_hfp_loss_suspends_active_transaction" to {
@@ -604,6 +636,29 @@ fun main(args: Array<String>) {
                     val traces = RouterLog.events.filter { it.first == "ROUTING_TRACE" }.map { it.second }
                     listOf("HANDSET", "WIRED", "STREAMING", "OTHER_BLUETOOTH", "UNKNOWN").forEach { route ->
                         check(traces.any { "route=$route" in it })
+                    }
+                }
+            },
+            "structured_evidence_classifies_every_hfp_audio_owner" to {
+                Fixture().use { f ->
+                    f.activateWithoutSettling()
+                    HfpMonitor.audioDevices = emptySet()
+                    HfpMonitor.emit(HfpMonitor.devices, known = false)
+                    f.flush()
+                    HfpMonitor.emit(setOf(TARGET, COMPETING, OTHER))
+                    f.flush()
+                    HfpMonitor.audioDevices = setOf(OTHER)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.flush()
+                    HfpMonitor.audioDevices = setOf(TARGET, COMPETING)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.flush()
+                    HfpMonitor.audioDevices = setOf(TARGET)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.flush()
+                    val traces = RouterLog.events.filter { it.first == "ROUTING_TRACE" }.map { it.second }
+                    listOf("UNKNOWN", "NONE", "OTHER", "MULTIPLE", "TARGET").forEach { owner ->
+                        check(traces.any { "event=EVIDENCE_SNAPSHOT" in it && "hfp_audio_owner=$owner" in it })
                     }
                 }
             },

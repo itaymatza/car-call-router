@@ -35,7 +35,11 @@ With a suitable Android SDK:
 bash gradlew :core:check :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --stacktrace --console=plain
 ```
 
-The repository workflow runs that command on pushes and pull requests with read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
+The repository workflow runs that command on pushes, merge-queue candidates, and pull requests with
+read-only workflow permissions and uploads only the generated debug APK as an expiring artifact.
+PR `edited` events are included so retargeting a branch onto `main` cannot bypass required checks.
+The policy/service/trace host contracts run independently on JDK 17 and 21 for faster failures and
+runtime-compatibility coverage.
 
 Kotlin formatting is enforced with ktlint's official style and a 140-character maximum. Run
 `bash gradlew :app:ktlintFormat :core:ktlintFormat :verification:service-tests:ktlintFormat` before
@@ -75,7 +79,7 @@ bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing \
   --tag cold-start --tag battery-unrestricted --tag android-auto-first
 ```
 
-Supported scenarios are `incoming`, `outgoing`, `override`, `hold-resume`, `reconnect`,
+Supported scenarios are `incoming`, `outgoing`, `selector-recovery`, `override`, `hold-resume`, `reconnect`,
 `second-call`, `conference`, and `other`. Override and reconnect runs require exactly one matching
 route/disconnect tag so the corresponding physical observation cannot be skipped. Omit `--serial`
 only when exactly one authorized ADB device is connected. If the build
@@ -85,14 +89,15 @@ by that run; `--help` lists the controlled tag names.
 
 The script verifies that the package is installed and `MANAGE_ONGOING_CALLS` is allowed. It takes
 a baseline, prompts for one parked non-emergency call, then captures only new, structured
-`ROUTING_TRACE` records. It never starts a call, clears logcat, runs broad `dumpsys` collection, or
+`ROUTING_TRACE` records. Each new session must contain its environment plus at least one complete
+evidence snapshot for a qualification verdict. It never starts a call, clears logcat, runs broad `dumpsys` collection, or
 stores the ADB serial, phone number, Bluetooth name, or raw Bluetooth address.
 
 Each local, Git-ignored directory under `verification/device-runs/` contains:
 
 | File | Contents |
 |---|---|
-| `device.txt` | Scenario/tags, UTC time, phone/build identity, app version, installed APK SHA-256, and authorization state. |
+| `device.txt` | Scenario/tags, UTC time, phone/build/One UI identity, app version, installed APK SHA-256, and authorization state. |
 | `trace.log` | Only new schema-1 structured routing records; prior sessions are removed. |
 | `report.txt` / `report.json` | Per-session status, confirmations, latencies, finish reason, and anomalies. |
 | `observations.txt` | Parked human checks for native HFP speaker/microphone and preserved Android Auto behavior. |
@@ -114,6 +119,14 @@ callbacks are reported for diagnostics only because Android can emit them during
 a user action. A session cannot be `PASS` without a finish, exact target HFP audio confirmation, and
 no detected instability. `selector_recoveries` reports the bounded Samsung selector-restoration path;
 it remains a routing failure until a later manual BMW selection produces exact target HFP audio.
+The report separately marks `diagnostic_complete`, lists any missing request contexts, identifies a
+verified Telecom-BMW/HFP-Android-Auto split, and reports the final HFP owner and selector-recovery
+confirmation. Use `--require-diagnostics` when checking a capture outside the harness.
+
+For the reported Samsung selector regression, run `--scenario selector-recovery`. In addition to
+the standard speaker, microphone, and Android Auto observations, the harness records whether the
+Phone UI showed BMW while Android Auto actually owned audio, whether recovery made the UI truthful,
+whether BMW became selectable, and whether the final manual selection moved both speaker and mic.
 
 After collecting multiple runs, summarize the entire batch with:
 

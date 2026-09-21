@@ -6,6 +6,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  merge_group:
+    branches: [main]
 
 concurrency:
   group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -15,6 +18,26 @@ permissions:
   contents: read
 
 jobs:
+  host-contract:
+    name: Host contracts (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Test policy, service callback, trace, and capture contracts
+        run: |
+          python3 -m unittest tools.tests.test_analyze_device_trace tools.tests.test_capture_device_run
+          bash gradlew :core:test :verification:service-tests:test --stacktrace --console=plain
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25

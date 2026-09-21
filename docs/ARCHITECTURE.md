@@ -21,7 +21,7 @@ compiled implementation, preventing either harness from maintaining a private co
 | `HfpMonitor` | Tracks the target device’s HFP connection and SCO state through the Bluetooth profile service. | It starts only for verified projection or an explicit manual test, stops on confirmed projection loss, and re-queries profile state rather than trusting broadcast extras. |
 | `CellularClassifier` and `CallSafety` | Determine whether the call is a single, verifiable, non-emergency SIM-backed call. | Emergency, hidden/unclassifiable, external, self-managed, conference, and multi-call cases are rejected. |
 | `RoutingPolicy` (`:core`) | Pure Kotlin state machine that decides whether the one-shot routing transaction is permitted, delayed, verified, or stopped. | Waits for call-start routing to settle, permits exactly one automatic BMW request, requires stable target HFP/SCO audio, and can restore a provably stale Samsung selector once. |
-| `RoutingTrace` | Emits versioned, redacted, session-sequenced evidence with stable reason codes and elapsed timings. | Separates a Telecom endpoint observation from exact target HFP audio/SCO evidence; it does not claim physical microphone quality. |
+| `RoutingTrace` | Emits versioned, redacted, session-sequenced environment, evidence, action, and result records with stable reason codes and elapsed timings. | Places Telecom's displayed route beside exact HFP/SCO ownership without addresses, names, call identifiers, or phone numbers; it does not claim physical microphone quality. |
 | `EndpointIdentity` and `AddressedTelecomRouter` | Resolve the saved paired target against live API 34+ endpoints and issue the request. | Uses only callback-supplied endpoint objects. Unique label or one-to-one HFP topology is required; ambiguity fails closed. |
 | `RouterInCallService` | Coordinates Telecom, route, endpoint, projection, HFP, and call callbacks on the main thread. | Safety-relevant events are latched before deferred evaluation so that later callbacks cannot erase them. |
 
@@ -35,6 +35,14 @@ compiled implementation, preventing either harness from maintaining a private co
 6. Only the exact configured Bluetooth address owning HFP/SCO continuously for the confirmation interval produces `TARGET_HFP_AUDIO_CONFIRMED` and releases the transaction.
 7. The transaction never retries or reasserts BMW. API 37 endpoint-request callbacks are recorded but do not control the policy because Samsung also emits them during call startup. Manual Dialer changes remain system-owned.
 8. If the transaction expires in the exact captured split state—Telecom displays BMW while the configured Android Auto endpoint still owns SCO—the app makes one bounded selector-recovery request for that already-active Android Auto endpoint. This reconciles Samsung's display with physical audio so BMW becomes selectable again. It is not a second BMW attempt and is never repeated.
+
+Every active session starts with `SESSION_ENVIRONMENT` and emits a deduplicated
+`EVIDENCE_SNAPSHOT` whenever routing inputs or the resulting policy decision change. These records
+capture app/OS build context, process and battery state, projection, call eligibility, HFP topology,
+SCO-owner classification, endpoint revisions and resolution bases, route, phase, request budget,
+and pending action. Request and selector-recovery records then carry generation, latency,
+pre/post-route, and HFP-owner context, making callback order reconstructable without raw device or
+call identifiers.
 
 ## State machine
 

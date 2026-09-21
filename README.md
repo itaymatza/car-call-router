@@ -187,13 +187,15 @@ Neither replaces a parked physical microphone and speaker test.
 
 ## Verification
 
-Run `bash tools/test-all.sh` for the pure-JVM core, deterministic property, exhaustive eligibility, JSONL replay, and service-callback suites. CI enforces at least 95% line / 90% branch coverage for `:core` and 90% line / 75% branch coverage for the production Telecom-service boundary, excluding framework stubs and test drivers. The pull-request workflow uploads HTML/XML coverage and JUnit reports, assembles the APK, runs Android lint, and verifies APK signature and manifest identity. Passing those checks does not establish stable Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure and stability matrix in [testing guidance](docs/TESTING.md).
+Run `bash tools/test-all.sh` for the pure-JVM core, deterministic property, exhaustive eligibility, JSONL replay, and service-callback suites. CI enforces at least 95% line / 90% branch coverage for `:core` and 90% line / 75% branch coverage for the production Telecom-service boundary, excluding framework stubs and test drivers. Host contracts also run on JDK 17 and 21. The pull-request workflow uploads HTML/XML coverage and JUnit reports, assembles the APK, runs Android lint, verifies APK signature and manifest identity, and reruns when a PR is retargeted to `main`. Passing those checks does not establish stable Samsung, Android Auto, Bluetooth, microphone, or speaker behavior; use the parked-car procedure and stability matrix in [testing guidance](docs/TESTING.md).
 
 For repeatable real-device evidence, run
 `bash tools/capture_device_run.sh --serial PHONE_SERIAL --scenario outgoing` while parked. The
 harness stores only new structured app traces plus explicit physical observations in a local,
 Git-ignored run directory and emits `PASS` only when exact HFP audio and all required observations
-agree. Controlled tags classify each matrix cell, and
+agree. Each session includes a privacy-safe device/app environment record and deduplicated evidence
+snapshots showing Telecom's route beside the actual HFP/SCO owner. Controlled tags classify each
+matrix cell, and
 
 ```sh
 python3 tools/summarize_qualification.py verification/device-runs --require-ready
