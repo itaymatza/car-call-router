@@ -8,9 +8,16 @@ Calls are rejected when they are emergency or emergency-callback calls, external
 
 ## Bounded behavior
 
-A fresh automatic session has up to ten seconds to collect authoritative evidence. The first permitted route request starts a separate 5.5-second action/guard window. Only one request may be in flight, attempts are at least 2.5 seconds apart, and the maximum budget is three requests. A timeout may retry within that budget; a missing endpoint requires a newer endpoint snapshot; external cancellation, unknown errors, and runtime exceptions stop the session. Once the target route is observed, only a specifically configured competing route can cause a bounded reassertion. Speaker, handset, wired, streaming, unknown Bluetooth, or other routes are treated as possible user choices; an alternative observed during the first second after the app's own request must persist before suspension so a transient platform route does not become a false override.
+A fresh automatic session has up to ten seconds to collect authoritative evidence. After the call
+becomes active, the policy waits 500 ms for Android Auto's call-start routing to settle. It then
+makes at most one request for BMW and observes the result for up to four seconds. There is no retry,
+reassertion, or call-long route ownership. Telecom's displayed endpoint and accepted request result
+are diagnostic only; success requires the exact configured HFP device to own SCO continuously for
+the confirmation interval. A timeout may still be followed by late SCO confirmation, but it never
+authorizes another request. Endpoint disappearance, external cancellation, unknown errors, and
+runtime exceptions stop the transaction.
 
-Safety-relevant callback edges are latched before deferred evaluation. Therefore, confirmed projection loss, confirmed target HFP loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session. Temporary unknown projection/HFP evidence and transient Telecom endpoint-list gaps are not treated as confirmed loss: requests pause, stale endpoints are never submitted, and evaluation resumes only from fresh callback evidence within the bounded window.
+Safety-relevant callback edges are latched before deferred evaluation. Therefore, confirmed projection loss, confirmed target HFP loss, a call hold, a second call, a conference child, a settings change during the session, service teardown, or user pause cancels further automatic requests for that session. Temporary unknown projection/HFP evidence and transient Telecom endpoint-list gaps are not treated as confirmed loss: the transaction waits, stale endpoints are never submitted, and evaluation resumes only from fresh callback evidence within the bounded window. `onCallEndpointRequested()` is recorded but never interpreted as verified user intent, because Samsung emits the same callback during startup; the one-request budget guarantees it cannot create a routing fight.
 
 ## Authorization safety
 

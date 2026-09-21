@@ -18,7 +18,6 @@ class RoutingPropertyTest {
             val initial = if (random.nextBoolean()) Route.COMPETING_DEVICE else Route.entries.random(random)
             val policy = RoutingPolicy().also { it.begin(0, initial, manual) }
             var now = 0L
-            var lastRequest: Long? = null
 
             repeat(50) {
                 now += random.nextInt(0, 181)
@@ -47,6 +46,7 @@ class RoutingPropertyTest {
                         safeCellularCall = random.nextInt(100) > 1,
                         projection = evidence(),
                         targetHfpConnected = evidence(),
+                        targetHfpAudio = evidence(),
                         targetAvailable = evidence(),
                         endpointRevision = trace.toLong() + 1,
                         route = route,
@@ -55,16 +55,14 @@ class RoutingPropertyTest {
                 val decision = policy.evaluate(snapshot)
                 transitions++
 
-                check(policy.requests <= if (manual) 1 else 3)
+                check(policy.requests <= 1)
                 if (before in terminal) check(!decision.requestTarget)
                 if (decision.requestTarget) {
                     check(snapshot.authorized && snapshot.active && snapshot.singleCall)
                     check(snapshot.safeCellularCall)
                     check(snapshot.targetHfpConnected == true && snapshot.targetAvailable == true)
+                    check(snapshot.targetHfpAudio == false)
                     check(manual || (snapshot.enabled && snapshot.projection == true))
-                    check(snapshot.now < 15_500)
-                    check(lastRequest == null || snapshot.now - requireNotNull(lastRequest) >= 2_500)
-                    lastRequest = snapshot.now
                 }
                 decision.wakeAt?.let { check(it > snapshot.now) }
             }

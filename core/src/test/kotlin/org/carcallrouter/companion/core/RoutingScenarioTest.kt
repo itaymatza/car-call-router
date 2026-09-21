@@ -10,7 +10,7 @@ import org.junit.Test
 
 class RoutingScenarioTest {
     @Test
-    fun slowScoConfirmationIsRecordedWithoutAnotherRouteRequest() {
+    fun slowScoConfirmationIsTheStrongestRecordedEvidence() {
         var now = 0L
         val lines = mutableListOf<String>()
         val trace = RoutingTrace({ now }, { "slow-sco" }, lines::add)
@@ -20,110 +20,80 @@ class RoutingScenarioTest {
         trace.confirmTargetHfpAudio()
         assertEquals(
             RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
-            trace.finish(Phase.RELEASED, RoutingPolicy.ReasonCode.STARTUP_COMPLETE, "complete"),
+            trace.finish(Phase.RELEASED, RoutingPolicy.ReasonCode.TARGET_AUDIO_CONFIRMED, "complete"),
         )
-        assertEquals(1, lines.count { "TARGET_HFP_AUDIO_CONFIRMED" in it })
     }
 
     @Test
-    fun headUnitReclaimAtThreeSecondsGetsOneBoundedReassertion() {
-        val policy = policy()
-        assertTrue(policy.evaluate(snapshot(0)).requestTarget)
-        policy.evaluate(snapshot(100, route = Route.TARGET))
-        val decision = policy.evaluate(snapshot(3_000, route = Route.COMPETING_DEVICE))
-        assertTrue(decision.requestTarget)
-        assertEquals(2, decision.requestAttempt)
+    fun capturedSamsungSplitBrainForcesExactlyOneBmwRequest() {
+        val policy = RoutingPolicy(settleDelayMs = 500).also { it.begin(0, Route.TARGET) }
+
+        assertFalse(
+            policy.evaluate(snapshot(7, route = Route.TARGET, targetHfpAudio = false)).requestTarget,
+        )
+        policy.observeRoute(Route.OTHER_BLUETOOTH, 7)
+        val request = policy.evaluate(snapshot(500, route = Route.TARGET, targetHfpAudio = false))
+
+        assertTrue(request.requestTarget)
+        assertEquals(1, request.requestAttempt)
+        assertEquals(1, policy.requests)
+        assertFalse(policy.evaluate(snapshot(3_000, route = Route.TARGET, targetHfpAudio = false)).requestTarget)
     }
 
     @Test
-    fun intermediateHandsetRouteDoesNotWinInsideSelfRequestDebounce() {
-        val policy = policy()
-        policy.evaluate(snapshot(0))
-        assertFalse(policy.evaluate(snapshot(200, route = Route.HANDSET)).requestTarget)
-        assertTrue(policy.phase != Phase.SUSPENDED)
-        policy.evaluate(snapshot(400, route = Route.TARGET))
+    fun targetScoAfterRequestMustRemainStableBeforeRelease() {
+        val policy = RoutingPolicy(settleDelayMs = 0, targetAudioStableMs = 250).also { it.begin(0, Route.TARGET) }
+        policy.evaluate(snapshot(0, route = Route.TARGET, targetHfpAudio = false))
+        policy.evaluate(snapshot(300, route = Route.TARGET, targetHfpAudio = true))
+        assertEquals(Phase.STABILIZING, policy.phase)
+        policy.evaluate(snapshot(549, route = Route.TARGET, targetHfpAudio = true))
+        assertFalse(policy.verified)
+        policy.evaluate(snapshot(550, route = Route.TARGET, targetHfpAudio = true))
         assertTrue(policy.verified)
+        assertEquals(Phase.RELEASED, policy.phase)
     }
 
     @Test
-    fun projectionUnknownAtStartCanRecoverWithinEvidenceWindow() {
-        val policy = policy()
-        assertFalse(policy.evaluate(snapshot(0, projection = null)).requestTarget)
-        assertTrue(policy.evaluate(snapshot(9_000, projection = true)).requestTarget)
+    fun latePrerequisitesStillReceiveOneFullActionWindow() {
+        val policy = RoutingPolicy(settleDelayMs = 500).also { it.begin(0, Route.COMPETING_DEVICE) }
+        assertFalse(policy.evaluate(snapshot(500, targetAvailable = false)).requestTarget)
+        assertTrue(policy.evaluate(snapshot(9_000, targetAvailable = true)).requestTarget)
+        assertFalse(policy.evaluate(snapshot(11_500, targetAvailable = true)).requestTarget)
+        policy.evaluate(snapshot(13_000, targetAvailable = true))
+        assertEquals(Phase.FAILED, policy.phase)
     }
 
     @Test
-    fun bothConnectionOrdersConvergeOnOneRequest() {
-        val projectionFirst = policy()
-        assertFalse(projectionFirst.evaluate(snapshot(0, targetHfpConnected = false, targetAvailable = false)).requestTarget)
-        assertTrue(projectionFirst.evaluate(snapshot(1_000, targetHfpConnected = true, targetAvailable = true)).requestTarget)
+    fun manualSelectionAfterCompletionCannotBeReasserted() {
+        val policy = RoutingPolicy(settleDelayMs = 0, targetAudioStableMs = 0).also { it.begin(0, Route.COMPETING_DEVICE) }
+        policy.evaluate(snapshot(0, targetHfpAudio = false))
+        policy.evaluate(snapshot(100, route = Route.TARGET, targetHfpAudio = true))
+        assertEquals(Phase.RELEASED, policy.phase)
 
-        val hfpFirst = policy()
-        assertFalse(hfpFirst.evaluate(snapshot(0, projection = false)).requestTarget)
-        assertTrue(hfpFirst.evaluate(snapshot(1_000, projection = true)).requestTarget)
+        policy.observeRoute(Route.SPEAKER, 1_000)
+        assertFalse(policy.evaluate(snapshot(1_000, route = Route.SPEAKER, targetHfpAudio = false)).requestTarget)
+        assertEquals(1, policy.requests)
     }
-
-    @Test
-    fun jsonlRegressionTraceReplaysDeterministically() {
-        val resource = requireNotNull(javaClass.getResource("/traces/head-unit-reclaim.jsonl"))
-        val policy = policy()
-        val attempts =
-            resource
-                .readText()
-                .lineSequence()
-                .filter { it.isNotBlank() }
-                .map { line ->
-                    val fields = parseFlatJson(line)
-                    policy
-                        .evaluate(
-                            snapshot(
-                                now = requireNotNull(fields["now"]).toLong(),
-                                projection = fields["projection"].toNullableBoolean(),
-                                targetHfpConnected = fields["targetHfpConnected"].toNullableBoolean(),
-                                targetAvailable = fields["targetAvailable"].toNullableBoolean(),
-                                endpointRevision = requireNotNull(fields["endpointRevision"]).toLong(),
-                                route = Route.valueOf(requireNotNull(fields["route"])),
-                            ),
-                        ).requestAttempt
-                }.filterNotNull()
-                .toList()
-        assertEquals(listOf(1, 2), attempts)
-        assertTrue(policy.verified)
-    }
-
-    private fun policy() = RoutingPolicy().also { it.begin(0, Route.COMPETING_DEVICE) }
 
     private fun snapshot(
         now: Long,
         projection: Boolean? = true,
         targetHfpConnected: Boolean? = true,
+        targetHfpAudio: Boolean? = false,
         targetAvailable: Boolean? = true,
-        endpointRevision: Long = 1,
         route: Route = Route.COMPETING_DEVICE,
     ) = Snapshot(
-        now,
-        true,
-        true,
-        true,
-        true,
-        true,
-        projection,
-        targetHfpConnected,
-        targetAvailable,
-        endpointRevision,
-        route,
+        now = now,
+        enabled = true,
+        authorized = true,
+        active = true,
+        singleCall = true,
+        safeCellularCall = true,
+        projection = projection,
+        targetHfpConnected = targetHfpConnected,
+        targetHfpAudio = targetHfpAudio,
+        targetAvailable = targetAvailable,
+        endpointRevision = 1,
+        route = route,
     )
-
-    private fun String?.toNullableBoolean(): Boolean? =
-        when (this) {
-            "true" -> true
-            "false" -> false
-            "null" -> null
-            else -> error("Invalid nullable boolean: $this")
-        }
-
-    private fun parseFlatJson(line: String): Map<String, String> =
-        Regex("\\\"([^\\\"]+)\\\"\\s*:\\s*(\\\"([^\\\"]*)\\\"|true|false|null|-?\\d+)")
-            .findAll(line)
-            .associate { match -> match.groupValues[1] to match.groupValues[2].trim('"') }
 }

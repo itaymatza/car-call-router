@@ -13,10 +13,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Explicit edge cases keep the coverage gate tied to meaningful state-machine behavior. */
+/** Explicit edge cases keep the coverage gate tied to meaningful behavior. */
 class CoverageCasesTest {
     @Test
-    fun staleAndTerminalCallbacksAreNoOps() {
+    fun idleAndTerminalCallbacksAreNoOps() {
         val idle = RoutingPolicy()
         idle.observeRoute(Route.SPEAKER, 0)
         idle.requestSucceeded(1, 0)
@@ -24,62 +24,31 @@ class CoverageCasesTest {
         assertEquals(Phase.IDLE, idle.phase)
 
         val policy = policy()
-        val first = policy.evaluate(snapshot(0))
-        policy.requestSucceeded(requireNotNull(first.requestAttempt) + 1, 10)
-        policy.requestFailed(requireNotNull(first.requestAttempt) + 1, RequestError.TIMEOUT)
-        assertEquals(Phase.VERIFYING, policy.phase)
+        val attempt = requireNotNull(policy.evaluate(snapshot(0)).requestAttempt)
         policy.suspend("stop")
-        policy.requestSucceeded(first.requestAttempt, 20)
-        policy.requestFailed(first.requestAttempt, RequestError.TIMEOUT)
+        policy.requestSucceeded(attempt, 20)
+        policy.requestFailed(attempt, RequestError.TIMEOUT)
         assertEquals(Phase.SUSPENDED, policy.phase)
     }
 
     @Test
-    fun unspecifiedPlatformFailureStopsWithoutRetry() {
-        val policy = policy()
+    fun stableAudioAtActionDeadlineWinsOverTimeout() {
+        val policy = policy(actionWindowMs = 1_000, stableMs = 0)
+        policy.evaluate(snapshot(0))
+        policy.evaluate(snapshot(1_000, targetHfpAudio = true, route = Route.TARGET))
+        assertEquals(Phase.RELEASED, policy.phase)
+        assertEquals(ReasonCode.TARGET_AUDIO_CONFIRMED, policy.reasonCode)
+    }
+
+    @Test
+    fun acceptedCallbackClearsPlatformTimeoutButNotActionDeadline() {
+        val policy = policy(actionWindowMs = 1_000)
         val attempt = requireNotNull(policy.evaluate(snapshot(0)).requestAttempt)
-        policy.requestFailed(attempt, RequestError.UNSPECIFIED)
+        policy.requestSucceeded(attempt, 100)
+        val decision = policy.evaluate(snapshot(500))
+        assertEquals(1_000L, decision.wakeAt)
+        policy.evaluate(snapshot(1_000))
         assertEquals(Phase.FAILED, policy.phase)
-        assertEquals(ReasonCode.REQUEST_FAILED, policy.reasonCode)
-    }
-
-    @Test
-    fun actionDeadlineFailureAndTargetDeadlineReleaseAreDistinct() {
-        val failed = policy()
-        failed.evaluate(snapshot(0))
-        failed.evaluate(snapshot(5_500))
-        assertEquals(Phase.FAILED, failed.phase)
-        assertEquals(ReasonCode.ACTION_DEADLINE_EXPIRED, failed.reasonCode)
-
-        val released = policy()
-        released.evaluate(snapshot(10_000, route = Route.TARGET))
-        assertEquals(Phase.RELEASED, released.phase)
-        assertEquals(ReasonCode.STARTUP_COMPLETE, released.reasonCode)
-    }
-
-    @Test
-    fun configurableLongWindowCanExhaustRequestBudget() {
-        val policy = RoutingPolicy(actionWindowMs = 20_000).also { it.begin(0, Route.COMPETING_DEVICE) }
-        assertTrue(policy.evaluate(snapshot(0)).requestTarget)
-        assertTrue(policy.evaluate(snapshot(2_500)).requestTarget)
-        assertTrue(policy.evaluate(snapshot(5_000)).requestTarget)
-        assertFalse(policy.evaluate(snapshot(7_500)).requestTarget)
-        assertEquals(ReasonCode.REQUEST_BUDGET_EXHAUSTED, policy.reasonCode)
-    }
-
-    @Test
-    fun manualAndUnknownRoutesNeverReceiveBlindRetries() {
-        val manual =
-            RoutingPolicy(platformRequestTimeoutMs = 100, actionWindowMs = 1_000)
-                .also { it.begin(0, Route.COMPETING_DEVICE, manualOneShot = true) }
-        manual.evaluate(snapshot(0))
-        manual.evaluate(snapshot(100))
-        assertEquals(ReasonCode.REQUEST_NOT_VERIFIED, manual.reasonCode)
-
-        val unknown = policy()
-        unknown.evaluate(snapshot(0))
-        unknown.evaluate(snapshot(2_500, route = Route.UNKNOWN))
-        assertEquals(ReasonCode.ALTERNATIVE_ROUTE_DURING_REQUEST, unknown.reasonCode)
     }
 
     @Test
@@ -109,18 +78,12 @@ class CoverageCasesTest {
         trace.confirmTargetHfpAudio()
         assertEquals(
             RoutingTrace.Confirmation.TARGET_HFP_AUDIO,
-            trace.finish(Phase.RELEASED, ReasonCode.STARTUP_COMPLETE, "done", "final_route" to Route.TARGET),
+            trace.finish(Phase.RELEASED, ReasonCode.TARGET_AUDIO_CONFIRMED, "done", "final_route" to Route.TARGET),
         )
         assertTrue(lines.first().contains("session=empty"))
         assertTrue(lines.any { "elapsed_ms=0" in it && "nullable_field=null" in it })
         assertEquals(1, lines.count { "TELECOM_ENDPOINT_CONFIRMED" in it })
         assertEquals(1, lines.count { "TARGET_HFP_AUDIO_CONFIRMED" in it })
-        assertTrue(
-            lines.last().contains(
-                "requests=1 route_changes=1 endpoint_callbacks=4 self_callbacks=1 " +
-                    "startup_replays=1 external_callbacks=1 suspensions=1 final_route=TARGET",
-            ),
-        )
 
         session = "second"
         trace.begin("manual", "again")
@@ -140,22 +103,31 @@ class CoverageCasesTest {
         )
     }
 
-    private fun policy() = RoutingPolicy().also { it.begin(0, Route.COMPETING_DEVICE) }
+    private fun policy(
+        actionWindowMs: Long = 4_000,
+        stableMs: Long = 250,
+    ) = RoutingPolicy(
+        settleDelayMs = 0,
+        actionWindowMs = actionWindowMs,
+        targetAudioStableMs = stableMs,
+    ).also { it.begin(0, Route.COMPETING_DEVICE) }
 
     private fun snapshot(
         now: Long,
+        targetHfpAudio: Boolean? = false,
         route: Route = Route.COMPETING_DEVICE,
     ) = Snapshot(
-        now,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        1,
-        route,
+        now = now,
+        enabled = true,
+        authorized = true,
+        active = true,
+        singleCall = true,
+        safeCellularCall = true,
+        projection = true,
+        targetHfpConnected = true,
+        targetHfpAudio = targetHfpAudio,
+        targetAvailable = true,
+        endpointRevision = 1,
+        route = route,
     )
 }
