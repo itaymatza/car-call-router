@@ -852,6 +852,7 @@ class RouterInCallService :
                 RoutingPolicy.Route.SPEAKER,
                 RoutingPolicy.Route.WIRED,
             )
+
         private fun isPreActive(state: Int) =
             state in setOf(Call.STATE_NEW, Call.STATE_RINGING, Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_SELECT_PHONE_ACCOUNT)
 
