@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0-beta.11
+
 - Replace the callback-fighting startup guard with a bounded transaction: wait 500 ms after ACTIVE,
   make at most one BMW endpoint request, verify stable target HFP/SCO audio, and stop.
 - Treat Telecom's displayed endpoint as diagnostic evidence rather than physical audio proof. A

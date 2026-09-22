@@ -6,7 +6,7 @@
 [![Downloads](https://img.shields.io/github/downloads/itaymatza/car-call-router/total?label=downloads)](https://github.com/itaymatza/car-call-router/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[**Download current APK**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.10-debug/car-call-router-0.3.0-beta.10-debug.apk) · [All versions and release notes](https://github.com/itaymatza/car-call-router/releases)
+[**Download current APK**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.11-debug/car-call-router-0.3.0-beta.11-debug.apk) · [All versions and release notes](https://github.com/itaymatza/car-call-router/releases)
 
 ![Car Call Router keeps Android Auto for navigation and media while a preferred Bluetooth HFP device handles calls.](docs/assets/social-preview.png)
 
@@ -57,7 +57,7 @@ the [compatibility guide](docs/DEVICE-COMPATIBILITY.md) and [FAQ](docs/FAQ.md) b
 
 ## Project status
 
-The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.10` extends strict late-bind recovery to genuinely new consecutive calls in a long-lived Telecom service while keeping same-call replays fail-closed, and stops HFP monitoring whenever Android Auto is confirmed disconnected; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
+The routing proof of concept has been confirmed by the project owner on the intended Samsung + Android Auto + native BMW Bluetooth setup: an active cellular call moved to the selected native hands-free endpoint, including its microphone, while Android Auto remained active. That confirms the core approach, not production reliability. Version `0.3.0-beta.11` replaces callback fighting with a one-shot BMW request verified by actual HFP/SCO ownership, restores Samsung's manual selector only for the exact captured split state, and records complete redacted evidence for the next parked test; see the [production-readiness gates](docs/PRODUCTION-READINESS.md).
 
 
 ## Public-repository posture
@@ -81,13 +81,13 @@ The source namespace is the generic value `org.carcallrouter.companion`. Overrid
 ```sh
 bash gradlew \
   -PAPP_APPLICATION_ID=example.callroute \
-  -PAPP_VERSION_CODE=12 \
-  -PAPP_VERSION_NAME=0.3.0-beta.10 \
+  -PAPP_VERSION_CODE=13 \
+  -PAPP_VERSION_NAME=0.3.0-beta.11 \
   :app:assembleDebug
 ```
 
 
-`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `12`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.10`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
+`APP_APPLICATION_ID` defaults to `org.carcallrouter.companion`; `APP_VERSION_CODE` defaults to `13`; and `APP_VERSION_NAME` defaults to `0.3.0-beta.11`. Choose an application ID that you control before distributing a build. The source namespace remains generic and fixed so Kotlin and manifest class references stay consistent.
 
 
 ### Runtime configuration
@@ -113,7 +113,8 @@ account is not required just to download the APK.
 
 | Version | Channel | Downloads |
 | --- | --- | --- |
-| `0.3.0-beta.10` | Android 14+ debug beta | [APK](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.10-debug/car-call-router-0.3.0-beta.10-debug.apk) · [SHA-256](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.10-debug/car-call-router-0.3.0-beta.10-debug.apk.sha256) · [Verification report](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.10-debug/apk-verification.txt) |
+| `0.3.0-beta.11` | Android 14+ debug beta | [APK](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.11-debug/car-call-router-0.3.0-beta.11-debug.apk) · [SHA-256](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.11-debug/car-call-router-0.3.0-beta.11-debug.apk.sha256) · [Verification report](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.11-debug/apk-verification.txt) |
+| `0.3.0-beta.10` | Previous Android 14+ debug beta | [Release](https://github.com/itaymatza/car-call-router/releases/tag/v0.3.0-beta.10-debug) |
 | `0.3.0-beta.9` | Previous Android 14+ debug beta | [Release](https://github.com/itaymatza/car-call-router/releases/tag/v0.3.0-beta.9-debug) |
 | `0.3.0-beta.7` | Previous Android 14+ debug beta | [Release](https://github.com/itaymatza/car-call-router/releases/tag/v0.3.0-beta.7-debug) |
 | `0.3.0-beta.6` | Previous Android 14+ debug beta | [Release](https://github.com/itaymatza/car-call-router/releases/tag/v0.3.0-beta.6-debug) |
@@ -125,7 +126,7 @@ New versions will appear automatically on the [Releases page](https://github.com
 
 The easiest path is the durable direct download:
 
-1. Download [**car-call-router-0.3.0-beta.10-debug.apk**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.10-debug/car-call-router-0.3.0-beta.10-debug.apk).
+1. Download [**car-call-router-0.3.0-beta.11-debug.apk**](https://github.com/itaymatza/car-call-router/releases/download/v0.3.0-beta.11-debug/car-call-router-0.3.0-beta.11-debug.apk).
 2. Open the downloaded APK on the Android device.
 3. If Android prompts you, temporarily allow **Install unknown apps** for the browser or file
    manager, install the APK, and then disable that permission again.
