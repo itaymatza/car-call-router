@@ -1,0 +1,6 @@
+Version 0.3.0-beta.11
+
+- Uses one bounded BMW request and verifies actual HFP/SCO call-audio ownership.
+- Restores Samsung's manual BMW selector only for the exact verified split-routing state.
+- Adds redacted environment, evidence, request, and selector-recovery diagnostics.
+- Stops recovery for speaker, handset, wired, and other Bluetooth choices.
