@@ -43,7 +43,7 @@ def main() -> int:
             "installed app and this repository are both named **Car Call Router**",
             f"APP_VERSION_CODE={version_code}",
             f"APP_VERSION_NAME={version_name}",
-            f"releases/download/v{version_name}-debug/car-call-router-{version_name}-debug.apk",
+            "https://github.com/itaymatza/car-call-router/releases",
         ],
         "docs/CONFIGURATION.md": [f"`{version_code}`", f"`{version_name}`"],
         "docs/PRODUCTION-READINESS.md": [f"`{version_name}` is a production-hardening beta"],
@@ -63,12 +63,12 @@ def main() -> int:
             f"org.carcallrouter.companion {version_code} {version_name} 34 36 false"
         ],
         ".github/workflows/publish-debug-prerelease.yml": [
-            f"VERSION_CODE: '{version_code}'",
-            f"VERSION_NAME: {version_name}",
-            f"RELEASE_TAG: v{version_name}-debug",
-            f"APK_NAME: car-call-router-{version_name}-debug.apk",
+            f"BASE_VERSION_CODE: '{version_code}'",
+            f"BASE_VERSION_NAME: {version_name}",
+            'echo "RELEASE_TAG=v${BASE_VERSION_NAME}-debug.${short_sha}"',
+            'echo "APK_NAME=car-call-router-${BASE_VERSION_NAME}-debug.${short_sha}.apk"',
         ],
-        "docs/DEBUG-PRERELEASE-NOTES.md": [f"car-call-router-{version_name}-debug.apk"],
+        "docs/DEBUG-PRERELEASE-NOTES.md": ["the `.apk` attached to this release"],
         "app/src/main/AndroidManifest.xml": [
             'android:description="@string/app_description"',
             'android:icon="@mipmap/ic_launcher"',
