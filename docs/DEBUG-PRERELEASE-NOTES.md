@@ -27,6 +27,11 @@ to the workflow and source commit that produced it.
 
 ## What changed in beta.12
 
+- The latest source build re-queries HFP audio during the bounded verification window, including
+  at its deadline, so a missing Bluetooth broadcast cannot make a stale audio reading the final
+  verdict. Diagnostics record the sample age, trigger, and redacted audio-device alias.
+- Technical status now separates Telecom's displayed endpoint from observed HFP audio and marks
+  BMW confirmed only when the target's audio has passed the stability check.
 - Replaces callback-fighting behavior with one bounded BMW request verified by exact, stable
   HFP/SCO ownership rather than the endpoint displayed by the Phone UI.
 - Restores Samsung's manual BMW selector once when Telecom displays BMW but the configured Android
