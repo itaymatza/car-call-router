@@ -97,18 +97,37 @@ class RouterInCallService :
                     "sleep_delta_ms" to (elapsedDelta - uptimeDelta).coerceAtLeast(0),
                 )
             }
+            val settling =
+                policy.phase == RoutingPolicy.Phase.WAITING &&
+                    policy.reasonCode == RoutingPolicy.ReasonCode.SETTLING_AFTER_ACTIVE
             if (
                 hfpStarted &&
                 (
-                    policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
+                    settling ||
+                        policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
                         (policy.phase == RoutingPolicy.Phase.RELEASED && postConfirmationDeadlineAt != null)
                 )
             ) {
                 val previousSampleAt = hfp.sampledAt
-                hfp.refresh("verification_timer", notify = false)
+                val previousAudio = if (hfp.known) hfp.audioConnected else null
+                hfp.refresh(if (settling) "settling_timer" else "verification_timer", notify = false)
+                if (settling && previousAudio != null && hfp.known && hfp.audioConnected != previousAudio) {
+                    policy.observeStartupActivity(SystemClock.elapsedRealtime())
+                    trace.event(
+                        "STARTUP_AUDIO_ACTIVITY",
+                        "previous_count" to previousAudio.size,
+                        "current_count" to hfp.audioConnected.size,
+                        "source" to "settling_sample",
+                    )
+                }
+                if (settling) lastHfpAudioDevices = if (hfp.known) hfp.audioConnected else null
                 val address = settings.targetAddress?.uppercase()
                 trace.event(
-                    if (policy.phase == RoutingPolicy.Phase.RELEASED) "HFP_POST_CONFIRMATION_SAMPLE" else "HFP_VERIFICATION_SAMPLE",
+                    when {
+                        settling -> "HFP_SETTLING_SAMPLE"
+                        policy.phase == RoutingPolicy.Phase.RELEASED -> "HFP_POST_CONFIRMATION_SAMPLE"
+                        else -> "HFP_VERIFICATION_SAMPLE"
+                    },
                     "previous_sample_age_ms" to previousSampleAt?.let { (SystemClock.elapsedRealtime() - it).coerceAtLeast(0) },
                     "sample" to hfp.sampleSequence,
                     "known" to hfp.known,
@@ -435,9 +454,14 @@ class RouterInCallService :
                     "endpoint_revision" to router.endpointRevision(),
                     "target_hfp_connected" to (address != null && hfp.known && address in hfp.connected),
                     "target_sco" to (address != null && hfp.known && address in hfp.audioConnected),
+                    "post_confirmation_loss_observed" to postConfirmationLossObserved,
                 )
             if (confirmation != null) {
-                settings.recordLastSession(policy.phase.name, policy.reasonCode.name, confirmation.name)
+                settings.recordLastSession(
+                    policy.phase.name,
+                    policy.reasonCode.name,
+                    if (postConfirmationLossObserved) "TARGET_HFP_AUDIO_UNSTABLE" else confirmation.name,
+                )
             }
             router.clearSession()
             policy = RoutingPolicy()
@@ -1145,9 +1169,12 @@ class RouterInCallService :
         }
         if (policy.phase !in setOf(RoutingPolicy.Phase.SUSPENDED, RoutingPolicy.Phase.FAILED)) {
             decision.wakeAt?.let { deadline ->
-                val verifying = policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING)
-                val due = if (verifying && hfpStarted) minOf(deadline, now + HFP_VERIFY_POLL_MS) else deadline
-                scheduleTick(due, if (due < deadline) "HFP_VERIFY_POLL" else policy.reasonCode.name)
+                val sampleHfp =
+                    policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
+                        (policy.phase == RoutingPolicy.Phase.WAITING &&
+                            policy.reasonCode == RoutingPolicy.ReasonCode.SETTLING_AFTER_ACTIVE)
+                val due = if (sampleHfp && hfpStarted) minOf(deadline, now + HFP_VERIFY_POLL_MS) else deadline
+                scheduleTick(due, if (due < deadline) "HFP_SAMPLE_POLL" else policy.reasonCode.name)
             }
             if (policy.phase == RoutingPolicy.Phase.RELEASED && hfpStarted) {
                 postConfirmationDeadlineAt?.let { deadline ->

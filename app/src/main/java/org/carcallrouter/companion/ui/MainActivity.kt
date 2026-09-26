@@ -226,6 +226,14 @@ class MainActivity : Activity() {
                 getString(
                     R.string.last_call_summary,
                     DateFormat.getDateTimeInstance().format(Date(lastSession.completedAt)),
+                    getString(
+                        when (lastSession.result) {
+                            RouterSettings.Result.HFP_CONFIRMED -> R.string.last_call_hfp_confirmed
+                            RouterSettings.Result.UNSTABLE -> R.string.last_call_unstable
+                            RouterSettings.Result.FAILED -> R.string.last_call_failed
+                            RouterSettings.Result.INCOMPLETE -> R.string.last_call_incomplete
+                        },
+                    ),
                     lastSession.phase,
                     lastSession.reason,
                     lastSession.confirmation,

@@ -136,6 +136,20 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual("UNSTABLE", summaries[0].status)
         self.assertEqual(1, summaries[0].route_oscillations)
 
+    def test_watch_loss_keeps_hfp_confirmation_from_being_reported_as_pass(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 700, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 3, 3700, "POST_CONFIRMATION_WATCH_FINISHED",
+                   "reason=deadline loss_observed=true final_target_sco=false")
+            + line("abc", 4, 5000, "SESSION_FINISHED",
+                   "phase=SUSPENDED reason=CALL_NOT_ACTIVE termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO post_confirmation_loss_observed=true")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("UNSTABLE", summaries[0].status)
+        self.assertEqual(1, summaries[0].audio_confirmation_losses)
+
     def test_startup_replay_is_reported_but_does_not_fail_session(self):
         content = (
             line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")

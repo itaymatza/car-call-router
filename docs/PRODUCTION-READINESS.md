@@ -43,6 +43,9 @@
 - Evidence collection and routing action use separate deadlines, transient alternative routes are
   debounced only during the immediate post-request settling period, and the UI persists the last
   completed session result.
+- Call-start settling re-queries HFP at 250 ms intervals so silent ownership changes can extend
+  the existing bounded quiet period; it does not add a route request. The last-call result and trace
+  distinguish a confirmed HFP route that later became unconfirmed.
 - A protected, manually triggered/tag-triggered workflow builds a non-debuggable signed APK,
   verifies its identity, publishes its SHA-256 digest, and creates a GitHub artifact attestation.
 
@@ -51,6 +54,8 @@
 - Complete the real-car stability matrix in [TESTING.md](TESTING.md) using one unchanged APK and
   retain one capture-harness record per trial.
 - Classify every observed failure from the redacted event sequence and add a deterministic regression before changing routing behavior.
+- Measure the 300–900 ms settling window against new parked-car traces before changing its bounds;
+  the report's 800–1200 ms suggestion is a hypothesis until that test isolates request timing.
 - Pass the complete Gradle build, JVM tests, service tests, Android lint, and APK verification for
   the release commit; repeat the APK gate against the separately signed, non-debuggable release.
 - Verify upgrade and fresh-install flows, including AppOps authorization detection, revocation, reboot, process death, and settings preservation.

@@ -171,6 +171,33 @@ fun main(args: Array<String>) {
                     countEquals(f, 1)
                 }
             },
+            "silent_startup_audio_churn_is_sampled_before_the_only_request" to {
+                Fixture().use { f ->
+                    f.activateWithoutSettling()
+                    val before = HfpMonitor.refreshes
+                    HfpMonitor.audioDevices = setOf(OTHER)
+                    TestQueue.advanceTo(250)
+                    check(HfpMonitor.refreshes > before)
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=HFP_SETTLING_SAMPLE" in it.second &&
+                                "audio_owner=OTHER" in it.second
+                        },
+                    )
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=STARTUP_AUDIO_ACTIVITY" in it.second &&
+                                "source=settling_sample" in it.second
+                        },
+                    )
+                    TestQueue.advanceTo(599)
+                    countEquals(f, 0)
+                    TestQueue.advanceTo(600)
+                    countEquals(f, 1)
+                }
+            },
             "outgoing_connecting_active_uses_same_delay" to {
                 Fixture(initialState = Call.STATE_DIALING).use { f ->
                     f.call.deliverState(Call.STATE_CONNECTING)
@@ -762,6 +789,11 @@ fun main(args: Array<String>) {
                     TestQueue.advanceTo(20_000)
                     check(HfpMonitor.refreshes == after)
                     countEquals(f, 1)
+                    f.service.onCallRemoved(f.call)
+                    f.flush()
+                    val last = checkNotNull(RouterSettings(f.service).lastSession)
+                    check(last.confirmation == "TARGET_HFP_AUDIO_UNSTABLE")
+                    check(last.result == RouterSettings.Result.UNSTABLE)
                 }
             },
             "hfp_monitor_follows_projection_and_manual_lifecycle" to {
@@ -1013,6 +1045,22 @@ fun main(args: Array<String>) {
                     check(last.phase == "RELEASED")
                     check(last.reason == "TARGET_AUDIO_CONFIRMED")
                     check(last.confirmation == "TARGET_HFP_AUDIO")
+                    check(last.result == RouterSettings.Result.HFP_CONFIRMED)
+                }
+            },
+            "normal_disconnect_retains_confirmed_last_call_result" to {
+                Fixture().use { f ->
+                    f.activateAndSettle()
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(750)
+                    f.call.deliverState(Call.STATE_DISCONNECTED)
+                    f.flush()
+                    f.service.onCallRemoved(f.call)
+                    f.flush()
+                    val last = checkNotNull(RouterSettings(f.service).lastSession)
+                    check(last.phase == "SUSPENDED")
+                    check(last.reason == "CALL_NOT_ACTIVE")
+                    check(last.result == RouterSettings.Result.HFP_CONFIRMED)
                 }
             },
             "request_markers_expire_and_are_generation_bound" to {

@@ -37,6 +37,7 @@ The owner-supplied redacted trace from 2026-09-26 shows an Android Auto UI outgo
 | Incoming, connecting, rebind, delayed authorization/projection | No unsafe takeover or duplicate request | Service harness and core property suite |
 | Telecom target display but other HFP owns SCO | No false audio confirmation; bounded verdict | Service harness and trace analyzer |
 | Telecom endpoint snapshot changes after request, target SCO arrives | Confirm exact stable HFP audio without retry | Service harness |
+| HFP owner changes without a broadcast during call-start settling | Re-query HFP every 250 ms within the existing 300–900 ms cap and extend the quiet period when the owner changes | Service harness |
 | Delayed audio-mode/communication-device transition | Log context, await target HFP evidence, no AudioManager mutation | Service harness |
 | HFP broadcast missing but proxy changes | Timer re-queries HFP before the deadline | Service harness |
 | Target audio confirmed, then another HFP peer silently takes over | Bounded passive watch records confirmation loss; no reassertion or long-running polling | Service harness and trace analyzer |
