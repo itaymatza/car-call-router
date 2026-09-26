@@ -967,5 +967,5 @@ fun main(args: Array<String>) {
     )
     output.forEach(::println)
     args.firstOrNull()?.let { File(it).writeText(output.joinToString("\n") + "\n") }
-    if (failed.isNotEmpty()) kotlin.system.exitProcess(1)
+    check(failed.isEmpty()) { "Service scenarios failed: ${failed.joinToString()}" }
 }

@@ -102,6 +102,7 @@ class RoutingScenarioTest {
     @Test
     fun otherServiceRequestStopsSelectorRecoveryButNotAudioConfirmation() {
         val policy = RoutingPolicy().also { it.begin(0, Route.TARGET) }
+        assertFalse(policy.observeExternalRequestAfterTarget())
         policy.evaluate(snapshot(300, route = Route.TARGET))
         assertTrue(policy.observeExternalRequestAfterTarget())
         policy.evaluate(snapshot(4_300, route = Route.TARGET, selectorRecoveryAvailable = true))
@@ -114,6 +115,24 @@ class RoutingScenarioTest {
         audio.evaluate(snapshot(700, route = Route.TARGET, targetHfpAudio = true))
         audio.evaluate(snapshot(950, route = Route.TARGET, targetHfpAudio = true))
         assertTrue(audio.verified)
+        assertFalse(audio.observeExternalRequestAfterTarget())
+    }
+
+    @Test
+    fun quietPeriodIgnoresManualAndLateEvents() {
+        val manual = RoutingPolicy().also { it.begin(1_000, Route.TARGET, manualOneShot = true) }
+        manual.observeStartupActivity(1_100)
+        assertTrue(manual.evaluate(snapshot(1_100)).requestTarget)
+
+        val automatic = RoutingPolicy().also { it.begin(1_000, Route.TARGET) }
+        automatic.observeStartupActivity(999)
+        assertTrue(automatic.evaluate(snapshot(1_300)).requestTarget)
+        automatic.observeStartupActivity(1_350)
+        assertEquals(1, automatic.requests)
+
+        val idle = RoutingPolicy()
+        idle.observeStartupActivity(10)
+        assertEquals(Phase.IDLE, idle.phase)
     }
 
     private fun snapshot(
