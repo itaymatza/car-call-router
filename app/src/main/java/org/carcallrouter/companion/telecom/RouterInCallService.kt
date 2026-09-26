@@ -61,6 +61,7 @@ class RouterInCallService :
     private var scheduledTickElapsed: Long? = null
     private var scheduledTickUptime: Long? = null
     private var confirmedAudioPresent: Boolean? = null
+    private var lastHfpAudioDevices: Set<String>? = null
 
     private data class Record(
         val id: Int,
@@ -233,6 +234,15 @@ class RouterInCallService :
 
     private fun newHfpMonitor(): HfpMonitor =
         HfpMonitor(this) {
+            val audio = if (hfp.known) hfp.audioConnected else null
+            if (audio != null && lastHfpAudioDevices != null && audio != lastHfpAudioDevices) {
+                val before = lastHfpAudioDevices?.size ?: 0
+                policy.observeStartupActivity(SystemClock.elapsedRealtime())
+                if (policy.phase == RoutingPolicy.Phase.WAITING && policy.requests == 0) {
+                    trace.event("STARTUP_AUDIO_ACTIVITY", "previous_count" to before, "current_count" to audio.size)
+                }
+            }
+            lastHfpAudioDevices = audio
             // Cancellation edges must survive a disconnect/reconnect before queued evaluation.
             val address = settings.targetAddress?.uppercase()
             if (guardHasActed() && address != null && hfp.known && address !in hfp.connected) {
@@ -257,6 +267,7 @@ class RouterInCallService :
         hfp.close()
         hfp = newHfpMonitor()
         hfpStarted = false
+        lastHfpAudioDevices = null
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -450,6 +461,7 @@ class RouterInCallService :
             )
         } else {
             policy.observeRoute(route, SystemClock.elapsedRealtime())
+            if (route != previousRoute) policy.observeStartupActivity(SystemClock.elapsedRealtime())
         }
         // Device names may contain personal data, so log only type + a salted ID.
         RouterLog.event("ENDPOINT", "type=${callEndpoint.endpointType}; id=${RouterLog.deviceId(callEndpoint.identifier.toString())}")
@@ -526,9 +538,20 @@ class RouterInCallService :
             "phase" to policy.phase,
             "attempts" to policy.requests,
         )
-        // This callback reports requests from another InCallService, not verified user intent.
-        // Samsung emits it during call startup. The router therefore records it but never blocks
-        // the Dialer's selector or changes the bounded one-shot transaction because of it.
+        // Call-start requests extend only the short quiet period. Once our request has been sent,
+        // another service's request suppresses selector recovery, without stopping HFP verification.
+        if (observation.origin == AddressedTelecomRouter.RequestOrigin.EXTERNAL && sessionStarted) {
+            policy.observeStartupActivity(now)
+            if (policy.observeExternalRequestAfterTarget()) {
+                trace.event(
+                    "EXTERNAL_CONTROL_AFTER_TARGET",
+                    "type" to callEndpoint.endpointType,
+                    "id" to RouterLog.deviceId(endpointId),
+                    "matches_target" to matchesTarget,
+                    "selector_recovery_suppressed" to true,
+                )
+            }
+        }
         queueEvaluation()
     }
 
@@ -1163,7 +1186,7 @@ class RouterInCallService :
     }
 
     companion object {
-        private const val HFP_VERIFY_POLL_MS = 500L
+        private const val HFP_VERIFY_POLL_MS = 250L
         private const val LATE_BIND_EVIDENCE_WINDOW_MS = 5_000L
         private val DEFINITE_USER_OWNED_ROUTES =
             setOf(

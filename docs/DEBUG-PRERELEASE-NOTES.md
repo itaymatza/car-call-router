@@ -27,6 +27,13 @@ to the workflow and source commit that produced it.
 
 ## What changed in beta.12
 
+- Call-start routing now uses a short quiet period that extends when Telecom reports another
+  endpoint request or route change, capped at 900 ms after the call becomes active. With no
+  competing activity, the BMW request can start after 300 ms instead of a fixed 500 ms.
+- HFP audio is sampled every 250 ms during verification. Telecom's callback wait is reduced to
+  1.5 seconds while the full four-second audio evidence window remains available for slow SCO.
+- If another service requests an endpoint after the BMW request, the router still observes BMW
+  audio but will not issue a selector recovery request that could fight that service.
 - The latest source build re-queries HFP audio during the bounded verification window, including
   at its deadline, so a missing Bluetooth broadcast cannot make a stale audio reading the final
   verdict. Diagnostics record the sample age, trigger, and redacted audio-device alias.

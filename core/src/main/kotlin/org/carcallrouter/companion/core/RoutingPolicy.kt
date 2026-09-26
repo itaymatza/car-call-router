@@ -9,10 +9,12 @@ package org.carcallrouter.companion.core
  */
 class RoutingPolicy(
     private val evidenceWindowMs: Long = 10_000,
-    private val settleDelayMs: Long = 500,
+    private val settleDelayMs: Long = 300,
     private val actionWindowMs: Long = 4_000,
-    private val platformRequestTimeoutMs: Long = 2_500,
+    private val platformRequestTimeoutMs: Long = 1_500,
     private val targetAudioStableMs: Long = 250,
+    private val startupQuietMs: Long = 350,
+    private val startupMaxDelayMs: Long = 900,
 ) {
     enum class Phase { IDLE, WAITING, VERIFYING, STABILIZING, RECOVERING_SELECTOR, RELEASED, SUSPENDED, FAILED }
 
@@ -118,12 +120,14 @@ class RoutingPolicy(
     private var manual = false
     private var evidenceDeadline = 0L
     private var settleUntil = 0L
+    private var startedAt = 0L
     private var actionDeadline: Long? = null
     private var inFlightAttempt: Int? = null
     private var inFlightUntil: Long? = null
     private var targetAudioSince: Long? = null
     private var selectorRecoveryDeadline: Long? = null
     private var selectorRecoveryAccepted = false
+    private var externalRequestAfterTarget = false
 
     fun begin(
         now: Long,
@@ -131,6 +135,7 @@ class RoutingPolicy(
         manualOneShot: Boolean = false,
     ) {
         manual = manualOneShot
+        startedAt = now
         evidenceDeadline = now + evidenceWindowMs
         settleUntil = now + if (manual) 0 else settleDelayMs
         actionDeadline = null
@@ -139,6 +144,7 @@ class RoutingPolicy(
         targetAudioSince = null
         selectorRecoveryDeadline = null
         selectorRecoveryAccepted = false
+        externalRequestAfterTarget = false
         requests = 0
         selectorRecoveries = 0
         verified = false
@@ -176,6 +182,19 @@ class RoutingPolicy(
     ) {
         @Suppress("UNUSED_VARIABLE")
         val diagnosticObservation = route to now
+    }
+
+    /** Wait for call-start routing activity to quiet down, but never postpone it indefinitely. */
+    fun observeStartupActivity(now: Long) {
+        if (manual || phase != Phase.WAITING || requests != 0 || now < startedAt) return
+        settleUntil = minOf(startedAt + startupMaxDelayMs, maxOf(settleUntil, now + startupQuietMs))
+    }
+
+    /** Another service may control the endpoint. Keep observing audio without fighting it. */
+    fun observeExternalRequestAfterTarget(): Boolean {
+        if (requests == 0 || phase !in setOf(Phase.VERIFYING, Phase.STABILIZING)) return false
+        externalRequestAfterTarget = true
+        return true
     }
 
     fun requestSucceeded(
@@ -347,6 +366,7 @@ class RoutingPolicy(
         if (s.now >= currentDeadline()) {
             if (
                 selectorRecoveries == 0 &&
+                !externalRequestAfterTarget &&
                 s.route == Route.TARGET &&
                 s.targetHfpAudio == false &&
                 s.selectorRecoveryAvailable == true
@@ -363,8 +383,12 @@ class RoutingPolicy(
                 )
             }
             return fail(
-                "BMW HFP audio was not confirmed after the one-shot request",
-                ReasonCode.TARGET_AUDIO_NOT_CONFIRMED,
+                if (externalRequestAfterTarget) {
+                    "Another endpoint request occurred; BMW audio was not confirmed and no route was restored"
+                } else {
+                    "BMW HFP audio was not confirmed after the one-shot request"
+                },
+                if (externalRequestAfterTarget) ReasonCode.EXTERNAL_ENDPOINT_REQUEST else ReasonCode.TARGET_AUDIO_NOT_CONFIRMED,
             )
         }
         phase = Phase.VERIFYING
