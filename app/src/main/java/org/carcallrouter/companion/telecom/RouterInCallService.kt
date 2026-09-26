@@ -110,7 +110,10 @@ class RouterInCallService :
         scheduledTickUptime = null
     }
 
-    private fun scheduleTick(due: Long, reason: String) {
+    private fun scheduleTick(
+        due: Long,
+        reason: String,
+    ) {
         val elapsed = SystemClock.elapsedRealtime()
         val uptime = SystemClock.uptimeMillis()
         val delay = (due - elapsed).coerceAtLeast(1)
@@ -131,6 +134,7 @@ class RouterInCallService :
             scheduledTickUptime = null
         }
     }
+
     private val prefListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             // Diagnostic writes (last_bound / last_session_*) share this preference file but do
