@@ -126,7 +126,7 @@ a user action. A session cannot be `PASS` without a finish, exact target HFP aud
 no detected instability. `selector_recoveries` reports the bounded Samsung selector-restoration path;
 it remains a routing failure until a later manual BMW selection produces exact target HFP audio.
 The report separately marks `diagnostic_complete`, lists any missing request contexts, identifies a
-verified Telecom-BMW/HFP-Android-Auto split, and reports the final HFP owner and selector-recovery
+Telecom-BMW/other-HFP mismatch without assuming which device owns that HFP audio, and reports the final HFP owner and selector-recovery
 confirmation. Use `--require-diagnostics` when checking a capture outside the harness.
 
 For the reported Samsung selector regression, run `--scenario selector-recovery`. In addition to
