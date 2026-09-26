@@ -63,7 +63,7 @@ The routing proof of concept has been confirmed by the project owner on the inte
 ## Public-repository posture
 
 
-The tracked tree contains no real target-device settings. Device names and Bluetooth addresses are selected at runtime and stored only in the application’s private local preferences. Generated APKs, IDE configuration, local SDK configuration, test logs, captures, and conventional key/certificate files are excluded by `.gitignore`. GitHub Actions compiles, unit-tests, lints, and verifies the source. Normal builds upload an expiring debug artifact; every successful main-branch push also publishes a commit-specific debug pre-release with an APK, digest, and verification report. No APK is committed to the repository.
+The tracked tree contains no real target-device settings. Device names and Bluetooth addresses are selected at runtime and stored only in the application’s private local preferences. Generated APKs, IDE configuration, local SDK configuration, test logs, captures, and conventional key/certificate files are excluded by `.gitignore`. GitHub Actions compiles, unit-tests, lints, and verifies the source. Normal builds upload an expiring debug artifact; every successful main-branch push also publishes a commit-specific debug pre-release signed with a protected, persistent key with an APK, digest, and verification report. No APK is committed to the repository.
 
 
 A public repository still exposes its files, commit history, issue/discussion content, and workflow logs. Do not commit exported logs, screenshots, pairing records, keystores, certificates, API keys, or private test notes. If the repository should not be forked, copied, or associated with its GitHub owner, use a private repository and consider a separately planned history rewrite.
@@ -120,7 +120,7 @@ account is not required just to download the APK.
 | `0.3.0-beta.6` | Previous Android 14+ debug beta | [Release](https://github.com/itaymatza/car-call-router/releases/tag/v0.3.0-beta.6-debug) |
 | `0.3.0-beta.5` | Previous Android 14+ debug beta | [Release](https://github.com/itaymatza/car-call-router/releases/tag/v0.3.0-beta.5-debug) |
 
-A new debug APK is published for each successful push to `main` on the [Releases page](https://github.com/itaymatza/car-call-router/releases). Each file and version includes the source commit ID.
+A new debug APK is published for each successful push to `main` on the [Releases page](https://github.com/itaymatza/car-call-router/releases). Each file and version includes the source commit ID. Protected debug signing must be configured before publication; the pinned certificate blocks unexpected keys. The first protected-key APK requires a one-time reinstall for users of beta.11 or the initial beta.12 build. Later protected-key builds can update each other in place.
 
 ## Download and install the APK
 
