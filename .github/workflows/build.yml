@@ -92,3 +92,24 @@ jobs:
             verification/current/apk-verification.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Verify custom debug signing contract
+        env:
+          BETA_KEYSTORE_FILE: ${{ runner.temp }}/ci-debug-signing.p12
+          BETA_KEYSTORE_PASSWORD: ci-only-test-password
+          BETA_KEY_ALIAS: ci-debug
+          BETA_KEY_PASSWORD: ci-only-test-password
+        run: |
+          trap 'rm -f "$BETA_KEYSTORE_FILE"' EXIT
+          keytool -genkeypair -noprompt -storetype PKCS12 \
+            -keystore "$BETA_KEYSTORE_FILE" -storepass "$BETA_KEYSTORE_PASSWORD" \
+            -keypass "$BETA_KEY_PASSWORD" -alias "$BETA_KEY_ALIAS" \
+            -keyalg RSA -keysize 2048 -validity 1 \
+            -dname "CN=CI Debug Signing Test"
+          expected_cert="$(LC_ALL=C keytool -list -v -keystore "$BETA_KEYSTORE_FILE" \
+            -storepass "$BETA_KEYSTORE_PASSWORD" -alias "$BETA_KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1)"
+          bash gradlew :app:assembleDebug -PENABLE_BETA_SIGNING=true \
+            -PAPP_VERSION_NAME=0.3.0-beta.12.ci --stacktrace --console=plain
+          EXPECTED_CERT_SHA256="$expected_cert" bash tools/verify-apk.sh \
+            app/build/outputs/apk/debug/app-debug.apk \
+            org.carcallrouter.companion 14 0.3.0-beta.12.ci 34 36 true
