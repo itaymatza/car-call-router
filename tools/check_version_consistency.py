@@ -57,16 +57,14 @@ def main() -> int:
             f"if (-not $VersionName) {{ $VersionName = '{version_name}' }}",
         ],
         ".github/workflows/build.yml": [
-            f"org.carcallrouter.companion {version_code} {version_name} 34 36 true"
-        ],
-        ".github/workflows/release.yml": [
-            f"org.carcallrouter.companion {version_code} {version_name} 34 36 false"
-        ],
-        ".github/workflows/publish-debug-prerelease.yml": [
+            f"org.carcallrouter.companion {version_code} {version_name} 34 36 true",
             f"BASE_VERSION_CODE: '{version_code}'",
             f"BASE_VERSION_NAME: {version_name}",
             'echo "RELEASE_TAG=v${BASE_VERSION_NAME}-debug.${short_sha}"',
             'echo "APK_NAME=car-call-router-${BASE_VERSION_NAME}-debug.${short_sha}.apk"',
+        ],
+        ".github/workflows/release.yml": [
+            f"org.carcallrouter.companion {version_code} {version_name} 34 36 false"
         ],
         "docs/DEBUG-PRERELEASE-NOTES.md": ["the `.apk` attached to this release"],
         "app/src/main/AndroidManifest.xml": [
