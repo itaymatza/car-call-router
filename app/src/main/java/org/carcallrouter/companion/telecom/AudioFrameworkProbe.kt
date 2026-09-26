@@ -6,8 +6,13 @@ import android.media.AudioManager
 import android.os.SystemClock
 
 /** Read-only public audio-framework evidence. It cannot identify a Bluetooth endpoint by MAC. */
-internal class AudioFrameworkProbe(context: Context) {
-    data class State(val mode: String, val communicationDevice: String)
+internal class AudioFrameworkProbe(
+    context: Context,
+) {
+    data class State(
+        val mode: String,
+        val communicationDevice: String,
+    )
 
     private val manager = context.getSystemService(AudioManager::class.java)
     private var sampledAt = Long.MIN_VALUE
