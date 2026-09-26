@@ -56,6 +56,10 @@ tasks.named<JavaExec>("run") {
 tasks.test {
     useJUnit()
     outputs.upToDateWhen { false }
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
     finalizedBy(tasks.jacocoTestReport)
 }
 

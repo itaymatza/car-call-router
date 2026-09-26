@@ -36,6 +36,7 @@ class RouterInCallService :
     private lateinit var classifier: CellularClassifier
     private lateinit var projectionMonitor: ProjectionMonitor
     private lateinit var hfp: HfpMonitor
+    private lateinit var audioFramework: AudioFrameworkProbe
     private lateinit var trace: RoutingTrace
     private var projection: Boolean? = null
     private var sequence = 0
@@ -62,6 +63,7 @@ class RouterInCallService :
     private var scheduledTickUptime: Long? = null
     private var confirmedAudioPresent: Boolean? = null
     private var lastHfpAudioDevices: Set<String>? = null
+    private var lastAudioFrameworkState: AudioFrameworkProbe.State? = null
 
     private data class Record(
         val id: Int,
@@ -181,6 +183,7 @@ class RouterInCallService :
         hfpStarted = false
         lastTracePolicy = null
         lastTraceEvidence = null
+        lastAudioFrameworkState = null
         projection = null
         lastPublished = ""
         activeTransitionAt = null
@@ -206,6 +209,7 @@ class RouterInCallService :
         router = AddressedTelecomRouter(this)
         classifier = CellularClassifier(this)
         hfp = newHfpMonitor()
+        audioFramework = AudioFrameworkProbe(this)
         projectionMonitor =
             ProjectionMonitor(this) { value ->
                 val previous = projection
@@ -429,6 +433,7 @@ class RouterInCallService :
             policy = RoutingPolicy()
             lastTracePolicy = null
             lastTraceEvidence = null
+            lastAudioFrameworkState = null
             sessionStarted = false
             manualSession = false
             manualCooldownUntil = 0L
@@ -595,6 +600,7 @@ class RouterInCallService :
         if (starting) {
             trace.event("SESSION_ENVIRONMENT", *ProcessDiagnostics.traceFields(this))
             lastTraceEvidence = null
+            lastAudioFrameworkState = null
         }
     }
 
@@ -690,6 +696,16 @@ class RouterInCallService :
                 else -> competitorAddress in hfp.audioConnected && competitor.endpoint != null
             }
         val now = SystemClock.elapsedRealtime()
+        val audioState = if (active) audioFramework.sample(now) else null
+        if (audioState != null && audioState != lastAudioFrameworkState) {
+            lastAudioFrameworkState = audioState
+            trace.event(
+                "AUDIO_FRAMEWORK_STATE",
+                "mode" to audioState.mode,
+                "communication_device" to audioState.communicationDevice,
+                "diagnostic_only" to true,
+            )
+        }
         val route = currentRoute()
         val lateBindDeadline = lateBindRecoveryDeadlineAt
         if (lateBindDeadline != null && policy.phase == RoutingPolicy.Phase.IDLE) {
@@ -814,6 +830,8 @@ class RouterInCallService :
                 "hfp_connected_count" to hfp.connected.size,
                 "hfp_audio_count" to hfp.audioConnected.size,
                 "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                "audio_mode" to audioState?.mode,
+                "communication_device" to audioState?.communicationDevice,
                 "hfp_sample" to hfp.sampleSequence,
                 "hfp_sample_age_ms" to hfp.sampledAt?.let { (now - it).coerceAtLeast(0) },
                 "hfp_audio_device" to hfp.audioConnected.singleOrNull()?.let(RouterLog::deviceId),
@@ -1094,6 +1112,8 @@ class RouterInCallService :
                 "Endpoint resolution: ${target.reason}",
                 "Telecom endpoint: $route",
                 "HFP audio: ${hfpAudioOwner(address, competitorAddress)}; BMW confirmed=${policy.verified && targetHfpAudio == true}",
+                "Audio framework: mode=${audioState?.mode ?: "unknown"}; " +
+                    "device=${audioState?.communicationDevice ?: "unknown"} (diagnostic only)",
                 "Controller: ${policy.phase}; attempts=${policy.requests}; " +
                     "selectorRecoveries=${policy.selectorRecoveries}; reason=${policy.reasonCode}",
                 policy.reason,

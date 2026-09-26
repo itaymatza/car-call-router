@@ -12,6 +12,7 @@ import org.carcallrouter.companion.RouterLog
 import org.carcallrouter.companion.RouterSettings
 import org.carcallrouter.companion.SessionBridge
 import org.carcallrouter.companion.telecom.AddressedTelecomRouter
+import org.carcallrouter.companion.telecom.AudioFrameworkProbe
 import org.carcallrouter.companion.telecom.HfpMonitor
 import org.carcallrouter.companion.telecom.RouterInCallService
 import java.io.File
@@ -49,6 +50,8 @@ private fun reset() {
     HfpMonitor.audioDevices = setOf(COMPETING)
     HfpMonitor.starts = 0
     HfpMonitor.refreshes = 0
+    AudioFrameworkProbe.mode = "IN_CALL"
+    AudioFrameworkProbe.device = "BLUETOOTH_SCO"
     SessionBridge.controller = null
 }
 
@@ -231,6 +234,62 @@ fun main(args: Array<String>) {
                     val after = HfpMonitor.refreshes
                     TestQueue.advanceTo(10_000)
                     check(HfpMonitor.refreshes == after)
+                    countEquals(f, 1)
+                }
+            },
+            "audio_framework_mode_is_observed_without_controlling_telecom" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    AudioFrameworkProbe.mode = "NORMAL"
+                    AudioFrameworkProbe.device = "UNKNOWN"
+                    f.activateAndSettle()
+                    countEquals(f, 1)
+                    check(SessionBridge.status.contains("Audio framework: mode=NORMAL; device=UNKNOWN"))
+                    AudioFrameworkProbe.mode = "IN_CALL"
+                    AudioFrameworkProbe.device = "BLUETOOTH_SCO"
+                    TestQueue.advanceTo(1_000)
+                    check(SessionBridge.status.contains("mode=IN_CALL; device=BLUETOOTH_SCO"))
+                    check(RouterLog.events.any { it.first == "ROUTING_TRACE" && "event=AUDIO_FRAMEWORK_STATE" in it.second })
+                    countEquals(f, 1)
+                }
+            },
+            "endpoint_snapshot_churn_after_request_does_not_hide_exact_audio_confirmation" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    f.endpoints(listOf(competing, other))
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(800)
+                    check(SessionBridge.status.contains("TARGET_AUDIO_CONFIRMED"))
+                    countEquals(f, 1)
+                }
+            },
+            "late_audio_stream_before_deadline_confirms_without_second_request" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    AudioFrameworkProbe.mode = "NORMAL"
+                    AudioFrameworkProbe.device = "UNKNOWN"
+                    f.activateAndSettle()
+                    TestQueue.advanceTo(3_800)
+                    countEquals(f, 1)
+                    AudioFrameworkProbe.mode = "IN_CALL"
+                    AudioFrameworkProbe.device = "BLUETOOTH_SCO"
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(4_050)
+                    check(SessionBridge.status.contains("TARGET_AUDIO_CONFIRMED"))
+                    countEquals(f, 1)
+                }
+            },
+            "verification_poll_has_bounded_query_budget" to {
+                Fixture(initialEndpoint = target, available = listOf(target, other)).use { f ->
+                    HfpMonitor.audioDevices = setOf(OTHER)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.activateAndSettle()
+                    val baseline = HfpMonitor.refreshes
+                    // Drive the fake uptime queue at the real 250 ms polling cadence. A
+                    // single jump would execute only the first overdue Handler callback.
+                    repeat(16) { TestQueue.advanceTo(TestQueue.now + 250) }
+                    val periodicQueries = HfpMonitor.refreshes - baseline
+                    check(periodicQueries in 10..18) { "Unexpected four-second HFP query budget: $periodicQueries" }
+                    TestQueue.advanceTo(20_000)
+                    check(HfpMonitor.refreshes - baseline == periodicQueries)
                     countEquals(f, 1)
                 }
             },

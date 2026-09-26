@@ -24,6 +24,9 @@ The production-service harness includes the captured Samsung failure shape: Tele
 Android Auto owns SCO, and another `InCallService` request arrives immediately after ACTIVE. It
 also verifies the settling delay, strict one-BMW-request budget, stable-SCO requirement, result races,
 manual selector preservation, lifecycle cancellation, late binding, and request-marker isolation.
+The [call-audio mechanism and CI matrix](CALL-AUDIO-MECHANISM.md) also cover Android 17's conditional
+Audio Managed SCO path, read-only audio-framework diagnostics, endpoint-list churn after a request,
+late voice-stream activation and a bounded HFP query budget.
 
 These checks exercise decision rules and lifecycle behavior. They do not install an APK, emulate Android Telecom, validate protected-permission admission, or test a real Bluetooth stack, microphone, projection host, headset, or vehicle.
 

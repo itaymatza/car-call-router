@@ -297,11 +297,6 @@ class RoutingPolicy(
         if (s.targetHfpConnected == null) {
             return waitFor("Waiting for Bluetooth HFP evidence", ReasonCode.TARGET_HFP_UNKNOWN, s.now)
         }
-        if (s.targetAvailable != true) {
-            val code = if (s.targetAvailable == null) ReasonCode.WAITING_ENDPOINT_SNAPSHOT else ReasonCode.WAITING_TARGET_ENDPOINT
-            return waitFor("Waiting for BMW in Telecom's endpoint list", code, s.now)
-        }
-
         if (s.now < settleUntil) {
             targetAudioSince = null
             phase = Phase.WAITING
@@ -338,6 +333,13 @@ class RoutingPolicy(
         targetAudioSince = null
 
         if (requests == 0) {
+            // Availability is required to submit the request. Once submitted, Telecom may
+            // replace its endpoint snapshot while the Bluetooth audio transition completes.
+            // Exact, stable target HFP audio remains the stronger post-request evidence.
+            if (s.targetAvailable != true) {
+                val code = if (s.targetAvailable == null) ReasonCode.WAITING_ENDPOINT_SNAPSHOT else ReasonCode.WAITING_TARGET_ENDPOINT
+                return waitFor("Waiting for BMW in Telecom's endpoint list", code, s.now)
+            }
             if (s.targetHfpAudio == null) {
                 return waitFor("Waiting for current HFP audio ownership", ReasonCode.TARGET_HFP_UNKNOWN, s.now)
             }
