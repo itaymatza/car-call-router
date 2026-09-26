@@ -24,25 +24,27 @@ internal class AudioFrameworkProbe(
         cached =
             runCatching {
                 val mode =
-                    when (manager?.mode) {
-                        AudioManager.MODE_IN_CALL -> "IN_CALL"
-                        AudioManager.MODE_IN_COMMUNICATION -> "IN_COMMUNICATION"
-                        AudioManager.MODE_CALL_REDIRECT -> "CALL_REDIRECT"
-                        AudioManager.MODE_NORMAL -> "NORMAL"
-                        AudioManager.MODE_RINGTONE -> "RINGTONE"
-                        null -> "UNKNOWN"
-                        else -> "OTHER"
-                    }
+                    manager?.mode?.let { audioMode ->
+                        when (audioMode) {
+                            AudioManager.MODE_IN_CALL -> "IN_CALL"
+                            AudioManager.MODE_IN_COMMUNICATION -> "IN_COMMUNICATION"
+                            AudioManager.MODE_CALL_REDIRECT -> "CALL_REDIRECT"
+                            AudioManager.MODE_NORMAL -> "NORMAL"
+                            AudioManager.MODE_RINGTONE -> "RINGTONE"
+                            else -> "OTHER"
+                        }
+                    } ?: "UNKNOWN"
                 val device =
-                    when (manager?.communicationDevice?.type) {
-                        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "BLUETOOTH_SCO"
-                        AudioDeviceInfo.TYPE_BLE_HEADSET -> "BLE_HEADSET"
-                        AudioDeviceInfo.TYPE_BLE_SPEAKER -> "BLE_SPEAKER"
-                        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "SPEAKER"
-                        AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "EARPIECE"
-                        null -> "UNKNOWN"
-                        else -> "OTHER"
-                    }
+                    manager?.communicationDevice?.type?.let { communicationType ->
+                        when (communicationType) {
+                            AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "BLUETOOTH_SCO"
+                            AudioDeviceInfo.TYPE_BLE_HEADSET -> "BLE_HEADSET"
+                            AudioDeviceInfo.TYPE_BLE_SPEAKER -> "BLE_SPEAKER"
+                            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "SPEAKER"
+                            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "EARPIECE"
+                            else -> "OTHER"
+                        }
+                    } ?: "UNKNOWN"
                 State(mode, device)
             }.getOrDefault(State("UNKNOWN", "UNKNOWN"))
         return cached
