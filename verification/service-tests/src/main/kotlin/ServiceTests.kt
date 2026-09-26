@@ -236,7 +236,7 @@ fun main(args: Array<String>) {
                     countEquals(f, 1)
                     TestQueue.sleepFor(16_000)
                     TestQueue.advanceTo(20_500)
-                    check(f.service.issuedRequests.map { it.second } == listOf(TARGET_ID, COMPETING_ID))
+                    check(f.service.issuedRequests.map { it.second } == listOf(TARGET_ID.toString(), COMPETING_ID.toString()))
                     check(SessionBridge.status.contains("SELECTOR_RECOVERY_ACCEPTED"))
                     TestQueue.advanceTo(23_000)
                     countEquals(f, 2)
