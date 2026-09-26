@@ -55,6 +55,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            if (enableBetaSigning) signingConfig = signingConfigs.getByName("beta")
+        }
         release {
             isMinifyEnabled = false
             if (enableBetaSigning) signingConfig = signingConfigs.getByName("beta")

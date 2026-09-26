@@ -14,10 +14,11 @@ This pre-release makes the current Car Call Router beta installable as a direct 
 ## Important beta limitations
 
 - This is a debug-signed testing build, not a production-ready release.
-- Its signing certificate is recorded in **apk-verification.txt**. Each GitHub runner generates its
-  own debug signing key. Installing a newer debug APK over an older one can fail with **App not installed**;
-  uninstall the old app first, then reinstall, reconfigure, and repeat the one-time authorization.
-  The protected release certificate will also differ.
+- Its signing certificate is pinned and recorded in **apk-verification.txt**. Builds published after
+  the protected debug signing setup use the same key and can update each other in place. Older
+  beta.11 and beta.12 builds used temporary runner keys: the first protected-key build cannot
+  replace them. Uninstall the older app once, then reinstall, reconfigure, and repeat the one-time
+  authorization. The separately protected non-debug release certificate also differs.
 - Real-car stability qualification is still incomplete. Never use emergency calls for testing and
   do not interact with the app while driving.
 
