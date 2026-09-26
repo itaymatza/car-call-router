@@ -164,6 +164,38 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual("PASS", summaries[0].status)
         self.assertEqual(1, summaries[0].external_callbacks)
 
+    def test_explicit_policy_failure_overrides_endpoint_only_observation(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 8, "EVIDENCE_SNAPSHOT",
+                   "route=TARGET hfp_audio_owner=OTHER target_sco=false")
+            + line("abc", 3, 9, "TELECOM_ENDPOINT_CONFIRMED")
+            + line("abc", 4, 500, "TIMER_SCHEDULED", "delay_ms=500")
+            + line("abc", 5, 13800, "TIMER_FIRED", "late_ms=13300 sleep_delta_ms=13000")
+            + line("abc", 6, 13810, "POLICY_STATE", "phase=FAILED reason=EVIDENCE_DEADLINE_EXPIRED")
+            + line("abc", 7, 13820, "SESSION_FINISHED",
+                   "phase=SUSPENDED reason=CALL_NOT_ACTIVE best_confirmation=TELECOM_ENDPOINT")
+        )
+        summaries, _ = self.parse(content)
+        item = summaries[0]
+        self.assertEqual("FAIL", item.status)
+        self.assertTrue(item.split_brain_observed)
+        self.assertEqual(13300, item.max_timer_late_ms)
+        self.assertEqual(0, item.requests)
+
+    def test_confirmed_audio_loss_is_unstable_without_endpoint_oscillation(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 100, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 3, 120000, "CONFIRMED_AUDIO_CHANGED",
+                   "target_sco=false hfp_audio_owner=OTHER telecom_route=TARGET")
+            + line("abc", 4, 120100, "SESSION_FINISHED",
+                   "phase=SUSPENDED reason=CALL_NOT_ACTIVE best_confirmation=TARGET_HFP_AUDIO")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("UNSTABLE", summaries[0].status)
+        self.assertEqual(1, summaries[0].audio_confirmation_losses)
+
     def test_sequence_gap_is_invalid(self):
         content = line("abc", 1, 0, "SESSION_STARTED") + line("abc", 3, 10, "SESSION_FINISHED")
         summaries, _ = self.parse(content)
