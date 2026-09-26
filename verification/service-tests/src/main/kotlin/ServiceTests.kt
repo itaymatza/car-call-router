@@ -283,7 +283,9 @@ fun main(args: Array<String>) {
                     HfpMonitor.emit(HfpMonitor.devices)
                     f.activateAndSettle()
                     val baseline = HfpMonitor.refreshes
-                    TestQueue.advanceTo(4_500)
+                    // Drive the fake uptime queue at the real 250 ms polling cadence. A
+                    // single jump would execute only the first overdue Handler callback.
+                    repeat(16) { TestQueue.advanceTo(TestQueue.now + 250) }
                     val periodicQueries = HfpMonitor.refreshes - baseline
                     check(periodicQueries in 10..18) { "Unexpected four-second HFP query budget: $periodicQueries" }
                     TestQueue.advanceTo(20_000)

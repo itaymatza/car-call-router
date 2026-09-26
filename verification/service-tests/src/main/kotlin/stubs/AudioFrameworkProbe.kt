@@ -10,7 +10,9 @@ internal class AudioFrameworkProbe(
         val communicationDevice: String,
     )
 
-    fun sample(@Suppress("UNUSED_PARAMETER") now: Long): State = State(mode, device)
+    fun sample(
+        @Suppress("UNUSED_PARAMETER") now: Long,
+    ): State = State(mode, device)
 
     companion object {
         var mode = "IN_CALL"
