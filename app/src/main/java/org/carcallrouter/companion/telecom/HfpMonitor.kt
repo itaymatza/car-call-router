@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import org.carcallrouter.companion.Access
 import org.carcallrouter.companion.RouterLog
 
@@ -93,6 +94,11 @@ class HfpMonitor(
 
     fun refresh() {
         if (closed) return
+        val startedElapsed = SystemClock.elapsedRealtime()
+        val startedUptime = SystemClock.uptimeMillis()
+        var devicesQueryMs = 0L
+        var audioQueryMs = 0L
+        var deviceCount = 0
         try {
             val proxy = headset
             if (proxy == null || !Access.bluetoothGranted(context)) {
@@ -100,10 +106,15 @@ class HfpMonitor(
                 connected = emptySet()
                 audioConnected = emptySet()
             } else {
+                val devicesStarted = SystemClock.elapsedRealtime()
                 val devices = proxy.connectedDevices
+                devicesQueryMs = SystemClock.elapsedRealtime() - devicesStarted
+                deviceCount = devices.size
                 known = true
                 connected = devices.map { it.address.uppercase() }.toSet()
+                val audioStarted = SystemClock.elapsedRealtime()
                 audioConnected = devices.filter { proxy.isAudioConnected(it) }.map { it.address.uppercase() }.toSet()
+                audioQueryMs = SystemClock.elapsedRealtime() - audioStarted
             }
         } catch (e: RuntimeException) {
             known = false
@@ -111,6 +122,13 @@ class HfpMonitor(
             audioConnected = emptySet()
             RouterLog.event("HFP_QUERY_ERROR", e.javaClass.simpleName)
         }
+        val elapsedDelta = SystemClock.elapsedRealtime() - startedElapsed
+        val uptimeDelta = SystemClock.uptimeMillis() - startedUptime
+        RouterLog.event(
+            "HFP_QUERY_TIMING",
+            "elapsedMs=$elapsedDelta; uptimeMs=$uptimeDelta; sleepDeltaMs=${(elapsedDelta - uptimeDelta).coerceAtLeast(0)}; " +
+                "devicesMs=$devicesQueryMs; audioMs=$audioQueryMs; deviceCount=$deviceCount; known=$known",
+        )
         val stateKey = "$known|${connected.sorted()}|${audioConnected.sorted()}"
         if (stateKey != lastLoggedState) {
             lastLoggedState = stateKey

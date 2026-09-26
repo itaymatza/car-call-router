@@ -43,6 +43,8 @@ class SessionSummary:
     external_callbacks: int
     route_changes: int
     route_oscillations: int
+    audio_confirmation_losses: int
+    max_timer_late_ms: int
     endpoint_confirmed: bool
     endpoint_latency_ms: int | None
     hfp_audio_confirmed: bool
@@ -164,7 +166,7 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
         )
         split_brain_observed = any(
             event.fields.get("route") == "TARGET"
-            and event.fields.get("hfp_audio_owner") == "COMPETITOR"
+            and event.fields.get("hfp_audio_owner") in {"COMPETITOR", "OTHER"}
             and event.fields.get("target_sco") == "false"
             for event in evidence_events
         )
@@ -186,14 +188,31 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             routes[index] == routes[index - 2] and routes[index] != routes[index - 1]
             for index in range(2, len(routes))
         )
+        audio_confirmation_losses = sum(
+            event.event == "CONFIRMED_AUDIO_CHANGED"
+            and event.fields.get("target_sco") != "true"
+            for event in session_events
+        )
+        timer_lateness = [
+            int(event.fields["late_ms"])
+            for event in session_events
+            if event.event == "TIMER_FIRED"
+            and event.fields.get("late_ms", "").isdigit()
+        ]
+        explicit_failure = any(
+            event.event == "POLICY_STATE" and event.fields.get("phase") == "FAILED"
+            for event in session_events
+        ) or (finish is not None and finish.fields.get("phase") == "FAILED")
         if anomalies:
             status = "INVALID"
         elif finish is None:
             status = "OPEN"
-        elif hfp is not None and route_oscillations > 0:
+        elif hfp is not None and (route_oscillations > 0 or audio_confirmation_losses > 0):
             status = "UNSTABLE"
         elif hfp is not None:
             status = "PASS"
+        elif explicit_failure:
+            status = "FAIL"
         elif endpoint is not None:
             status = "INCOMPLETE"
         else:
@@ -217,6 +236,8 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             external_callbacks=classifications.count("EXTERNAL"),
             route_changes=len(route_events),
             route_oscillations=route_oscillations,
+            audio_confirmation_losses=audio_confirmation_losses,
+            max_timer_late_ms=max(timer_lateness, default=0),
             endpoint_confirmed=endpoint is not None,
             endpoint_latency_ms=endpoint.elapsed_ms if endpoint else None,
             hfp_audio_confirmed=hfp is not None,
@@ -265,7 +286,9 @@ def render_text(summaries: list[SessionSummary], warnings: list[str], out: TextI
             f"(self={item.self_callbacks}, startup_replay={item.startup_replays}, external={item.external_callbacks})",
             file=out,
         )
-        print(f"  route changes/oscillations: {item.route_changes}/{item.route_oscillations}", file=out)
+        print(f"  route changes/oscillations: {item.route_changes}/{item.route_oscillations}; "
+              f"audio losses after confirmation: {item.audio_confirmation_losses}; "
+              f"max timer lateness: {item.max_timer_late_ms} ms", file=out)
         print(f"  Telecom endpoint: {'confirmed' if item.endpoint_confirmed else 'not confirmed'}"
               + (f" at {item.endpoint_latency_ms} ms" if item.endpoint_latency_ms is not None else ""), file=out)
         print(f"  target HFP audio: {'confirmed' if item.hfp_audio_confirmed else 'not confirmed'}"

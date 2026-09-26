@@ -19,6 +19,8 @@ class Looper {
 
 object SystemClock {
     fun elapsedRealtime() = TestQueue.now
+
+    fun uptimeMillis() = TestQueue.now
 }
 
 object TestQueue {

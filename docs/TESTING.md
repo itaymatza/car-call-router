@@ -111,16 +111,22 @@ python3 tools/analyze_device_trace.py exported-log.txt
 python3 tools/analyze_device_trace.py exported-log.txt --format json
 ```
 
+The in-app log export also contains `HFP_QUERY_TIMING` records. Keep the full export when a
+deadline fires late: the structured trace records `TIMER_SCHEDULED`, `TIMER_CANCELLED`,
+and `TIMER_FIRED` with elapsed time, uptime, and calculated sleep delta. The capture harness
+currently filters to `ROUTING_TRACE`, so its `trace.log` alone cannot show Bluetooth proxy
+query latency. A late timer is evidence of delayed evaluation, not by itself proof of why it
+was delayed. Correlate the exported timing records before changing the policy or adding retries.
+
 The analyzer reports malformed records, unsupported schemas, sequence gaps, time regressions,
-missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom
-endpoint is `INCOMPLETE`. A session is `UNSTABLE` when exact target audio is eventually confirmed
-but the trace also shows an endpoint oscillation such as BMW → handset → BMW. Endpoint-request
+missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom endpoint is `INCOMPLETE` unless the policy explicitly\nfailed, in which case it is `FAIL`. A session is `UNSTABLE` when exact target audio is eventually confirmed
+but the trace also shows an endpoint oscillation such as BMW → handset → BMW or a later\nloss of confirmed BMW HFP audio. Endpoint-request
 callbacks are reported for diagnostics only because Android can emit them during call startup without
 a user action. A session cannot be `PASS` without a finish, exact target HFP audio confirmation, and
 no detected instability. `selector_recoveries` reports the bounded Samsung selector-restoration path;
 it remains a routing failure until a later manual BMW selection produces exact target HFP audio.
 The report separately marks `diagnostic_complete`, lists any missing request contexts, identifies a
-verified Telecom-BMW/HFP-Android-Auto split, and reports the final HFP owner and selector-recovery
+Telecom-BMW/other-HFP mismatch without assuming which device owns that HFP audio, and reports the final HFP owner and selector-recovery
 confirmation. Use `--require-diagnostics` when checking a capture outside the harness.
 
 For the reported Samsung selector regression, run `--scenario selector-recovery`. In addition to

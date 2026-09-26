@@ -57,6 +57,10 @@ class RouterInCallService :
     private var activeTransitionAt: Long? = null
     private var lateBindRecoveryDeadlineAt: Long? = null
     private var lastEndpointId: String? = null
+    private var scheduledTickAt: Long? = null
+    private var scheduledTickElapsed: Long? = null
+    private var scheduledTickUptime: Long? = null
+    private var confirmedAudioPresent: Boolean? = null
 
     private data class Record(
         val id: Int,
@@ -68,10 +72,69 @@ class RouterInCallService :
     private val records = IdentityHashMap<Call, Record>()
     private val tick =
         Runnable {
-            // One-shot deadline verification, not continuous polling.
+            val due = scheduledTickAt
+            val scheduledElapsed = scheduledTickElapsed
+            val scheduledUptime = scheduledTickUptime
+            scheduledTickAt = null
+            scheduledTickElapsed = null
+            scheduledTickUptime = null
+            if (due != null && scheduledElapsed != null && scheduledUptime != null) {
+                val elapsedNow = SystemClock.elapsedRealtime()
+                val elapsedDelta = elapsedNow - scheduledElapsed
+                val uptimeDelta = SystemClock.uptimeMillis() - scheduledUptime
+                trace.event(
+                    "TIMER_FIRED",
+                    "due_elapsed_ms" to due,
+                    "late_ms" to (elapsedNow - due).coerceAtLeast(0),
+                    "elapsed_delta_ms" to elapsedDelta,
+                    "uptime_delta_ms" to uptimeDelta,
+                    "sleep_delta_ms" to (elapsedDelta - uptimeDelta).coerceAtLeast(0),
+                )
+            }
             evaluate()
         }
     private val evaluateEvent = Runnable { evaluate() }
+
+    private fun cancelTick(reason: String) {
+        handler.removeCallbacks(tick)
+        scheduledTickAt?.let {
+            trace.event(
+                "TIMER_CANCELLED",
+                "due_elapsed_ms" to it,
+                "remaining_ms" to (it - SystemClock.elapsedRealtime()).coerceAtLeast(0),
+                "reason" to reason,
+            )
+        }
+        scheduledTickAt = null
+        scheduledTickElapsed = null
+        scheduledTickUptime = null
+    }
+
+    private fun scheduleTick(
+        due: Long,
+        reason: String,
+    ) {
+        val elapsed = SystemClock.elapsedRealtime()
+        val uptime = SystemClock.uptimeMillis()
+        val delay = (due - elapsed).coerceAtLeast(1)
+        scheduledTickAt = due
+        scheduledTickElapsed = elapsed
+        scheduledTickUptime = uptime
+        val posted = handler.postDelayed(tick, delay)
+        trace.event(
+            "TIMER_SCHEDULED",
+            "reason" to reason,
+            "due_elapsed_ms" to due,
+            "delay_ms" to delay,
+            "posted" to posted,
+        )
+        if (!posted) {
+            scheduledTickAt = null
+            scheduledTickElapsed = null
+            scheduledTickUptime = null
+        }
+    }
+
     private val prefListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             // Diagnostic writes (last_bound / last_session_*) share this preference file but do
@@ -105,6 +168,10 @@ class RouterInCallService :
         activeTransitionAt = null
         lateBindRecoveryDeadlineAt = null
         lastEndpointId = null
+        confirmedAudioPresent = null
+        scheduledTickAt = null
+        scheduledTickElapsed = null
+        scheduledTickUptime = null
         trace =
             RoutingTrace(
                 now = SystemClock::elapsedRealtime,
@@ -315,7 +382,7 @@ class RouterInCallService :
             RouterLog.event("CALL_REMOVED", "call=${it.id}")
         }
         if (records.isEmpty()) {
-            handler.removeCallbacks(tick)
+            cancelTick("call_removed")
             val address = settings.targetAddress?.uppercase()
             val confirmation =
                 trace.finish(
@@ -340,6 +407,7 @@ class RouterInCallService :
             activeTransitionAt = null
             lateBindRecoveryDeadlineAt = null
             lastEndpointId = null
+            confirmedAudioPresent = null
             RouterLog.event("SESSION_END", "No audio reset, disconnect, A2DP or projection operation performed")
         }
         queueEvaluation()
@@ -467,7 +535,7 @@ class RouterInCallService :
         beginTrace("automatic", "safety_event")
         if (policy.phase == RoutingPolicy.Phase.SUSPENDED && policy.reasonCode == code) return
         policy.suspend(reason, code)
-        handler.removeCallbacks(tick)
+        cancelTick("session_suspended")
         RouterLog.event("SESSION_PAUSED_EVENT", reason)
         trace.event("SESSION_SUSPENDED", "reason" to code)
     }
@@ -546,7 +614,7 @@ class RouterInCallService :
 
     private fun evaluate() {
         if (disposed) return
-        handler.removeCallbacks(tick)
+        cancelTick("new_evaluation")
         val live = liveCalls()
         val active = live.any { it.details.state == Call.STATE_ACTIVE }
         val rejections = live.mapNotNull(classifier::rejection)
@@ -653,7 +721,7 @@ class RouterInCallService :
                         RouterLog.event("STATUS", state.replace("\n", " | "))
                         SessionBridge.publish(state)
                     }
-                    handler.postDelayed(tick, (lateBindDeadline - now).coerceAtLeast(1))
+                    scheduleTick(lateBindDeadline, "late_bind_evidence")
                     return
                 }
             }
@@ -676,6 +744,19 @@ class RouterInCallService :
                     route = route,
                 ),
             )
+        if (active && policy.verified) {
+            val prior = confirmedAudioPresent
+            if (prior != null && prior != targetHfpAudio) {
+                trace.event(
+                    "CONFIRMED_AUDIO_CHANGED",
+                    "target_sco" to targetHfpAudio,
+                    "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                    "telecom_route" to route,
+                    "previous_target_sco" to prior,
+                )
+            }
+            confirmedAudioPresent = targetHfpAudio
+        }
         val evidence =
             listOf<Pair<String, Any?>>(
                 "enabled" to settings.enabled,
@@ -978,7 +1059,7 @@ class RouterInCallService :
             SessionBridge.publish(state)
         }
         if (policy.phase !in setOf(RoutingPolicy.Phase.SUSPENDED, RoutingPolicy.Phase.FAILED)) {
-            decision.wakeAt?.let { handler.postDelayed(tick, (it - SystemClock.elapsedRealtime()).coerceAtLeast(1)) }
+            decision.wakeAt?.let { scheduleTick(it, policy.reasonCode.name) }
         }
     }
 
@@ -994,6 +1075,7 @@ class RouterInCallService :
         manualSession = true
         beginTrace("manual", "route_now")
         policy.begin(now, currentRoute(), manualOneShot = true)
+        confirmedAudioPresent = null
         manualCooldownUntil = now + 1_500
         RouterLog.event("MANUAL_TEST", "One request only; projection gate bypassed explicitly")
         evaluate()
@@ -1010,7 +1092,7 @@ class RouterInCallService :
         sessionStarted = true
         beginTrace("manual", "pause")
         policy.suspend("Paused by user for this call session", RoutingPolicy.ReasonCode.USER_PAUSED)
-        handler.removeCallbacks(tick)
+        cancelTick("user_pause")
         RouterLog.event("USER_PAUSE", "No further requests this session; an already-submitted request cannot be recalled")
         trace.event("SESSION_SUSPENDED", "reason" to policy.reasonCode)
         evaluate()
@@ -1025,6 +1107,7 @@ class RouterInCallService :
     private fun stopObservers() {
         if (disposed) return
         disposed = true
+        cancelTick("service_stopped")
         trace.finish(policy.phase, policy.reasonCode, "service_stopped")
         router.clearSession()
         handler.removeCallbacksAndMessages(null)
