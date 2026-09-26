@@ -34,12 +34,12 @@
   current-route evidence plus 1,000 seeded callback storms. Protected handset/speaker/wired edges
   are latched even when callbacks coalesce, while a pre-snapshot car Bluetooth route remains
   unresolved instead of being misclassified as a user override.
-- Requests are single-flight and generation-tokened. AOSP's two-second timeout is respected, new
-  requests are separated by 2.5 seconds, timeout/stale-endpoint errors have bounded typed recovery,
-  and an endpoint-gone retry requires a newer endpoint snapshot.
-- API 37 request markers are call-generation-bound and expire; late result callbacks are ignored,
-  Samsung startup-request replays are distinguished from genuine external requests, and the
-  diagnostic analyzer rejects route oscillation or external interference as an unstable run.
+- Requests are generation-tokened. The target request is submitted once. A timeout can be followed
+  by late HFP audio confirmation within the bounded observation window, but never triggers another
+  target request. Selector recovery is a separate one-shot action under the exact split-state guard.
+- API 37 request markers are call-generation-bound and expire; late result callbacks are ignored.
+  Startup-request replays are classified separately, while a later external request suppresses
+  selector recovery. The diagnostic analyzer flags route oscillation and post-confirmation audio loss.
 - Evidence collection and routing action use separate deadlines, transient alternative routes are
   debounced only during the immediate post-request settling period, and the UI persists the last
   completed session result.
@@ -61,4 +61,4 @@
 
 ## Stability rule
 
-Do not add retries merely to improve a success percentage. A retry is permitted only for the explicitly configured competing endpoint, inside the bounded startup window, after fresh evidence confirms eligibility. Unknown evidence freezes routing; confirmed safety loss stops it; an alternative route that may be a user choice is never fought.
+Do not add retries merely to improve a success percentage. The target request is one-shot. The explicitly configured competing endpoint may receive a separate, single selector-recovery request only when it owns HFP audio and Telecom still displays the target after the verification window. Unknown evidence freezes routing; confirmed safety loss stops it; an alternative route that may be a user choice is never fought.

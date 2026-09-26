@@ -24,7 +24,7 @@ AOSP `InCallController` classifies a non-UI service only when it has `CONTROL_IN
 - The request outcome reports acceptance or an error. The final route is verified only by `onCallEndpointChanged()`.
 - `CallEndpoint` exposes a human-readable name, type, and UUID, but no Bluetooth hardware address. AOSP keeps its UUID-to-address map internally. Public documentation does not promise that the UUID is a durable identifier suitable for persistence.
 - The implementation therefore persists the paired Bluetooth identity locally, but resolves it anew against each live endpoint set. A unique endpoint-name match is accepted. A name mismatch is accepted only when exactly one HFP device and one Bluetooth endpoint exist. Duplicate or otherwise ambiguous endpoints fail closed.
-- API 37 `onCallEndpointRequested()` lets a non-UI service observe endpoint requests from another in-call UI. The service treats a non-self request as a possible user override and stops reassertion for that call.
+- API 37 `onCallEndpointRequested()` lets a non-UI service observe an endpoint request from another in-call service. It does not identify the requester or prove the final route. Call-start activity can extend the short settling window; an external request after the target attempt suppresses selector recovery, while target HFP audio observation continues.
 
 ## Alternatives rejected
 
@@ -32,7 +32,7 @@ AOSP `InCallController` classifies a non-UI service only when it has `CONTROL_IN
 
 ## Evidence boundaries
 
-- **Verified by source inspection:** repository behavior, manifest, authorization checks, endpoint resolver, state machine, retry bounds, tests, and CI configuration.
+- **Verified by source inspection:** repository behavior, manifest, authorization checks, endpoint resolver, one-shot state machine, tests, and CI configuration.
 - **Verified by Android documentation/AOSP:** permission protection level, wearable companion wording, dialer requirements, non-UI AppOps gate, API 34 endpoint contract, deprecations, and API 37 request observation.
 - **Verified by automated tests:** pure endpoint matching, routing policy, callback/lifecycle scenarios, compilation, unit tests, and lint when CI is green.
 - **Requires real-device verification:** Samsung/One UI admission after AppOps, endpoint labels, Android Auto coexistence, actual microphone/speaker selection, incoming/outgoing calls, and OEM callback timing.

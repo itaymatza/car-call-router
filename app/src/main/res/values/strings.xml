@@ -67,10 +67,10 @@
     <string name="show_advanced">Advanced options ▾</string>
     <string name="hide_advanced">Advanced options ▴</string>
     <string name="competitor_title">Competing call device (optional)</string>
-    <string name="competitor_none">None — do not retry after the initial request</string>
-    <string name="competitor_selected">%1$s may trigger a bounded retry</string>
+    <string name="competitor_none">None — manual-selector recovery unavailable</string>
+    <string name="competitor_selected">%1$s selected for manual-selector recovery</string>
     <string name="competitor_action">Choose competing device</string>
-    <string name="competitor_help">Leave this unset for the safest behavior. When selected, only this device may trigger limited, non-overlapping retries during the bounded startup guard.</string>
+    <string name="competitor_help">If Android Auto uses a separate Bluetooth call device, select that exact device. After a failed one-shot route, the app can restore the call selector only when this device is confirmed to own HFP audio. It never retries the preferred device. Leave this unset if the other call device is uncertain.</string>
     <string name="battery_settings">Battery settings (only if calls are missed)</string>
     <string name="battery_dialog_title">Optional battery settings</string>
     <string name="battery_dialog_message">Use this only if real tests show missed calls while the phone is idle. A battery exemption does not guarantee Telecom binding, and the app will not change this setting automatically.</string>
