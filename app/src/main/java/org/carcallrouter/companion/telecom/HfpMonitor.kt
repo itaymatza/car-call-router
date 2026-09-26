@@ -31,6 +31,10 @@ class HfpMonitor(
         private set
     var audioConnected: Set<String> = emptySet()
         private set
+    var sampledAt: Long? = null
+        private set
+    var sampleSequence: Long = 0
+        private set
     private val receiver =
         object : BroadcastReceiver() {
             override fun onReceive(
@@ -38,7 +42,7 @@ class HfpMonitor(
                 intent: Intent,
             ) {
                 // Extras are not trusted. Re-query the authenticated Bluetooth service.
-                refresh()
+                refresh("broadcast_${intent.action?.substringAfterLast('.') ?: "unknown"}")
             }
         }
     private val listener =
@@ -52,7 +56,7 @@ class HfpMonitor(
                         runCatching { adapter?.closeProfileProxy(profile, proxy) }
                     } else if (profile == BluetoothProfile.HEADSET) {
                         headset = proxy as? BluetoothHeadset
-                        refresh()
+                        refresh("proxy_connected")
                     }
                 }
             }
@@ -92,7 +96,11 @@ class HfpMonitor(
         }
     }
 
-    fun refresh() {
+    /** A verification timer can sample without scheduling a second service evaluation. */
+    fun refresh(
+        trigger: String = "unspecified",
+        notify: Boolean = true,
+    ) {
         if (closed) return
         val startedElapsed = SystemClock.elapsedRealtime()
         val startedUptime = SystemClock.uptimeMillis()
@@ -124,10 +132,13 @@ class HfpMonitor(
         }
         val elapsedDelta = SystemClock.elapsedRealtime() - startedElapsed
         val uptimeDelta = SystemClock.uptimeMillis() - startedUptime
+        sampledAt = SystemClock.elapsedRealtime()
+        sampleSequence++
         RouterLog.event(
             "HFP_QUERY_TIMING",
             "elapsedMs=$elapsedDelta; uptimeMs=$uptimeDelta; sleepDeltaMs=${(elapsedDelta - uptimeDelta).coerceAtLeast(0)}; " +
-                "devicesMs=$devicesQueryMs; audioMs=$audioQueryMs; deviceCount=$deviceCount; known=$known",
+                "devicesMs=$devicesQueryMs; audioMs=$audioQueryMs; deviceCount=$deviceCount; known=$known; " +
+                "trigger=$trigger; sample=$sampleSequence",
         )
         val stateKey = "$known|${connected.sorted()}|${audioConnected.sorted()}"
         if (stateKey != lastLoggedState) {
@@ -137,7 +148,7 @@ class HfpMonitor(
                 "known=$known; connected=${connected.map(RouterLog::deviceId)}; sco=${audioConnected.map(RouterLog::deviceId)}",
             )
         }
-        changed()
+        if (notify) changed()
     }
 
     override fun close() {

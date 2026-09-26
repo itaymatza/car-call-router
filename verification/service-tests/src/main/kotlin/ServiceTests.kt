@@ -48,6 +48,7 @@ private fun reset() {
     HfpMonitor.devices = setOf(TARGET, COMPETING, OTHER)
     HfpMonitor.audioDevices = setOf(COMPETING)
     HfpMonitor.starts = 0
+    HfpMonitor.refreshes = 0
     SessionBridge.controller = null
 }
 
@@ -156,6 +157,56 @@ fun main(args: Array<String>) {
                     f.activateAndSettle()
                     countEquals(f, 1)
                     check(SessionBridge.status.contains("SCO=false"))
+                    check(SessionBridge.status.contains("Telecom endpoint: TARGET"))
+                    check(SessionBridge.status.contains("HFP audio: COMPETITOR; BMW confirmed=false"))
+                }
+            },
+            "outgoing_audio_change_without_broadcast_is_sampled_before_verdict" to {
+                Fixture(initialState = Call.STATE_CONNECTING, initialEndpoint = target).use { f ->
+                    HfpMonitor.audioDevices = setOf(TARGET)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.call.deliverState(Call.STATE_DIALING)
+                    f.flush()
+                    HfpMonitor.audioDevices = setOf(COMPETING)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.activateAndSettle()
+                    countEquals(f, 1)
+                    check(SessionBridge.status.contains("HFP audio: COMPETITOR; BMW confirmed=false"))
+
+                    // The headset proxy changes after Telecom accepts, but the OEM does not
+                    // deliver an audio-state broadcast. The verification timer must re-query it.
+                    HfpMonitor.audioDevices = setOf(TARGET)
+                    TestQueue.advanceTo(1_000)
+                    check(SessionBridge.status.contains("STABILIZING"))
+                    TestQueue.advanceTo(1_250)
+                    check(SessionBridge.status.contains("TARGET_AUDIO_CONFIRMED"))
+                    check(SessionBridge.status.contains("HFP audio: TARGET; BMW confirmed=true"))
+                    countEquals(f, 1)
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=HFP_VERIFICATION_SAMPLE" in it.second &&
+                                "audio_owner=TARGET" in it.second
+                        },
+                    )
+                }
+            },
+            "failed_audio_verdict_uses_fresh_sample_and_never_retries" to {
+                Fixture(initialEndpoint = target, available = listOf(target, other)).use { f ->
+                    HfpMonitor.audioDevices = setOf(OTHER)
+                    HfpMonitor.emit(HfpMonitor.devices)
+                    f.activateAndSettle()
+                    val before = HfpMonitor.refreshes
+                    TestQueue.advanceTo(4_500)
+                    check(HfpMonitor.refreshes > before)
+                    check(SessionBridge.status.contains("TARGET_AUDIO_NOT_CONFIRMED"))
+                    check(SessionBridge.status.contains("Telecom endpoint: TARGET"))
+                    check(SessionBridge.status.contains("HFP audio: OTHER; BMW confirmed=false"))
+                    countEquals(f, 1)
+                    val after = HfpMonitor.refreshes
+                    TestQueue.advanceTo(10_000)
+                    check(HfpMonitor.refreshes == after)
+                    countEquals(f, 1)
                 }
             },
             "startup_endpoint_request_is_observational" to {
@@ -245,7 +296,7 @@ fun main(args: Array<String>) {
                         RouterLog.events.any {
                             it.first == "ROUTING_TRACE" &&
                                 "event=TIMER_FIRED" in it.second &&
-                                "late_ms=16000" in it.second &&
+                                "late_ms=19500" in it.second &&
                                 "sleep_delta_ms=16000" in it.second
                         },
                     )

@@ -1,5 +1,6 @@
 package org.carcallrouter.companion.telecom
 import android.content.Context
+import android.os.SystemClock
 import android.telecom.Call
 
 class CellularClassifier(
@@ -13,9 +14,16 @@ class HfpMonitor(
     private val changed: () -> Unit,
 ) : AutoCloseable {
     private var started = false
-    val known get() = started && isKnown
-    val connected get() = if (started) devices else emptySet()
-    val audioConnected get() = if (started) audioDevices else emptySet()
+    private var sampledKnown = false
+    private var sampledDevices = emptySet<String>()
+    private var sampledAudioDevices = emptySet<String>()
+    val known get() = started && sampledKnown
+    val connected get() = if (started) sampledDevices else emptySet()
+    val audioConnected get() = if (started) sampledAudioDevices else emptySet()
+    var sampledAt: Long? = null
+        private set
+    var sampleSequence = 0L
+        private set
 
     init {
         instances.add(this)
@@ -25,7 +33,21 @@ class HfpMonitor(
         if (started) return
         started = true
         starts++
-        changed()
+        refresh("startup")
+    }
+
+    fun refresh(
+        trigger: String = "unspecified",
+        notify: Boolean = true,
+    ) {
+        if (!started) return
+        sampledKnown = isKnown
+        sampledDevices = devices
+        sampledAudioDevices = audioDevices
+        sampledAt = SystemClock.elapsedRealtime()
+        sampleSequence++
+        refreshes++
+        if (notify) changed()
     }
 
     override fun close() {
@@ -37,6 +59,7 @@ class HfpMonitor(
         var devices = setOf<String>()
         var audioDevices = setOf<String>()
         var starts = 0
+        var refreshes = 0
         val instances = mutableListOf<HfpMonitor>()
 
         fun emit(
@@ -45,7 +68,7 @@ class HfpMonitor(
         ) {
             devices = value
             isKnown = known
-            instances.filter { it.started }.forEach { it.changed() }
+            instances.filter { it.started }.forEach { it.refresh("broadcast") }
         }
     }
 }

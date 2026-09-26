@@ -91,6 +91,23 @@ class RouterInCallService :
                     "sleep_delta_ms" to (elapsedDelta - uptimeDelta).coerceAtLeast(0),
                 )
             }
+            if (
+                hfpStarted &&
+                policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING)
+            ) {
+                val previousSampleAt = hfp.sampledAt
+                hfp.refresh("verification_timer", notify = false)
+                val address = settings.targetAddress?.uppercase()
+                trace.event(
+                    "HFP_VERIFICATION_SAMPLE",
+                    "previous_sample_age_ms" to previousSampleAt?.let { (SystemClock.elapsedRealtime() - it).coerceAtLeast(0) },
+                    "sample" to hfp.sampleSequence,
+                    "known" to hfp.known,
+                    "audio_owner" to hfpAudioOwner(address, settings.competitorAddress?.uppercase()),
+                    "audio_device" to hfp.audioConnected.singleOrNull()?.let(RouterLog::deviceId),
+                    "telecom_route" to currentRoute(),
+                )
+            }
             evaluate()
         }
     private val evaluateEvent = Runnable { evaluate() }
@@ -714,7 +731,8 @@ class RouterInCallService :
                             "Safety: $lastSafety\n" +
                             "Selected device: endpoint resolved=${target.endpoint != null}; " +
                             "HFP connected=${hfpConnected ?: "unknown"}\n" +
-                            "Route: $route\n" +
+                            "Telecom endpoint: $route\n" +
+                            "HFP audio: ${hfpAudioOwner(address, settings.competitorAddress?.uppercase())}\n" +
                             "Controller: WAITING; reason=LATE_BIND_RECOVERY_EVIDENCE"
                     if (state != lastPublished) {
                         lastPublished = state
@@ -773,6 +791,9 @@ class RouterInCallService :
                 "hfp_connected_count" to hfp.connected.size,
                 "hfp_audio_count" to hfp.audioConnected.size,
                 "hfp_audio_owner" to hfpAudioOwner(address, competitorAddress),
+                "hfp_sample" to hfp.sampleSequence,
+                "hfp_sample_age_ms" to hfp.sampledAt?.let { (now - it).coerceAtLeast(0) },
+                "hfp_audio_device" to hfp.audioConnected.singleOrNull()?.let(RouterLog::deviceId),
                 "target_configured" to (address != null),
                 "target_hfp_connected" to hfpConnected,
                 "target_sco" to targetHfpAudio,
@@ -1048,7 +1069,8 @@ class RouterInCallService :
                 "Selected device: endpoint resolved=${target.endpoint != null}; " +
                     "HFP connected=${hfpConnected ?: "unknown"}; SCO=${targetHfpAudio ?: "unknown"}",
                 "Endpoint resolution: ${target.reason}",
-                "Route: $route",
+                "Telecom endpoint: $route",
+                "HFP audio: ${hfpAudioOwner(address, competitorAddress)}; BMW confirmed=${policy.verified && targetHfpAudio == true}",
                 "Controller: ${policy.phase}; attempts=${policy.requests}; " +
                     "selectorRecoveries=${policy.selectorRecoveries}; reason=${policy.reasonCode}",
                 policy.reason,
@@ -1059,7 +1081,11 @@ class RouterInCallService :
             SessionBridge.publish(state)
         }
         if (policy.phase !in setOf(RoutingPolicy.Phase.SUSPENDED, RoutingPolicy.Phase.FAILED)) {
-            decision.wakeAt?.let { scheduleTick(it, policy.reasonCode.name) }
+            decision.wakeAt?.let { deadline ->
+                val verifying = policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING)
+                val due = if (verifying && hfpStarted) minOf(deadline, now + HFP_VERIFY_POLL_MS) else deadline
+                scheduleTick(due, if (due < deadline) "HFP_VERIFY_POLL" else policy.reasonCode.name)
+            }
         }
     }
 
@@ -1137,6 +1163,7 @@ class RouterInCallService :
     }
 
     companion object {
+        private const val HFP_VERIFY_POLL_MS = 500L
         private const val LATE_BIND_EVIDENCE_WINDOW_MS = 5_000L
         private val DEFINITE_USER_OWNED_ROUTES =
             setOf(
