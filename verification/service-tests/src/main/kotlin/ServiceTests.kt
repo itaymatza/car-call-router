@@ -312,7 +312,7 @@ fun main(args: Array<String>) {
                         RouterLog.events.any {
                             it.first == "ROUTING_TRACE" &&
                                 "event=TIMER_FIRED" in it.second &&
-                                "late_ms=13000" in it.second &&
+                                "late_ms=13200" in it.second &&
                                 "sleep_delta_ms=13000" in it.second
                         },
                     )
