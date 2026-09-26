@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/publish-debug-prerelease.yml'
 
 permissions:
   contents: write
@@ -17,10 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VERSION_CODE: '13'
-  VERSION_NAME: 0.3.0-beta.11
-  RELEASE_TAG: v0.3.0-beta.11-debug
-  APK_NAME: car-call-router-0.3.0-beta.11-debug.apk
+  BASE_VERSION_CODE: '14'
+  BASE_VERSION_NAME: 0.3.0-beta.12
 
 jobs:
   publish:
@@ -35,6 +31,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Install SDK packages
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Identify this source build
+        run: |
+          short_sha="${GITHUB_SHA:0:12}"
+          echo "VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=${BASE_VERSION_NAME}.${short_sha}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v${BASE_VERSION_NAME}-debug.${short_sha}" >> "$GITHUB_ENV"
+          echo "APK_NAME=car-call-router-${BASE_VERSION_NAME}-debug.${short_sha}.apk" >> "$GITHUB_ENV"
       - name: Test host tooling
         run: |
           python3 tools/check_version_consistency.py
@@ -50,6 +53,8 @@ jobs:
           :verification:service-tests:ktlintCheck
           :verification:service-tests:run
           :app:lintDebug
+          -PAPP_VERSION_CODE="$VERSION_CODE"
+          -PAPP_VERSION_NAME="$VERSION_NAME"
           --stacktrace --console=plain
       - name: Verify APK identity
         env:
@@ -71,12 +76,16 @@ jobs:
       - name: Publish GitHub pre-release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$RELEASE_TAG"
-          "dist/$APK_NAME"
-          "dist/$APK_NAME.sha256"
-          dist/apk-verification.txt
-          --target "$GITHUB_SHA"
-          --prerelease
-          --title "Car Call Router $VERSION_NAME (debug beta)"
-          --notes-file docs/DEBUG-PRERELEASE-NOTES.md
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release for this source commit already exists: $RELEASE_TAG"
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" \
+            "dist/$APK_NAME" \
+            "dist/$APK_NAME.sha256" \
+            dist/apk-verification.txt \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Car Call Router $VERSION_NAME (debug beta)" \
+            --notes-file docs/DEBUG-PRERELEASE-NOTES.md

@@ -1,0 +1,3 @@
+Version 0.3.0-beta.12
+
+Selector recovery is hardened around user route changes. This debug beta includes the latest merged source and awaits parked real-car validation.
