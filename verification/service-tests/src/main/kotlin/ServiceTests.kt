@@ -213,6 +213,59 @@ fun main(args: Array<String>) {
                     check(SessionBridge.status.contains("TARGET_AUDIO_NOT_CONFIRMED"))
                 }
             },
+            "sleep_delays_settle_timer_without_unbounded_request" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateWithoutSettling()
+                    TestQueue.sleepFor(13_000)
+                    TestQueue.advanceTo(13_500)
+                    countEquals(f, 0)
+                    check(SessionBridge.status.contains("EVIDENCE_DEADLINE_EXPIRED"))
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=TIMER_FIRED" in it.second &&
+                                "late_ms=13000" in it.second &&
+                                "sleep_delta_ms=13000" in it.second
+                        },
+                    )
+                }
+            },
+            "sleep_delays_action_timer_without_reassertion" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    countEquals(f, 1)
+                    TestQueue.sleepFor(16_000)
+                    TestQueue.advanceTo(20_500)
+                    countEquals(f, 1)
+                    check(SessionBridge.status.contains("TARGET_AUDIO_NOT_CONFIRMED"))
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=TIMER_FIRED" in it.second &&
+                                "late_ms=16000" in it.second &&
+                                "sleep_delta_ms=16000" in it.second
+                        },
+                    )
+                }
+            },
+            "confirmed_audio_loss_and_return_are_observed_without_new_requests" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(750)
+                    check(SessionBridge.status.contains("RELEASED"))
+                    f.targetAudio(false)
+                    f.targetAudio(true)
+                    countEquals(f, 1)
+                    val changes =
+                        RouterLog.events
+                            .filter { it.first == "ROUTING_TRACE" && "event=CONFIRMED_AUDIO_CHANGED" in it.second }
+                            .map { it.second }
+                    check(changes.size == 2)
+                    check("target_sco=false" in changes[0] && "hfp_audio_owner=COMPETITOR" in changes[0])
+                    check("target_sco=true" in changes[1] && "hfp_audio_owner=TARGET" in changes[1])
+                }
+            },
             "split_brain_failure_restores_phone_selector_once" to {
                 Fixture(initialEndpoint = target).use { f ->
                     f.activateAndSettle()
