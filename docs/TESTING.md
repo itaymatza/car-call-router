@@ -99,6 +99,7 @@ Each local, Git-ignored directory under `verification/device-runs/` contains:
 |---|---|
 | `device.txt` | Scenario/tags, UTC time, phone/build/One UI identity, app version, installed APK SHA-256, and authorization state. |
 | `trace.log` | Only new schema-1 structured routing records; prior sessions are removed. |
+| `app-events.log` | New redacted app events, including HFP query timing when private app logs are available. |
 | `report.txt` / `report.json` | Per-session status, confirmations, latencies, finish reason, and anomalies. |
 | `observations.txt` | Parked human checks for native HFP speaker/microphone and preserved Android Auto behavior. |
 | `verdict.txt` | `PASS` only when every new session has complete trace evidence and every required observation is `yes`. |
@@ -113,9 +114,9 @@ python3 tools/analyze_device_trace.py exported-log.txt --format json
 
 The in-app log export also contains `HFP_QUERY_TIMING` records. Keep the full export when a
 deadline fires late: the structured trace records `TIMER_SCHEDULED`, `TIMER_CANCELLED`,
-and `TIMER_FIRED` with elapsed time, uptime, and calculated sleep delta. The capture harness
-currently filters to `ROUTING_TRACE`, so its `trace.log` alone cannot show Bluetooth proxy
-query latency. A late timer is evidence of delayed evaluation, not by itself proof of why it
+and `TIMER_FIRED` with elapsed time, uptime, and calculated sleep delta. The capture harness keeps the structured `trace.log` and a separate `app-events.log` for
+Bluetooth proxy query latency when private app logs are available. The logcat fallback keeps
+only structured trace records. A late timer is evidence of delayed evaluation, not by itself proof of why it
 was delayed. Correlate the exported timing records before changing the policy or adding retries.
 
 The analyzer reports malformed records, unsupported schemas, sequence gaps, time regressions,

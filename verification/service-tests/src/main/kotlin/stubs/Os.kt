@@ -20,7 +20,7 @@ class Looper {
 object SystemClock {
     fun elapsedRealtime() = TestQueue.now
 
-    fun uptimeMillis() = TestQueue.now
+    fun uptimeMillis() = TestQueue.uptime
 }
 
 object TestQueue {
@@ -33,11 +33,13 @@ object TestQueue {
 
     private val q = PriorityQueue<Task>(compareBy<Task> { it.at }.thenBy { it.id })
     var now = 0L
+    var uptime = 0L
     private var serial = 0L
 
     fun reset() {
         q.clear()
         now = 0L
+        uptime = 0L
         serial = 0L
     }
 
@@ -46,7 +48,7 @@ object TestQueue {
         r: Runnable,
         delay: Long,
     ) {
-        q.add(Task(now + delay, ++serial, owner, r))
+        q.add(Task(uptime + delay, ++serial, owner, r))
     }
 
     fun remove(
@@ -58,7 +60,7 @@ object TestQueue {
 
     fun runReady() {
         var n = 0
-        while (q.isNotEmpty() && q.peek().at <= now) {
+        while (q.isNotEmpty() && q.peek().at <= uptime) {
             check(n++ < 1000) { "Runaway handler" }
             q.remove().action.run()
         }
@@ -66,8 +68,15 @@ object TestQueue {
 
     fun advanceTo(value: Long) {
         require(value >= now)
+        uptime += value - now
         now = value
         runReady()
+    }
+
+    /** Elapsed time advances during device sleep while Handler's uptime-based queue does not. */
+    fun sleepFor(duration: Long) {
+        require(duration >= 0)
+        now += duration
     }
 
     fun size() = q.size
