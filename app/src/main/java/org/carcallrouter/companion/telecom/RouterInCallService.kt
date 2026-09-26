@@ -1171,8 +1171,10 @@ class RouterInCallService :
             decision.wakeAt?.let { deadline ->
                 val sampleHfp =
                     policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
-                        (policy.phase == RoutingPolicy.Phase.WAITING &&
-                            policy.reasonCode == RoutingPolicy.ReasonCode.SETTLING_AFTER_ACTIVE)
+                        (
+                            policy.phase == RoutingPolicy.Phase.WAITING &&
+                                policy.reasonCode == RoutingPolicy.ReasonCode.SETTLING_AFTER_ACTIVE
+                        )
                 val due = if (sampleHfp && hfpStarted) minOf(deadline, now + HFP_VERIFY_POLL_MS) else deadline
                 scheduleTick(due, if (due < deadline) "HFP_SAMPLE_POLL" else policy.reasonCode.name)
             }
