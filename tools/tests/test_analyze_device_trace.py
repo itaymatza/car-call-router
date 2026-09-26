@@ -183,6 +183,31 @@ class TraceAnalyzerTest(unittest.TestCase):
         self.assertEqual(13300, item.max_timer_late_ms)
         self.assertEqual(0, item.requests)
 
+    def test_late_policy_failure_overrides_earlier_hfp_confirmation(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 20, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 3, 500, "POLICY_STATE", "phase=FAILED reason=EVIDENCE_DEADLINE_EXPIRED")
+            + line("abc", 4, 700, "SESSION_FINISHED",
+                   "phase=SUSPENDED reason=CALL_NOT_ACTIVE termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO")
+        )
+        summaries, warnings = self.parse(content)
+        self.assertEqual([], warnings)
+        self.assertTrue(summaries[0].hfp_audio_confirmed)
+        self.assertEqual("FAIL", summaries[0].status)
+
+    def test_terminal_failure_overrides_earlier_hfp_confirmation(self):
+        content = (
+            line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")
+            + line("abc", 2, 20, "TARGET_HFP_AUDIO_CONFIRMED")
+            + line("abc", 3, 700, "SESSION_FINISHED",
+                   "phase=FAILED reason=SELECTOR_RECOVERY_FAILED termination=call_removed "
+                   "best_confirmation=TARGET_HFP_AUDIO")
+        )
+        summaries, _ = self.parse(content)
+        self.assertEqual("FAIL", summaries[0].status)
+
     def test_confirmed_audio_loss_is_unstable_without_endpoint_oscillation(self):
         content = (
             line("abc", 1, 0, "SESSION_STARTED", "mode=automatic trigger=fresh_active_transition")

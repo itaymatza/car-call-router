@@ -207,12 +207,14 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             status = "INVALID"
         elif finish is None:
             status = "OPEN"
+        elif explicit_failure:
+            # A confirmation records that target audio was observed once, not that the
+            # call ultimately succeeded. Keep a later terminal policy failure visible.
+            status = "FAIL"
         elif hfp is not None and (route_oscillations > 0 or audio_confirmation_losses > 0):
             status = "UNSTABLE"
         elif hfp is not None:
             status = "PASS"
-        elif explicit_failure:
-            status = "FAIL"
         elif endpoint is not None:
             status = "INCOMPLETE"
         else:
