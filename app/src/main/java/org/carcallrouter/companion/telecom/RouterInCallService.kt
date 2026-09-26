@@ -62,6 +62,9 @@ class RouterInCallService :
     private var scheduledTickElapsed: Long? = null
     private var scheduledTickUptime: Long? = null
     private var confirmedAudioPresent: Boolean? = null
+    private var postConfirmationDeadlineAt: Long? = null
+    private var postConfirmationWatchComplete = false
+    private var postConfirmationLossObserved = false
     private var lastHfpAudioDevices: Set<String>? = null
     private var lastAudioFrameworkState: AudioFrameworkProbe.State? = null
 
@@ -96,13 +99,16 @@ class RouterInCallService :
             }
             if (
                 hfpStarted &&
-                policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING)
+                (
+                    policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
+                        (policy.phase == RoutingPolicy.Phase.RELEASED && postConfirmationDeadlineAt != null)
+                )
             ) {
                 val previousSampleAt = hfp.sampledAt
                 hfp.refresh("verification_timer", notify = false)
                 val address = settings.targetAddress?.uppercase()
                 trace.event(
-                    "HFP_VERIFICATION_SAMPLE",
+                    if (policy.phase == RoutingPolicy.Phase.RELEASED) "HFP_POST_CONFIRMATION_SAMPLE" else "HFP_VERIFICATION_SAMPLE",
                     "previous_sample_age_ms" to previousSampleAt?.let { (SystemClock.elapsedRealtime() - it).coerceAtLeast(0) },
                     "sample" to hfp.sampleSequence,
                     "known" to hfp.known,
@@ -190,6 +196,9 @@ class RouterInCallService :
         lateBindRecoveryDeadlineAt = null
         lastEndpointId = null
         confirmedAudioPresent = null
+        postConfirmationDeadlineAt = null
+        postConfirmationWatchComplete = false
+        postConfirmationLossObserved = false
         scheduledTickAt = null
         scheduledTickElapsed = null
         scheduledTickUptime = null
@@ -415,6 +424,7 @@ class RouterInCallService :
         }
         if (records.isEmpty()) {
             cancelTick("call_removed")
+            finishPostConfirmationWatch("call_removed")
             val address = settings.targetAddress?.uppercase()
             val confirmation =
                 trace.finish(
@@ -441,6 +451,8 @@ class RouterInCallService :
             lateBindRecoveryDeadlineAt = null
             lastEndpointId = null
             confirmedAudioPresent = null
+            postConfirmationWatchComplete = false
+            postConfirmationLossObserved = false
             RouterLog.event("SESSION_END", "No audio reset, disconnect, A2DP or projection operation performed")
         }
         queueEvaluation()
@@ -802,6 +814,10 @@ class RouterInCallService :
                 ),
             )
         if (active && policy.verified) {
+            if (!postConfirmationWatchComplete && postConfirmationDeadlineAt == null && hfpStarted) {
+                postConfirmationDeadlineAt = now + POST_CONFIRMATION_WATCH_MS
+                trace.event("POST_CONFIRMATION_WATCH_STARTED", "duration_ms" to POST_CONFIRMATION_WATCH_MS)
+            }
             val prior = confirmedAudioPresent
             if (prior != null && prior != targetHfpAudio) {
                 trace.event(
@@ -813,6 +829,10 @@ class RouterInCallService :
                 )
             }
             confirmedAudioPresent = targetHfpAudio
+            if (targetHfpAudio != true) postConfirmationLossObserved = true
+            if (postConfirmationDeadlineAt?.let { now >= it } == true) {
+                finishPostConfirmationWatch("deadline")
+            }
         }
         val evidence =
             listOf<Pair<String, Any?>>(
@@ -1129,7 +1149,25 @@ class RouterInCallService :
                 val due = if (verifying && hfpStarted) minOf(deadline, now + HFP_VERIFY_POLL_MS) else deadline
                 scheduleTick(due, if (due < deadline) "HFP_VERIFY_POLL" else policy.reasonCode.name)
             }
+            if (policy.phase == RoutingPolicy.Phase.RELEASED && hfpStarted) {
+                postConfirmationDeadlineAt?.let { deadline ->
+                    scheduleTick(minOf(deadline, now + HFP_VERIFY_POLL_MS), "POST_CONFIRMATION_POLL")
+                }
+            }
         }
+    }
+
+    private fun finishPostConfirmationWatch(reason: String) {
+        val deadline = postConfirmationDeadlineAt ?: return
+        postConfirmationDeadlineAt = null
+        postConfirmationWatchComplete = true
+        trace.event(
+            "POST_CONFIRMATION_WATCH_FINISHED",
+            "reason" to reason,
+            "deadline_elapsed_ms" to deadline,
+            "loss_observed" to postConfirmationLossObserved,
+            "final_target_sco" to confirmedAudioPresent,
+        )
     }
 
     override fun routeNow() {
@@ -1145,6 +1183,9 @@ class RouterInCallService :
         beginTrace("manual", "route_now")
         policy.begin(now, currentRoute(), manualOneShot = true)
         confirmedAudioPresent = null
+        postConfirmationDeadlineAt = null
+        postConfirmationWatchComplete = false
+        postConfirmationLossObserved = false
         manualCooldownUntil = now + 1_500
         RouterLog.event("MANUAL_TEST", "One request only; projection gate bypassed explicitly")
         evaluate()
@@ -1177,6 +1218,7 @@ class RouterInCallService :
         if (disposed) return
         disposed = true
         cancelTick("service_stopped")
+        finishPostConfirmationWatch("service_stopped")
         trace.finish(policy.phase, policy.reasonCode, "service_stopped")
         router.clearSession()
         handler.removeCallbacksAndMessages(null)
@@ -1207,6 +1249,7 @@ class RouterInCallService :
 
     companion object {
         private const val HFP_VERIFY_POLL_MS = 250L
+        private const val POST_CONFIRMATION_WATCH_MS = 3_000L
         private const val LATE_BIND_EVIDENCE_WINDOW_MS = 5_000L
         private val DEFINITE_USER_OWNED_ROUTES =
             setOf(

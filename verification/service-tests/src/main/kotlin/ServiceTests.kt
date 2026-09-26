@@ -728,6 +728,42 @@ fun main(args: Array<String>) {
                     )
                 }
             },
+            "post_confirmation_watch_catches_silent_hfp_takeover_without_reassertion" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(800)
+                    check(SessionBridge.status.contains("TARGET_AUDIO_CONFIRMED"))
+                    val before = HfpMonitor.refreshes
+
+                    // The headset proxy changes ownership without delivering an audio broadcast.
+                    HfpMonitor.audioDevices = setOf(COMPETING)
+                    TestQueue.advanceTo(1_050)
+                    check(HfpMonitor.refreshes > before)
+                    check(SessionBridge.status.contains("HFP audio: COMPETITOR; BMW confirmed=false"))
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=CONFIRMED_AUDIO_CHANGED" in it.second &&
+                                "target_sco=false" in it.second
+                        },
+                    )
+                    countEquals(f, 1)
+
+                    repeat(14) { TestQueue.advanceTo(TestQueue.now + 250) }
+                    check(
+                        RouterLog.events.any {
+                            it.first == "ROUTING_TRACE" &&
+                                "event=POST_CONFIRMATION_WATCH_FINISHED" in it.second &&
+                                "loss_observed=true" in it.second
+                        },
+                    )
+                    val after = HfpMonitor.refreshes
+                    TestQueue.advanceTo(20_000)
+                    check(HfpMonitor.refreshes == after)
+                    countEquals(f, 1)
+                }
+            },
             "hfp_monitor_follows_projection_and_manual_lifecycle" to {
                 Fixture(projected = false).use { f ->
                     check(HfpMonitor.starts == 0)
