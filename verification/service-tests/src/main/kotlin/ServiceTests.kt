@@ -137,9 +137,34 @@ fun main(args: Array<String>) {
                     countEquals(f, 0)
                     f.activateWithoutSettling()
                     countEquals(f, 0)
-                    TestQueue.advanceTo(499)
+                    TestQueue.advanceTo(299)
                     countEquals(f, 0)
-                    TestQueue.advanceTo(500)
+                    TestQueue.advanceTo(300)
+                    countEquals(f, 1)
+                }
+            },
+            "startup_endpoint_activity_gets_a_bounded_quiet_period" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateWithoutSettling()
+                    TestQueue.advanceTo(100)
+                    f.service.onCallEndpointRequested(other)
+                    f.flush()
+                    TestQueue.advanceTo(449)
+                    countEquals(f, 0)
+                    TestQueue.advanceTo(450)
+                    countEquals(f, 1)
+                }
+            },
+            "startup_audio_churn_delays_the_only_request_until_quiet" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateWithoutSettling()
+                    TestQueue.advanceTo(100)
+                    f.targetAudio(true)
+                    TestQueue.advanceTo(200)
+                    f.targetAudio(false)
+                    TestQueue.advanceTo(549)
+                    countEquals(f, 0)
+                    TestQueue.advanceTo(550)
                     countEquals(f, 1)
                 }
             },
@@ -209,6 +234,18 @@ fun main(args: Array<String>) {
                     countEquals(f, 1)
                 }
             },
+            "external_request_after_target_suppresses_selector_recovery" to {
+                Fixture(initialEndpoint = target).use { f ->
+                    f.activateAndSettle()
+                    countEquals(f, 1)
+                    f.service.onCallEndpointRequested(other)
+                    f.flush()
+                    TestQueue.advanceTo(4_500)
+                    countEquals(f, 1)
+                    check(SessionBridge.status.contains("EXTERNAL_ENDPOINT_REQUEST"))
+                    check(RouterLog.events.any { it.first == "ROUTING_TRACE" && "event=EXTERNAL_CONTROL_AFTER_TARGET" in it.second })
+                }
+            },
             "startup_endpoint_request_is_observational" to {
                 Fixture(initialEndpoint = target).use { f ->
                     f.activateWithoutSettling()
@@ -275,7 +312,7 @@ fun main(args: Array<String>) {
                         RouterLog.events.any {
                             it.first == "ROUTING_TRACE" &&
                                 "event=TIMER_FIRED" in it.second &&
-                                "late_ms=13000" in it.second &&
+                                "late_ms=13200" in it.second &&
                                 "sleep_delta_ms=13000" in it.second
                         },
                     )
@@ -296,7 +333,7 @@ fun main(args: Array<String>) {
                         RouterLog.events.any {
                             it.first == "ROUTING_TRACE" &&
                                 "event=TIMER_FIRED" in it.second &&
-                                "late_ms=19500" in it.second &&
+                                "late_ms=19750" in it.second &&
                                 "sleep_delta_ms=16000" in it.second
                         },
                     )
@@ -930,5 +967,5 @@ fun main(args: Array<String>) {
     )
     output.forEach(::println)
     args.firstOrNull()?.let { File(it).writeText(output.joinToString("\n") + "\n") }
-    if (failed.isNotEmpty()) kotlin.system.exitProcess(1)
+    check(failed.isEmpty()) { "Service scenarios failed: ${failed.joinToString()}" }
 }
