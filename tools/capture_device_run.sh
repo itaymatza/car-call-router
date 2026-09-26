@@ -12,7 +12,7 @@ usage() {
     cat <<'EOF'
 Usage: tools/capture_device_run.sh [--serial SERIAL] [--scenario NAME] [--tag TAG] [--package ID] [--output DIR]
 
-Captures only Car Call Router's privacy-safe ROUTING_TRACE records around one parked test.
+Captures one parked test's structured trace and new redacted app events (when run-as is available).
 Scenarios: incoming, outgoing, selector-recovery, override, hold-resume, reconnect, second-call, conference, other.
 Repeat --tag to classify a run for the production stability matrix. Use --help to list tags.
 
@@ -118,20 +118,21 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 
 capture_app_log() {
     local destination="$1"
-    : >"$TEMP_DIR/app.log"
+    : >"$destination"
     if "${ADB[@]}" exec-out run-as "$PACKAGE" id >/dev/null 2>&1; then
         for log_name in router.3.log router.2.log router.1.log router.log; do
             "${ADB[@]}" exec-out run-as "$PACKAGE" cat "files/$log_name" \
-                >>"$TEMP_DIR/app.log" 2>/dev/null || true
+                >>"$destination" 2>/dev/null || true
         done
     else
         echo "Warning: private app-log access failed; using the current filtered logcat buffer." >&2
-        "${ADB[@]}" logcat -d -v threadtime -s CallRouteCompanion:I '*:S' >"$TEMP_DIR/app.log"
+        "${ADB[@]}" logcat -d -v threadtime -s CallRouteCompanion:I '*:S' |
+            awk 'index($0, "ROUTING_TRACE ") {print}' >"$destination"
     fi
-    awk 'index($0, "ROUTING_TRACE ") {print}' "$TEMP_DIR/app.log" >"$destination"
 }
 
-capture_app_log "$TEMP_DIR/before.trace"
+capture_app_log "$TEMP_DIR/before.app"
+awk 'index($0, "ROUTING_TRACE ") {print}' "$TEMP_DIR/before.app" >"$TEMP_DIR/before.trace"
 python3 "$ROOT/tools/analyze_device_trace.py" "$TEMP_DIR/before.trace" --session-ids-only \
     >"$TEMP_DIR/before.sessions"
 
@@ -171,7 +172,9 @@ echo "Keep Android Auto and the intended native HFP device connected, then perfo
 read -r -p "Press Enter immediately before starting the call... "
 read -r -p "End the call, wait two seconds for the final trace, then press Enter... "
 
-capture_app_log "$TEMP_DIR/after.trace"
+capture_app_log "$TEMP_DIR/after.app"
+python3 "$ROOT/tools/extract_new_app_events.py" "$TEMP_DIR/before.app" "$TEMP_DIR/after.app" >"$OUTPUT/app-events.log"
+awk 'index($0, "ROUTING_TRACE ") {print}' "$TEMP_DIR/after.app" >"$TEMP_DIR/after.trace"
 python3 "$ROOT/tools/analyze_device_trace.py" "$TEMP_DIR/after.trace" \
     --exclude-session-file "$TEMP_DIR/before.sessions" \
     --filtered-trace-output "$OUTPUT/trace.log" >"$OUTPUT/report.txt"
@@ -221,4 +224,4 @@ cat "$OUTPUT/report.txt"
 echo
 echo "Combined run verdict: $VERDICT"
 echo "Saved redacted evidence to: $OUTPUT"
-echo "Review trace.log before sharing even though it contains only structured, redacted app records."
+echo "Review trace.log and app-events.log before sharing; the latter includes non-trace diagnostics."
