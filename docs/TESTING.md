@@ -123,8 +123,11 @@ only structured trace records. A late timer is evidence of delayed evaluation, n
 was delayed. Correlate the exported timing records before changing the policy or adding retries.
 
 The analyzer reports malformed records, unsupported schemas, sequence gaps, time regressions,
-missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom endpoint is `INCOMPLETE` unless the policy explicitly\nfailed, in which case it is `FAIL`. A session is `UNSTABLE` when exact target audio is eventually confirmed
-but the trace also shows an endpoint oscillation such as BMW → handset → BMW or a later\nloss of confirmed BMW HFP audio. Endpoint-request
+missing starts, and duplicate finishes as `INVALID`. A session that confirms only the Telecom endpoint is `INCOMPLETE` unless the policy explicitly
+failed, in which case it is `FAIL`. A policy failure remains `FAIL` even if target HFP audio was confirmed earlier in the call.
+A session is `UNSTABLE` when exact target audio is eventually confirmed
+but the trace also shows an endpoint oscillation such as BMW → handset → BMW or a later
+loss of confirmed BMW HFP audio. Endpoint-request
 callbacks are reported for diagnostics only because Android can emit them during call startup without
 a user action. A session cannot be `PASS` without a finish, exact target HFP audio confirmation, and
 no detected instability. `selector_recoveries` reports the bounded Samsung selector-restoration path;
