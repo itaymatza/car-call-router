@@ -238,7 +238,7 @@ fun main(args: Array<String>) {
                     TestQueue.advanceTo(20_500)
                     check(f.service.issuedRequests.map { it.second } == listOf(TARGET_ID, COMPETING_ID))
                     check(SessionBridge.status.contains("SELECTOR_RECOVERY_ACCEPTED"))
-                    TestQueue.advanceTo(22_500)
+                    TestQueue.advanceTo(23_000)
                     countEquals(f, 2)
                     check(SessionBridge.status.contains("SELECTOR_RECOVERY_NOT_CONFIRMED"))
                     check(
