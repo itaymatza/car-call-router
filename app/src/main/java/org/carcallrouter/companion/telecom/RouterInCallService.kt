@@ -99,8 +99,10 @@ class RouterInCallService :
             }
             if (
                 hfpStarted &&
-                (policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
-                    (policy.phase == RoutingPolicy.Phase.RELEASED && postConfirmationDeadlineAt != null))
+                (
+                    policy.phase in setOf(RoutingPolicy.Phase.VERIFYING, RoutingPolicy.Phase.STABILIZING) ||
+                        (policy.phase == RoutingPolicy.Phase.RELEASED && postConfirmationDeadlineAt != null)
+                )
             ) {
                 val previousSampleAt = hfp.sampledAt
                 hfp.refresh("verification_timer", notify = false)
