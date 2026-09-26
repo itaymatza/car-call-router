@@ -28,6 +28,9 @@
   bound only for failure-free batches.
 - CI fails on APK signature rejection, package/version or SDK drift, missing required permissions,
   and unexpected debuggability; its artifact includes the exact APK and certificate SHA-256 values.
+- The main-branch debug pre-release is a downstream job of both JDK host-contract runs and the
+  Android build/lint/APK gates. A failed gate skips publication; only the downstream job can access
+  protected debug signing credentials, and reruns fill in missing assets of an interrupted release.
 - Service regressions cover authorization and runtime-permission revocation during a pending route,
   plus process recreation without taking over an already-active call.
 - Late-bind recovery is tested across every ordering of projection, HFP, endpoint-snapshot, and
