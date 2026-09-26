@@ -193,6 +193,18 @@ def summarize(events: Iterable[TraceEvent], excluded: set[str] | None = None) ->
             and event.fields.get("target_sco") != "true"
             for event in session_events
         )
+        # The watch and terminal record also retain a loss when an intermediate
+        # sample event is absent from a partial export. Count the observation once.
+        loss_recorded_at_finish = finish is not None and finish.fields.get(
+            "post_confirmation_loss_observed"
+        ) == "true"
+        loss_recorded_by_watch = any(
+            event.event == "POST_CONFIRMATION_WATCH_FINISHED"
+            and event.fields.get("loss_observed") == "true"
+            for event in session_events
+        )
+        if audio_confirmation_losses == 0 and (loss_recorded_at_finish or loss_recorded_by_watch):
+            audio_confirmation_losses = 1
         timer_lateness = [
             int(event.fields["late_ms"])
             for event in session_events

@@ -22,7 +22,8 @@ runs it through Gradle/JUnit so JaCoCo can measure the production boundary.
 
 The production-service harness includes the captured Samsung failure shape: Telecom displays BMW,
 Android Auto owns SCO, and another `InCallService` request arrives immediately after ACTIVE. It
-also verifies the settling delay, strict one-BMW-request budget, stable-SCO requirement, result races,
+also verifies the settling delay, silent HFP ownership changes sampled during settling, strict
+one-BMW-request budget, stable-SCO requirement, result races,
 manual selector preservation, lifecycle cancellation, late binding, and request-marker isolation.
 The [call-audio mechanism and CI matrix](CALL-AUDIO-MECHANISM.md) also cover Android 17's conditional
 Audio Managed SCO path, read-only audio-framework diagnostics, endpoint-list churn after a request,
@@ -127,7 +128,7 @@ missing starts, and duplicate finishes as `INVALID`. A session that confirms onl
 failed, in which case it is `FAIL`. A policy failure remains `FAIL` even if target HFP audio was confirmed earlier in the call.
 A session is `UNSTABLE` when exact target audio is eventually confirmed
 but the trace also shows an endpoint oscillation such as BMW → handset → BMW or a later
-loss of confirmed BMW HFP audio. Endpoint-request
+loss of confirmed BMW HFP audio (including the post-confirmation watch verdict). Endpoint-request
 callbacks are reported for diagnostics only because Android can emit them during call startup without
 a user action. A session cannot be `PASS` without a finish, exact target HFP audio confirmation, and
 no detected instability. `selector_recoveries` reports the bounded Samsung selector-restoration path;
@@ -135,6 +136,8 @@ it remains a routing failure until a later manual BMW selection produces exact t
 The report separately marks `diagnostic_complete`, lists any missing request contexts, identifies a
 Telecom-BMW/other-HFP mismatch without assuming which device owns that HFP audio, and reports the final HFP owner and selector-recovery
 confirmation. Use `--require-diagnostics` when checking a capture outside the harness.
+The app's last-call result labels HFP confirmation separately from later instability. It is not
+proof of the physical speaker or microphone: those require the parked-car observation.
 
 For the reported Samsung selector regression, run `--scenario selector-recovery`. In addition to
 the standard speaker, microphone, and Android Auto observations, the harness records whether the

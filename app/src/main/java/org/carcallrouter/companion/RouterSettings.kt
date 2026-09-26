@@ -11,7 +11,19 @@ class RouterSettings(
         val phase: String,
         val reason: String,
         val confirmation: String,
-    )
+    ) {
+        val result: Result
+            get() =
+                when {
+                    phase == "FAILED" -> Result.FAILED
+                    confirmation == "TARGET_HFP_AUDIO_UNSTABLE" -> Result.UNSTABLE
+                    confirmation == "TARGET_HFP_AUDIO" &&
+                        (phase == "RELEASED" || reason == "CALL_NOT_ACTIVE") -> Result.HFP_CONFIRMED
+                    else -> Result.INCOMPLETE
+                }
+    }
+
+    enum class Result { HFP_CONFIRMED, UNSTABLE, FAILED, INCOMPLETE }
 
     val prefs: SharedPreferences = context.getSharedPreferences("router_settings", Context.MODE_PRIVATE)
     var enabled: Boolean
