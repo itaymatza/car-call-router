@@ -236,8 +236,11 @@ fun main(args: Array<String>) {
                     countEquals(f, 1)
                     TestQueue.sleepFor(16_000)
                     TestQueue.advanceTo(20_500)
-                    countEquals(f, 1)
-                    check(SessionBridge.status.contains("TARGET_AUDIO_NOT_CONFIRMED"))
+                    check(f.service.issuedRequests.map { it.second } == listOf(TARGET_ID, COMPETING_ID))
+                    check(SessionBridge.status.contains("SELECTOR_RECOVERY_ACCEPTED"))
+                    TestQueue.advanceTo(22_500)
+                    countEquals(f, 2)
+                    check(SessionBridge.status.contains("SELECTOR_RECOVERY_NOT_CONFIRMED"))
                     check(
                         RouterLog.events.any {
                             it.first == "ROUTING_TRACE" &&
