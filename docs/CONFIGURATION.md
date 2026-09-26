@@ -24,7 +24,7 @@ Changing the application ID creates a distinct Android application. Any protecte
 
 ## Runtime choices
 
-At runtime, a person configuring a test device chooses the target Bluetooth call device from already paired devices. The app stores the chosen address and display name in application-private `SharedPreferences`; neither value is compiled into the source tree or transmitted by the app. An optional competing device can be selected to permit bounded reassertion only against that explicit route. When no competing device is set, the automatic path makes a single initial request instead of contesting a later route change.
+At runtime, a person configuring a test device chooses the target Bluetooth call device from already paired devices. The app stores the chosen address and display name in application-private `SharedPreferences`; neither value is compiled into the source tree or transmitted by the app. If the Android Auto head unit is another paired HFP call device, the user can optionally identify it as the competing device. This permits one bounded request to restore the manual call selector only when Telecom displays the target but that exact competing device still owns HFP audio after the target request. Without a configured competitor, the app cannot safely restore the selector in that split state. It never retries or reasserts the target.
 
 The master automation toggle is disabled by default. It cannot be enabled until the target is selected, the required runtime permissions are granted, and the operating system reports that the protected ongoing-call authorization is present. A manual one-shot is available only while Telecom has bound the service, and it retains all authorization, call-safety, and target-identity requirements.
 
