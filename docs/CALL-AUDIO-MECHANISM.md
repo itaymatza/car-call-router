@@ -24,7 +24,7 @@ The owner-supplied redacted trace from 2026-09-26 shows an Android Auto UI outgo
 
 1. Require a fresh safe cellular ACTIVE call, one live call, authorization, projection evidence for automatic mode, exact target HFP connection and a currently available uniquely resolved endpoint. Do not auto-route emergency, ambiguous, late-bound user-owned, conference, or multi-call sessions.
 2. Allow short call-start activity to settle, capped at 900 ms. A pre-ACTIVE SCO flicker is not confirmation of sustained ACTIVE audio.
-3. Submit at most one Telecom target request. A successful request callback is not a route or audio success verdict. Re-query exact HFP audio on callbacks and every 250 ms during the bounded four-second verification period; require 250 ms of stability.
+3. Submit at most one Telecom target request. A successful request callback is not a route or audio success verdict. Re-query exact HFP audio on callbacks and every 250 ms during the bounded four-second verification period; require 250 ms of stability. After confirmation, passively sample for three more seconds to detect an unannounced HFP takeover. This watch does not issue another route request.
 4. Once the request is submitted, a replacement Telecom endpoint list does not invalidate exact, stable target HFP audio. It **does** prohibit a new request. This handles asynchronous endpoint snapshot churn without guessing a new UUID.
 5. Respect a competing in-call service's request and protected user route; never reassert after the one target request. Selector recovery is a separate, bounded one-shot UI repair only when exact target audio is absent and the competing endpoint actually owns HFP audio.
 6. Stop periodic sampling at the terminal decision, call removal or service teardown. A failure means the target was **not observed** in the window, not that its speaker never played sound. Post-window device testing is required.
@@ -39,6 +39,7 @@ The owner-supplied redacted trace from 2026-09-26 shows an Android Auto UI outgo
 | Telecom endpoint snapshot changes after request, target SCO arrives | Confirm exact stable HFP audio without retry | Service harness |
 | Delayed audio-mode/communication-device transition | Log context, await target HFP evidence, no AudioManager mutation | Service harness |
 | HFP broadcast missing but proxy changes | Timer re-queries HFP before the deadline | Service harness |
+| Target audio confirmed, then another HFP peer silently takes over | Bounded passive watch records confirmation loss; no reassertion or long-running polling | Service harness and trace analyzer |
 | Request timeout, callback race, external request, protected route | One request; no routing fight | Service harness and seeded core property suite |
 | Long unsuccessful verification and terminal idle | Approximately 16 periodic HFP queries in four seconds; no subsequent periodic work | Deterministic service query budget |
 | Two similar Bluetooth endpoint names, UUID churn, other peer disconnected | Resolve uniquely or fail closed | Core endpoint tests and service harness |
